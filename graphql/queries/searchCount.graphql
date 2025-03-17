@@ -1,0 +1,22 @@
+  query searchProjects_query(
+    $searchParams: ProjectSearchParamsInput!
+    $sort: [SearchSortEnum!]
+    $limit: Int!
+    $offset: Int!
+    ) {
+      searchProjects(limit: $limit, offset: $offset, params: $searchParams, sort: $sort) {
+    total
+    stats {
+    ... on ProjectSearchMeta {
+      searchTime
+      area
+      bbox
+      geoBuckets
+      maxScore
+      metaDataBuckets
+      projectTypes
+    }
+    __typename
+    }    
+  }
+}

@@ -1,0 +1,13 @@
+query requestUploadImage_queries(
+  $token: String!
+) {
+  checkUpload(token: $token) {
+    status
+    data
+    percentComplete
+    projectId
+    errors
+  }
+}
+
+
