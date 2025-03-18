@@ -5,7 +5,7 @@ import argparse
 from time import sleep
 from datetime import datetime, timezone
 from rsxml import Logger, dotenv
-from dump_riverscapes import dump_riverscapes
+from rsapi.lib.dump.dump_riverscapes import dump_riverscapes
 from rsapi import RiverscapesAPI
 
 if __name__ == '__main__':

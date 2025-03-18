@@ -25,6 +25,14 @@ name_lookup = {'RSContext': "RS Context",
 
 
 def clean_tag_string(tags: str) -> list:
+    """ Clean up a tag string
+
+    Args:
+        tags (str): _description_
+
+    Returns:
+        list: _description_
+    """
     return [tag.strip() for tag in tags.split(',')]
 
 

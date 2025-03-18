@@ -5,14 +5,13 @@ Philip Bailey
 """
 from typing import Dict
 import shutil
-import sys
 import re
 import os
 import copy
 import sqlite3
-import argparse
 import uuid
-from rsxml import Logger, dotenv
+from rsxml import Logger
+from rsapi import RiverscapesAPI
 
 # Metric summary methods used in dictionary below
 LENGTH_WEIGHTED_AVG = 'length_weighted_avg'
@@ -23,6 +22,11 @@ MULTIPLIED_BY_AREA = 'multiplied_by_area'
 
 # Sums the segment area for DGOs that have the corresponding metric value equal to zero
 SUM_AREA_ZERO_COUNT = 'sum_area_zero_count'
+
+# RegEx for finding RME and RCAT output GeoPackages
+RME_OUTPUT_GPKG_REGEX = r'.*riverscapes_metrics\.gpkg'
+RCAT_OUTPUT_GPKG_REGEX = r'.*rcat\.gpkg'
+
 
 # These are RME metrics than can be scraped. The items in each Tuple are:
 # 1. The name of the metric in the RME database (not used by this code)
@@ -329,7 +333,7 @@ def continue_with_huc(huc: str, output_db: str) -> bool:
     return False
 
 
-def create_output_db(output_db: str, delete: bool) -> None:
+def create_output_db(output_db: str, delete: bool = False) -> None:
     """ 
     Build the output SQLite database by running the schema file.
     """
@@ -370,42 +374,58 @@ def dict_factory(cursor, row):
     return d
 
 
-def main():
+def scrape_hucs_batch(rs_api: RiverscapesAPI,  projects: Dict[str, str], download_dir: str, output_db: str, delete_downloads: bool) -> None:
     """
-    Scrape RME metrics for a single HUC
+    Loop over all the projects, download the RME and RCAT output GeoPackages, and scrape the statistics
     """
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('huc', help='HUC code for the scrape', type=str)
-    parser.add_argument('rme_gpkg', help='RME output GeoPackage path', type=str)
-    parser.add_argument('--delete', help='Delete the output database if it exists', action='store_true')
-    parser.add_argument('-v', '--verbose', help='Verbose logging', action='store_true')
-    args = dotenv.parse_args_env(parser)
+    log = Logger('Scrape HUC Batch')
 
-    # Initiate the log file
-    log = Logger('RME Scrape')
+    for index, (huc, project_ids) in enumerate(projects.items(), start=1):
+        try:
+            # HUCs that appears in 'hucs' db table are skipped
+            if continue_with_huc(huc, output_db) is not True:
+                continue
 
-    log_dir = os.path.join(os.path.dirname(args.rme_gpkg))
-    log.setup(logPath=os.path.join(log_dir, 'rme_scrape.log'), verbose=args.verbose)
-    log.title(f'RME scrape for HUC: {args.huc}')
+            log.info(f'Scraping RME metrics for HUC {huc} ({index} of {len(projects)})')
+            huc_dir = os.path.join(download_dir, huc)
 
-    if not os.path.isfile(args.rme_gpkg):
-        log.error(f'RME output GeoPackage cannot be found: {args.rme_gpkg}')
-        sys.exit(1)
+            rme_guid = project_ids['rme']
+            rme_gpkg = download_file(rs_api, rme_guid, os.path.join(huc_dir, 'rme'), RME_OUTPUT_GPKG_REGEX)
 
-    # Place the output RME scrape database in the same directory as the RME GeoPackage
-    output_db = os.path.join(os.path.dirname(args.rme_gpkg), 'rme_scrape.sqlite')
-    log.info(f'Output database: {output_db}')
+            rcat_guid = project_ids['rcat']
+            rcat_gpkg = download_file(rs_api, rcat_guid, os.path.join(huc_dir, 'rcat'), RCAT_OUTPUT_GPKG_REGEX)
 
-    try:
-        create_output_db(output_db, args.delete)
-        scrape_huc_statistics(args.huc, args.rme_gpkg, output_db)
-    except Exception as e:
-        log.error(f'Error scraping HUC {args.huc}: {e}')
-        sys.exit(1)
+            raise NotImplementedError('Scraping HUC batch is not implemented yet. FIX THIS ERROR!!!!!')
+            # scrape_huc_statistics(huc, rme_gpkg, rcat_gpkg, output_db)
 
-    log.info('Process complete')
+        except Exception as e:
+            log.error(f'Error scraping HUC {huc}: {e}')
+
+        if delete_downloads is True and os.path.isdir(huc_dir):
+            try:
+                log.info(f'Deleting download directory {huc_dir}')
+                shutil.rmtree(huc_dir)
+            except Exception as e:
+                log.error(f'Error deleting download directory {huc_dir}: {e}')
 
 
-if __name__ == '__main__':
-    main()
+def download_file(rs_api: RiverscapesAPI, project_id: str, download_dir: str, regex: str) -> str:
+    """
+    Download files from a project on Data Exchange that match the regex string
+    Return the path to the downloaded file
+    """
+
+    gpkg_path = get_matching_file(download_dir, regex)
+    if gpkg_path is not None and os.path.isfile(gpkg_path):
+        return gpkg_path
+
+    rs_api.download_files(project_id, download_dir, [regex])
+
+    gpkg_path = get_matching_file(download_dir, regex)
+
+    # Cannot proceed with this HUC if the output GeoPackage is missing
+    if gpkg_path is None or not os.path.isfile(gpkg_path):
+        raise FileNotFoundError(f'Could not find output GeoPackage in {download_dir}')
+
+    return gpkg_path

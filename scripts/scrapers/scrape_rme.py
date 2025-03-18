@@ -16,10 +16,13 @@ import os
 import sqlite3
 import logging
 import argparse
-from osgeo import ogr, osr
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
 from rsapi import RiverscapesAPI, RiverscapesSearchParams
+from rsapi.imports import import_gdal_ogr
+
+# Conditional imports
+gdal, ogr, osr = import_gdal_ogr()
 
 # RegEx for finding the RME output GeoPackages
 RME_OUTPUT_GPKG_REGEX = r'.*riverscapes_metrics\.gpkg'
