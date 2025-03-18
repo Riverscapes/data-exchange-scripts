@@ -1,16 +1,12 @@
 # Riverscapes
 
-A description of your project.
+EXPERIMENTAL. Takes the Riverscapes Graphql API code out of riverscapes-tools for simplicity. 
 
 ## Using UV
 
-When you clone this repo you can get it set up quickly using `uv`. Uv is a tool that helps manage python virtual environments and dependencies. It is an alternative to `pipenv` and `poetry`.
+When you clone this repo you can get it set up quickly using [uv](https://github.com/astral-sh/uv). Uv is a tool that helps manage python virtual environments and dependencies. It is an alternative to `pipenv` and `poetry`.
 
-Make sure you have `uv` installed. You can install it with `pip`:
-
-```bash
-pip install uv
-```
+Make sure you have `uv` installed. See the [installation instructions from uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation) for your operating system. 
 
 Then you can set up the project with the following commands:
 
