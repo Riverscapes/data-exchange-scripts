@@ -17,7 +17,7 @@
   ],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sh bootstrap.sh",
+	"postCreateCommand": "sh .devcontainer/bootstrap.sh",
 	"customizations": {
 		"vscode": {
 			"extensions": [
