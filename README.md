@@ -16,3 +16,9 @@ uv sync
 ```
 
 Now in VSCode you should have a `.venv` folder in the root with the correct python environment set up. If you don't see it immediately try reloading the window or restarting VSCode. You're looking for a version of python at the path: `.venv/bin/python`.
+
+## Codespace instructions
+
+1. Create the codespace labelled "Riverscapes API Codespace"
+2. In VSCode Load the `RiverscapesAPI.code-workspace` workspace
+3. In VSCode make sure to select the appropriate version of python (should show as `3.12.9 ('.venv')`)

@@ -17,7 +17,25 @@
   ],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "uv sync"
+	"postCreateCommand": "sh bootstrap.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"GitHub.codespaces",
+				"GitHub.copilot-chat",
+				"GitHub.copilot",
+				"GraphQL.vscode-graphql",
+				"mhutchie.git-graph",
+				"ms-python.debugpy",
+				"ms-python.isort",
+				"ms-python.pylint",
+				"ms-python.python",
+				"ms-vsliveshare.vsliveshare",
+				"njpwerner.autodocstring",
+				"redhat.vscode-xml"
+			]
+		}
+	}
 
 	// Configure tool-specific properties.
 	// "customizations": {},
