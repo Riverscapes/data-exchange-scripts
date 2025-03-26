@@ -22,7 +22,7 @@ import requests
 from dateutil.parser import parse as dateparse
 from rsxml import Logger, ProgressBar, calculate_etag
 from rsxml.util import safe_makedirs
-from rsapi.classes.riverscapes_helpers import RiverscapesProject, RiverscapesProjectType, RiverscapesSearchParams, format_date
+from pydex.classes.riverscapes_helpers import RiverscapesProject, RiverscapesProjectType, RiverscapesSearchParams, format_date
 
 # Disable all the weird terminal noise from urllib3
 logging.getLogger("urllib3").setLevel(logging.WARNING)

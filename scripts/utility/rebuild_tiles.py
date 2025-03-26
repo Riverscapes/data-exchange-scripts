@@ -10,7 +10,7 @@ import json
 from rsxml import Logger
 from rsxml.util import safe_makedirs
 import inquirer
-from rsapi import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 
 def confirm(msg: str = None):

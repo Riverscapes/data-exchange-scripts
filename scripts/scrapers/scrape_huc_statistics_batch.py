@@ -10,8 +10,8 @@ import logging
 import argparse
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
-from rsapi import RiverscapesAPI
-from rsapi.scrape_huc_statistics import create_output_db, scrape_hucs_batch
+from pydex import RiverscapesAPI
+from pydex.scrape_huc_statistics import create_output_db, scrape_hucs_batch
 
 
 def main():

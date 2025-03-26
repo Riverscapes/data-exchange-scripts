@@ -9,7 +9,7 @@ import inquirer
 from termcolor import colored
 import requests
 from rsxml import Logger
-from rsapi import RiverscapesAPI
+from pydex import RiverscapesAPI
 
 
 def string_same(label: str, local_obj: Dict[str, str], remote_obj: Dict[str, str]) -> bool:

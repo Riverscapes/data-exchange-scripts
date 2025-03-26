@@ -12,7 +12,7 @@ import sqlite3
 import argparse
 import inquirer
 from rsxml import dotenv, Logger, ProgressBar
-from rsapi import RiverscapesAPI
+from pydex import RiverscapesAPI
 
 name_lookup = {'RSContext': "RS Context",
                'ChannelArea': "Channel Area",

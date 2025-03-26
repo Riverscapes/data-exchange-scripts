@@ -7,7 +7,7 @@ from termcolor import colored
 from rsxml import Logger
 from rsxml.util import safe_makedirs
 import inquirer
-from rsapi import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
 
 
 def delete_by_tags(riverscapes_api: RiverscapesAPI):

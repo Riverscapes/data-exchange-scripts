@@ -7,7 +7,7 @@ This script is not in the launch. Use the "run the current file" command in VSCo
 """
 from rsxml import Logger
 import inquirer
-from rsapi import RiverscapesAPI
+from pydex import RiverscapesAPI
 
 
 def add_projects_to_collection(riverscapes_api: RiverscapesAPI, env: str):

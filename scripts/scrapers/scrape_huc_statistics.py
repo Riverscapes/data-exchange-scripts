@@ -7,7 +7,7 @@ import sys
 import os
 import argparse
 from rsxml import Logger, dotenv
-from rsapi.scrape_huc_statistics import scrape_huc_statistics, create_output_db
+from pydex.scrape_huc_statistics import scrape_huc_statistics, create_output_db
 
 
 def main():

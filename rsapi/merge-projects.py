@@ -29,8 +29,8 @@ from rsxml.project_xml import (
     Coords,
     BoundingBox,
 )
-from rsapi.imports import import_gdal_ogr, import_rs_commons
-from rsapi import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
+from pydex.imports import import_gdal_ogr, import_rs_commons
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 name_lookup = {'RSContext': "RS Context",
                'ChannelArea': "Channel Area",

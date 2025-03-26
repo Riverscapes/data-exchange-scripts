@@ -2,7 +2,7 @@ import os
 from rsxml import Logger
 from rsxml.util import safe_makedirs
 import inquirer
-from rsapi import RiverscapesAPI, RiverscapesSearchParams
+from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 
 def download_files(riverscapes_api: RiverscapesAPI):

@@ -11,7 +11,7 @@ import copy
 import sqlite3
 import uuid
 from rsxml import Logger
-from rsapi import RiverscapesAPI
+from pydex import RiverscapesAPI
 
 # Metric summary methods used in dictionary below
 LENGTH_WEIGHTED_AVG = 'length_weighted_avg'

@@ -7,8 +7,8 @@ import os
 import traceback
 import argparse
 from rsxml import Logger, dotenv
-from rsapi import RiverscapesAPI
-from rsapi.lib.dump.dump_riverscapes import dump_riverscapes
+from pydex import RiverscapesAPI
+from pydex.lib.dump.dump_riverscapes import dump_riverscapes
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

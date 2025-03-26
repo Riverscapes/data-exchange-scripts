@@ -3,7 +3,7 @@ import json
 import time
 from rsxml import Logger
 import requests
-from rsapi import RiverscapesAPI
+from pydex import RiverscapesAPI
 
 
 def update_hero_images(riverscapes_api: RiverscapesAPI):

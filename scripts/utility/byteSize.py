@@ -9,7 +9,7 @@ NOTE: We set max_results=1234 on all these queries for demo purposes. You probab
 import os
 import json
 from rsxml import Logger
-from rsapi import RiverscapesAPI, RiverscapesSearchParams
+from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 log = Logger('Search Projects')
 

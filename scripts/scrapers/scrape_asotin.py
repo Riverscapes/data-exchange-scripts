@@ -1,5 +1,5 @@
 import csv
-from rsapi import RiverscapesAPI, RiverscapesSearchParams
+from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 csv_file = "asotin_projects.csv"
 

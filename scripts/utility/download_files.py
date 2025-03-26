@@ -19,7 +19,7 @@
 # from rsxml import safe_makedirs, dotenv, Logger
 # from rsxml.project_xml import GeopackageLayer
 # from rscommons import ShapefileLayer
-# from rsapi import RiverscapesAPI
+# from pydex import RiverscapesAPI
 
 # igo_fields = {
 #     'HUC10': ogr.OFTString,

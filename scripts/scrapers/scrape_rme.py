@@ -18,8 +18,8 @@ import logging
 import argparse
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
-from rsapi import RiverscapesAPI, RiverscapesSearchParams
-from rsapi.imports import import_gdal_ogr
+from pydex import RiverscapesAPI, RiverscapesSearchParams
+from pydex.imports import import_gdal_ogr
 
 # Conditional imports
 gdal, ogr, osr = import_gdal_ogr()

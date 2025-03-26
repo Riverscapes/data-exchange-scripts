@@ -6,7 +6,7 @@ import json
 from rsxml import Logger
 from rsxml.util import safe_makedirs
 import inquirer
-from rsapi import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
 
 
 def add_tag(riverscapes_api: RiverscapesAPI):

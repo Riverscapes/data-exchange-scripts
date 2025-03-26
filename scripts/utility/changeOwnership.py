@@ -6,7 +6,7 @@ import json
 import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-from rsapi import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
 
 
 def change_owner(riverscapes_api: RiverscapesAPI):

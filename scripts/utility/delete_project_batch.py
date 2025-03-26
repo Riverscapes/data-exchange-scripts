@@ -19,8 +19,8 @@ from typing import List
 import argparse
 import inquirer
 from rsxml import dotenv
-from rsapi import RiverscapesAPI
-from rsapi.imports import import_sqlite3
+from pydex import RiverscapesAPI
+from pydex.imports import import_sqlite3
 
 sqlite3 = import_sqlite3()
 

@@ -15,7 +15,7 @@ import logging
 import argparse
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
-from rsapi import RiverscapesAPI, RiverscapesSearchParams
+from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 # RegEx for finding RME and RCAT output GeoPackages
 RME_SCRAPE_GPKG_REGEX = r'.*rme_scrape\.sqlite'

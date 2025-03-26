@@ -1,9 +1,9 @@
 [project]
-name = "riverscapes-api"
+name = "pydex"
 version = "0.1.0"
-description = "Add your description here"
+description = "Client scripts for the Riverscapes Data Exchange API"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.9"
 dependencies = [
     "graphql-core==3.2.6",
     "inquirer==3.4.0",

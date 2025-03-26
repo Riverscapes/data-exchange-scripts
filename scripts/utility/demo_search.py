@@ -11,7 +11,7 @@ import json
 import time
 from rsxml import Logger
 from termcolor import colored
-from rsapi import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 log = Logger('Search Projects')
 

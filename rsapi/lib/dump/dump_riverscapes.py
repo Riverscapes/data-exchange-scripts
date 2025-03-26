@@ -4,8 +4,8 @@ Dumps Riverscapes Data Exchange projects to a SQLite database
 import os
 from datetime import datetime, timezone
 from rsxml import Logger
-from rsapi import RiverscapesAPI, RiverscapesSearchParams
-from rsapi.imports import import_sqlite3
+from pydex import RiverscapesAPI, RiverscapesSearchParams
+from pydex.imports import import_sqlite3
 
 SCHEMA_FILE = os.path.join(os.path.dirname(__file__), 'riverscapes_schema.sql')
 

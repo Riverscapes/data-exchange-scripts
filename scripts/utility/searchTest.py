@@ -4,7 +4,7 @@ import os
 from typing import List
 import json
 import inquirer
-from rsapi import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
 
 
 def change_owner(riverscapes_api: RiverscapesAPI):

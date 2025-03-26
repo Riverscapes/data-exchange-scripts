@@ -7,7 +7,7 @@ import json
 import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-from rsapi import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
 
 
 def changeVis(riverscapes_api: RiverscapesAPI):

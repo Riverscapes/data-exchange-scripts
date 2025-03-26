@@ -1,2 +1,2 @@
-from rsapi.classes.RiverscapesAPI import *
-from rsapi.classes.riverscapes_helpers import *
+from pydex.classes.RiverscapesAPI import *
+from pydex.classes.riverscapes_helpers import *

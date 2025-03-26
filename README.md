@@ -1,6 +1,8 @@
-# Riverscapes
+# Data Exchange Scripts (pydex)
 
 EXPERIMENTAL. Takes the Riverscapes Graphql API code out of riverscapes-tools for simplicity. 
+
+This repo contains the python module called `pydex` for connecting to the Riverscapes Data Exchange API. It also contains a collection of script that use `pydex` classes to do interesting and useful things.
 
 ## Using UV
 

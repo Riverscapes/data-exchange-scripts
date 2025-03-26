@@ -5,7 +5,7 @@ This script is not in the launch. Use the "run the current file" command in VSCo
 import os
 from rsxml import Logger
 import inquirer
-from rsapi import RiverscapesAPI
+from pydex import RiverscapesAPI
 
 
 def create_collection(riverscapes_api: RiverscapesAPI, environment: str):
