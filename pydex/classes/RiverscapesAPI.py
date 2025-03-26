@@ -317,7 +317,7 @@ class RiverscapesAPI:
         Returns:
             str: _description_
         """
-        with open(os.path.join(os.path.dirname(__file__), '..', '..', 'graphql', 'queries', f'{query_name}.graphql'), 'r', encoding='utf-8') as queryFile:
+        with open(os.path.join(os.path.dirname(__file__), '..', 'graphql', 'queries', f'{query_name}.graphql'), 'r', encoding='utf-8') as queryFile:
             return queryFile.read()
 
     def load_mutation(self, mutation_name: str) -> str:
@@ -329,7 +329,7 @@ class RiverscapesAPI:
         Returns:
             str: _description_
         """
-        with open(os.path.join(os.path.dirname(__file__), '..', '..', 'graphql', 'mutations', f'{mutation_name}.graphql'), 'r', encoding='utf-8') as queryFile:
+        with open(os.path.join(os.path.dirname(__file__), '..',  'graphql', 'mutations', f'{mutation_name}.graphql'), 'r', encoding='utf-8') as queryFile:
             return queryFile.read()
 
     def get_project(self, project_id: str):

@@ -1,8 +1,8 @@
 {
   "$schema": "https://unpkg.com/graphql-config@3.3.0/config-schema.json",
-  "schema": "./graphql/riverscapes.schema.graphql",
+  "schema": "./pydex/graphql/riverscapes.schema.graphql",
   "documents": [
-    "./graphql/queries/**/*.graphql",
-    "./graphql/mutations/**/*.graphql"
+    "./pydex/graphql/queries/**/*.graphql",
+    "./pydex/graphql/mutations/**/*.graphql"
   ]
 }

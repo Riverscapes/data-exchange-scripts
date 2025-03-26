@@ -1,2 +1,2 @@
-from pydex.classes.RiverscapesAPI import *
-from pydex.classes.riverscapes_helpers import *
+from pydex.classes.RiverscapesAPI import RiverscapesAPI, RiverscapesAPIException
+from pydex.classes.riverscapes_helpers import RiverscapesSearchParams, RiverscapesProject, RiverscapesProjectType
