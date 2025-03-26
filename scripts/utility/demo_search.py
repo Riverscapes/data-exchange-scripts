@@ -68,7 +68,7 @@ def simple_search(api: RiverscapesAPI):
 
     # EXAMPLE: You can also load search parameters from a json file if you want to keep it out of .git or if it changes frequently
     # ====================================================================================================
-    loaded_search_params = RiverscapesSearchParams.load_from_json(os.path.join(os.path.dirname(__file__), '..', 'inputs', 'DEMO_search.json'))
+    loaded_search_params = RiverscapesSearchParams.load_from_json(os.path.join(os.path.dirname(__file__), '..', '..', 'inputs', 'DEMO_search.json'))
     log.debug(json.dumps(loaded_search_params.to_gql(), indent=2))
 
     # EXAMPLE: Loop over each project and "DO" somewthing with each one

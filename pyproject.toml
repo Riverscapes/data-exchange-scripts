@@ -17,3 +17,9 @@ dependencies = [
     "termcolor==2.5.0",
     "urllib3==2.3.0",
 ]
+
+[project.optional-dependencies]
+geo = [
+    "gdal==3.10.1",
+    "shapely>=2.0.7",
+]

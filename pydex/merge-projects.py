@@ -29,8 +29,10 @@ from rsxml.project_xml import (
     Coords,
     BoundingBox,
 )
-from pydex.imports import import_gdal_ogr, import_rs_commons
+from pydex.imports import import_geo
 from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
+from pydex.raster import Raster
+gdal, ogr, osr, shapely, np = import_geo()
 
 name_lookup = {'RSContext': "RS Context",
                'ChannelArea': "Channel Area",
@@ -40,10 +42,6 @@ name_lookup = {'RSContext': "RS Context",
                'anthro': "ANTHRO",
                'rcat': "RCAT",
                'rs_metric_engine': "Metric Engine"}
-
-gdal, ogr = import_gdal_ogr()
-rscommons = import_rs_commons()
-Raster = rscommons.Raster
 
 
 def merge_projects(projects_lookup: Dict[str, RiverscapesProject], merged_dir: str, name: str, project_type: str, collection_id: str, rs_stage: str, regex_list: List[str], delete_source: bool = False) -> None:
