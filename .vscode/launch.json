@@ -49,10 +49,13 @@
       "name": "📦 Merge Projects Tool",
       "type": "debugpy",
       "request": "launch",
-      "module": "pydex.merge-projects",
+      "program": "${workspaceFolder}/scripts/geo/merge-projects.py",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },      
       "args": [
         "{env:DATA_ROOT}/merge-projects",
       ]
