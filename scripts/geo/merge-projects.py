@@ -31,7 +31,7 @@ from rsxml.project_xml import (
 )
 from pydex.imports import import_geo
 from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
-from pydex.raster import Raster
+from pydex.lib.raster import Raster
 gdal, ogr, osr, shapely, np = import_geo()
 
 name_lookup = {'RSContext': "RS Context",

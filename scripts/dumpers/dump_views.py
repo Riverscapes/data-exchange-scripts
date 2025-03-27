@@ -5,9 +5,7 @@ import os
 import traceback
 import argparse
 import sqlite3
-# from datetime import date
 from rsxml import Logger, dotenv
-# from rsxml import safe_makedirs
 
 
 def dump_views(sqlite_db_path):
@@ -99,7 +97,7 @@ if __name__ == '__main__':
     # Initiate the log file
     logmain = Logger("SQLite Riverscapes Dump")
     logmain.setup(logPath=os.path.join(args.output_db_path,
-              "dump_sqlite.log"), verbose=args.verbose)
+                                       "dump_sqlite.log"), verbose=args.verbose)
 
     try:
         dump_views(args.output_db_path)

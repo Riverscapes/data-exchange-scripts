@@ -127,9 +127,9 @@ wheels = [
 
 [[package]]
 name = "gdal"
-version = "3.10.1"
+version = "3.10.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/98/50/7a528e3ff5a4e6b90a2b39dbcc549a7b45ac40f041e4be06ff272d780be2/gdal-3.10.1.tar.gz", hash = "sha256:ec66a6cf5cd2380d03b1c27f82738732e0f829a95f7f0c81cc61c4bea18a9cda", size = 845809 }
+sdist = { url = "https://files.pythonhosted.org/packages/30/db/6417c83f6e9c4169ebe57cd26e02ad01d1e0dafb9476736481f536c10517/gdal-3.10.2.tar.gz", hash = "sha256:c0cffa8ce9f9c0fa287fcc20b8271c519ca054958420e5880be8bedb432753f4", size = 838054 }
 
 [[package]]
 name = "graphql-core"
@@ -429,7 +429,7 @@ geo = [
 
 [package.metadata]
 requires-dist = [
-    { name = "gdal", marker = "extra == 'geo'", specifier = "==3.10.1" },
+    { name = "gdal", marker = "extra == 'geo'", specifier = ">=3.2.2" },
     { name = "graphql-core", specifier = "==3.2.6" },
     { name = "inquirer", specifier = "==3.4.0" },
     { name = "lxml", specifier = "==5.3.1" },

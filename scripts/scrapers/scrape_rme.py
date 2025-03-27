@@ -19,10 +19,10 @@ import argparse
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
 from pydex import RiverscapesAPI, RiverscapesSearchParams
-from pydex.imports import import_gdal_ogr
+from pydex.imports import import_geo
 
 # Conditional imports
-gdal, ogr, osr = import_gdal_ogr()
+gdal, ogr, osr, shapely, np = import_geo()
 
 # RegEx for finding the RME output GeoPackages
 RME_OUTPUT_GPKG_REGEX = r'.*riverscapes_metrics\.gpkg'

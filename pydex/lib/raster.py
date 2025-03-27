@@ -1,7 +1,7 @@
 from __future__ import annotations
 from os import path
 from pydex.imports import import_geo
-from pydex import Logger
+from rsxml import Logger
 
 gdal, ogr, osr, shapely, np = import_geo()
 

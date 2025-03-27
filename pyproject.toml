@@ -1,25 +1,38 @@
 [project]
 name = "pydex"
 version = "0.1.0"
+authors = [
+    { name = "Matt Reimer", email = "matt@northarrowresearch.com" }
+]
 description = "Client scripts for the Riverscapes Data Exchange API"
 readme = "README.md"
 requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "graphql-core==3.2.6",
-    "inquirer==3.4.0",
-    "lxml==5.3.1",
-    "python-dateutil==2.9.0.post0",
-    "requests==2.32.3",
-    "rsxml==2.0.6",
-    "semver==3.0.4",
-    "setuptools==76.0.0",
-    "six==1.17.0",
-    "termcolor==2.5.0",
-    "urllib3==2.3.0",
+  "graphql-core==3.2.6",
+  "inquirer==3.4.0",
+  "lxml==5.3.1",
+  "python-dateutil==2.9.0.post0",
+  "requests==2.32.3",
+  "rsxml==2.0.6",
+  "semver==3.0.4",
+  "setuptools==76.0.0",
+  "six==1.17.0",
+  "termcolor==2.5.0",
+  "urllib3==2.3.0",
 ]
 
 [project.optional-dependencies]
 geo = [
-    "gdal==3.10.1",
-    "shapely>=2.0.7",
+  "gdal>=3.2.2",
+  "shapely>=2.0.7",
 ]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+pydex = ["**/*.graphql", "**/*.json"]
