@@ -8,6 +8,7 @@ NOTE: We set max_results=1234 on all these queries for demo purposes. You probab
 """
 import os
 import json
+import time
 from rsxml import Logger
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 
@@ -30,10 +31,10 @@ def total_bytes_calc(api: RiverscapesAPI):
     total_projects = 0
     bytes_owner = {}
 
-    log.title("Loop over each project and \"DO\" somewthing with each one")
+    log.title("Loop over each project and \"DO\" something with each one")
 
     # Note how we keep the page size low here because byte size can be a little more expensive to calculate
-    for project, _stats, _total, _prg in api.search(RiverscapesSearchParams({"projectTypeId": "vbet"}), progress_bar=True, page_size=100):
+    for project, _stats, _total, _prg in api.search(RiverscapesSearchParams({"projectTypeId": "vbet"}), progress_bar=True, page_size=100, max_results=1234):
 
         size = project.json['totalSize']
         total_bytes += size
@@ -60,8 +61,10 @@ def total_bytes_calc(api: RiverscapesAPI):
 
 
 if __name__ == '__main__':
-
+    start = time.time()
+    log.debug("Starting...")
     with RiverscapesAPI() as riverscapes_api:
         total_bytes_calc(riverscapes_api)
 
+    log.debug(f"Elapsed time: {time.time() - start:.2f} seconds")
     log.info("Done!")

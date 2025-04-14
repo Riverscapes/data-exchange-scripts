@@ -566,6 +566,8 @@ class RiverscapesAPI:
         Returns:
             _type_: _description_
         """
+        self.log.debug(f"Running query: {query}")
+        self.log.debug(f"With variables: {json.dumps(variables)}")
         headers = {"authorization": "Bearer " + self.access_token} if self.access_token else {}
         request = requests.post(self.uri, json={
             'query': query,

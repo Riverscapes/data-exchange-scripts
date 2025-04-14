@@ -1,0 +1,14 @@
+  query searchCount_query(
+    $limit: Int!
+    $offset: Int!
+    $searchParams: ProjectSearchParamsInput!
+    ) {
+      searchProjects(limit: $limit, offset: $offset, params: $searchParams) {
+    stats {
+    ... on ProjectSearchMeta {
+      projectTypes
+    }
+    __typename
+    }    
+  }
+}

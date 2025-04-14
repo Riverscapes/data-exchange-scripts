@@ -1,0 +1,18 @@
+{
+  __type(name: "Profile") {
+    name
+    description
+    fields {
+      name
+      description
+      type {
+        name
+        kind
+        ofType {
+          name
+          kind
+        }
+      }
+    }
+  }
+}
