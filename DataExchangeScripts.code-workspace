@@ -19,7 +19,9 @@
       "--max-line-length=240"
     ],
     "graphql-config.load.rootDir": "${workspaceFolder}",
-    "python.analysis.extraPaths": ["../../lib/commons"],
+    "python.analysis.extraPaths": [
+      "../../lib/commons"
+    ],
     "python.terminal.activateEnvironment": true,
     "python.testing.pytestEnabled": true,
     "python.testing.unittestEnabled": true,
@@ -42,5 +44,24 @@
       "**/.venv/**": true,
       "**/__pycache__/**": true
     },
+    // spell check settings
+    "cSpell.customDictionaries": {
+      "riverscapesWords": {
+        "name": "riverscapesWords",
+        "path": "./.vscode/riverscapesWords.txt",
+        "scope": "workspace",
+        "addWords": true
+      }
+    },
+    "cSpell.languageSettings": [
+      {
+        // use with Markdown files
+        "languageId": "markdown",
+        // Exclude code.
+        "ignoreRegExpList": [
+          "/^\\s*```[\\s\\S]*?^\\s*```/gm",
+          "`[^`]*?`"
+        ]
+      }
+    }
   }
-}

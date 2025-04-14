@@ -292,6 +292,7 @@ class RiverscapesSearchParams:
             elif self.bbox[0] >= self.bbox[2] or self.bbox[1] >= self.bbox[3]:
                 raise ValueError("bbox must be a list of the form [minLng, minLat, maxLng, maxLat] (your minLng must be less than maxLng and minLat must be less than maxLat)")
 
+        self.log.debug(f"Search parameters: {json.dumps(self.to_gql(), indent=2)}")
         self.log.debug("Search parameters validated Successfully!")
 
     @staticmethod
