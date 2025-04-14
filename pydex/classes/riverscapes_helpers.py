@@ -103,36 +103,37 @@ class RiverscapesProjectType:
 
 class RiverscapesSearchParams:
     """ Search params are a bit of a pain to work with. This class will help us validate the input parameters.
-
-            # search_params = {
-        # keywords: "",          # [String]. Will search inside name, description, summary, meta data keys, metadata values, id and tags
-        # name: "",              # [String]. Will search within the project name only
-        # "editableOnly": True,  # [Boolean] Filter to Only items that I can edit as a user
-        # "createdOn": {
-        #     "from": "2024-01-01T00:00:00Z",
-        # },                     # [SearchDate] Search by date {from, to}. If both from AND to are provided it will search inside a window.
+        Example usage
+        ```
+          search_params = {
+          keywords: "",          # [String]. Will search inside name, description, summary, meta data keys, metadata values, id and tags
+          name: "",              # [String]. Will search within the project name only
+          "editableOnly": True,  # [Boolean] Filter to Only items that I can edit as a user
+          "createdOn": {
+              "from": "2024-01-01T00:00:00Z",
+          },                     # [SearchDate] Search by date {from, to}. If both from AND to are provided it will search inside a window.
         #                                       Otherwise it will search before, or after the date provided in the from or to field respecitvely
-        # "updatedOn": {"from": "" },  [SearchDate] # search by date {from, to}
-        # collection: "ID" # Filter to projects inside a collection
-        # bbox: [minLng, minLat, maxLng, maxLat]
-        # "projectTypeId": "vbet",
-        # "meta": [
-        #     {
-        #         "key": "Runner",
-        #         "value": "Cybercastor",
-        #     },
-        #     # {
-        #     #     "key": "ModelVersion",
-        #     #     "value": "3.2.0",
-        #     # }
-        # ],
-        # "tags": ["tag1", "tag2"],  # AND query for tags
-        # "ownedBy": {
-        #     "id": "USER/ORGID",
-        #     "type": "USER"  # or "ORGANIZATION"
-        # }
-        # }
-
+          "updatedOn": {"from": "" },  [SearchDate] # search by date {from, to}
+          collection: "ID" # Filter to projects inside a collection
+          bbox: [minLng, minLat, maxLng, maxLat]
+          "projectTypeId": "vbet",
+          "meta": [
+              {
+                  "key": "Runner",
+                  "value": "Cybercastor",
+              },
+              # {
+              #     "key": "ModelVersion",
+              #     "value": "3.2.0",
+              # }
+          ],
+          "tags": ["tag1", "tag2"],  # AND query for tags
+          "ownedBy": {
+              "id": "USER/ORGID",
+              "type": "USER"  # or "ORGANIZATION"
+          }
+          }
+        ```
     """
 
     def __init__(self, input_obj):
@@ -283,6 +284,7 @@ class RiverscapesSearchParams:
             elif self.bbox[0] >= self.bbox[2] or self.bbox[1] >= self.bbox[3]:
                 raise ValueError("bbox must be a list of the form [minLng, minLat, maxLng, maxLat] (your minLng must be less than maxLng and minLat must be less than maxLat)")
 
+        self.log.debug(f"Search parameters: {json.dumps(self.to_gql(), indent=2)}")
         self.log.debug("Search parameters validated Successfully!")
 
     @staticmethod
