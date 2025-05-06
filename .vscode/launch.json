@@ -176,6 +176,25 @@
       ]
     },
     {
+      "name": "Scrape RME - NEW Format",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/scrapers/scrape_rme2.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production",
+        "/opt/homebrew/lib/mod_spatialite.8.dylib",
+        "{env:DATA_ROOT}/rme-scrape",
+        "pgb_test_scrape",
+        "RME Scrape Test"
+      ]
+    },
+    {
       "name": "TAGS - batch update project tags",
       "type": "debugpy",
       "request": "launch",
