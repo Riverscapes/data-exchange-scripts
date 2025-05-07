@@ -23,6 +23,7 @@ import json
 import sqlite3
 import logging
 import argparse
+import semver
 import apsw
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
@@ -41,6 +42,8 @@ RME_OUTPUT_GPKG_REGEX = r'.*riverscapes_metrics\.gpkg$'
 RME_BOUNDS_REGEX = r'.*project_bounds\.geojson$'
 RME_PROJECT_REGEX = r'.*project\.rs\.xml$'
 
+MINIMUM_RME_VERSION = '3.0.1'
+
 
 def scrape_rme(rs_stage: str, rs_api: RiverscapesAPI, spatialite_path: str, search_params: RiverscapesSearchParams, download_dir: str, output_gpkg: str, project_name: str, delete_downloads: bool) -> None:
     """
@@ -49,18 +52,18 @@ def scrape_rme(rs_stage: str, rs_api: RiverscapesAPI, spatialite_path: str, sear
 
     log = Logger('Scrape RME')
 
-    # Loop over all projects yielded by the search
-    first_project_xml = None
-    projects_lookup = []
-    for project, _stats, searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
+    projects = {}
+    bounds_gpkg = os.path.join(os.path.dirname(output_gpkg), '..', 'project_bounds.gpkg')
+    for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
         try:
             # Attempt to retrieve the huc10 from the project metadata if it exists
-            huc10 = None
-            for key in ['HUC10', 'huc10', 'HUC', 'huc']:
-                if key in project.project_meta:
-                    value = project.project_meta[key]
-                    huc10 = value if len(value) == 10 else None
-                    break
+            huc10 = get_project_meta_value(project, ['HUC10', 'huc10', 'HUC', 'huc'], 10)
+            version = get_project_meta_value(project, ['ModelVersion', 'Model Version', 'model_version', 'ModelVersion', 'model_version'])
+
+            sem_version = semver.VersionInfo.parse(version) if version else None
+            if sem_version is None or sem_version < semver.VersionInfo.parse(MINIMUM_RME_VERSION):
+                log.warning(f'Skipping project {project.id} with version {version} (less than {MINIMUM_RME_VERSION})')
+                continue
 
             # While this allows for stopping and restarting the script, the output project file will only
             # reflect the latest run of projects.
@@ -68,90 +71,83 @@ def scrape_rme(rs_stage: str, rs_api: RiverscapesAPI, spatialite_path: str, sear
                 continue
 
             log.info(f'Scraping RME metrics for HUC {huc10}')
-            projects_lookup.append(project.id)
+            log.info(f'https://{"staging." if rs_stage == "STAGING" else ""}data.riverscapes.net/p/{project.id}')
             huc_dir = os.path.join(download_dir, huc10)
             safe_makedirs(huc_dir)
-
-            huc_dir = os.path.join(download_dir, huc10)
             rs_api.download_files(project.id, huc_dir, [RME_OUTPUT_GPKG_REGEX, RME_BOUNDS_REGEX, RME_PROJECT_REGEX])
-            rme_gpkg = get_matching_file(huc_dir, RME_OUTPUT_GPKG_REGEX)
+            projects[huc10] = huc_dir
 
-            if not os.path.isfile(output_gpkg):
-                create_gpkg(huc10, rme_gpkg, output_gpkg, spatialite_path)
-                first_project_xml = get_matching_file(huc_dir, RME_PROJECT_REGEX)
-            else:
-                scrape_huc(spatialite_path, huc10, rme_gpkg, output_gpkg)
-                pass
-
+            # append the project bounds to a temporary GeoPackage
             bounds_path = get_matching_file(huc_dir, RME_BOUNDS_REGEX)
-            if not os.path.isfile(bounds_path):
-                raise FileNotFoundError(f"Bounds file not found: {bounds_path}")
-
-            if not os.path.isfile(output_gpkg):
-                raise FileNotFoundError(f"Output GeoPackage not found: {output_gpkg}")
-
-            try:
-                log.info(f'Appending bounds to {output_gpkg}')
-
-                # cmd = "ogr2ogr --version"
-                # output = subprocess.run(cmd, shell=True, check=True, capture_output=True)
-                # print("OUTPUT:", output.stdout.decode("utf-8").strip())
-
-                cmd = f'ogr2ogr -makevalid -append -nln project_bounds "{output_gpkg}" "{bounds_path}"'
+            if os.path.isfile(bounds_path):
+                cmd = f'ogr2ogr -makevalid -append -nln project_bounds "{bounds_gpkg}" "{bounds_path}"'
                 log.debug(f'EXECUTING: {cmd}')
                 subprocess.call([cmd], shell=True, cwd=os.path.dirname(output_gpkg))
-                print('done')
-            except subprocess.CalledProcessError as e:
-                log.error(f'ogr2ogr error: {e}')
-                log.error('STDOUT: %s', e.stdout)
-                log.error('STDERR: %s', e.stderr)
-                raise
-
-            with sqlite3.connect(output_gpkg) as conn:
-                conn.execute(f"INSERT INTO hucs (huc, rme_project_id) VALUES ('{huc10}', '{project.id}')")
-                conn.commit()
-
+            else:
+                log.warning(f'Could not find bounds file for project {project.id} at {bounds_path}')
         except Exception as e:
             log.error(f'Error scraping HUC {huc10}: {e}')
+            continue
 
-        bounds, centroid, bounding_rect = get_bounds(output_gpkg, spatialite_path)
+    log.info(f'Found {len(projects)} projects to scrape')
+    first_project_xml = None
+    for huc10, huc_dir in projects.items():
+        rme_gpkg = get_matching_file(huc_dir, RME_OUTPUT_GPKG_REGEX)
+        if not os.path.isfile(output_gpkg):
+            create_gpkg(huc10, rme_gpkg, output_gpkg, spatialite_path)
+            first_project_xml = get_matching_file(huc_dir, RME_PROJECT_REGEX)
+        else:
+            scrape_huc(spatialite_path, huc10, rme_gpkg, output_gpkg)
 
-        output_geojson_path = os.path.join(os.path.dirname(output_gpkg), 'project_bounds.geojson')
-        with open(output_geojson_path, "w", encoding='utf8') as f:
-            json.dump(bounds, f, indent=2)
+    # Build the bounds for the new RME scrape project
+    bounds, centroid, bounding_rect = get_bounds(bounds_gpkg, spatialite_path)
 
-        if delete_downloads is True and os.path.isdir(huc_dir):
-            try:
-                log.info(f'Deleting download directory {huc_dir}')
-                shutil.rmtree(huc_dir)
-            except Exception as e:
-                log.error(f'Error deleting download directory {huc_dir}: {e}')
+    output_bounds_path = os.path.join(os.path.dirname(output_gpkg), 'project_bounds.geojson')
+    with open(output_bounds_path, "w", encoding='utf8') as f:
+        json.dump(bounds, f, indent=2)
 
-        # build a riverscapes project
-        if not os.path.isfile(first_project_xml):
-            raise FileNotFoundError(f"First Project XML file not found: {first_project_xml}")
+    if delete_downloads is True and os.path.isdir(huc_dir):
+        try:
+            log.info(f'Deleting download directory {huc_dir}')
+            shutil.rmtree(huc_dir)
+        except Exception as e:
+            log.error(f'Error deleting download directory {huc_dir}: {e}')
 
-        # Generate a new project.rs.xml file for the merged project based
-        # on the first project in the list
-        merge_project = Project.load_project(first_project_xml)
-        merge_project.name = project_name
+    # build a riverscapes project
+    if first_project_xml is None or not os.path.isfile(first_project_xml):
+        raise FileNotFoundError(f"First Project XML file not found: {first_project_xml}")
 
-        merge_project.description = f"""This project was generated by scraping metrics from {len(searchtotal)} Riverscapes Metric Engine projects together,
-            using the scrape_rme2.py script.  The project bounds are the union of the bounds of the individual projects."""
+    # Generate a new project.rs.xml file for the merged project based
+    # on the first project in the list
+    merge_project = Project.load_project(first_project_xml)
+    merge_project.name = project_name
+    merge_project.prject_type = 'igos'
 
-        coords = Coords(centroid[0], centroid[1])
-        bounding_box = BoundingBox(bounding_rect[0], bounding_rect[2], bounding_rect[1], bounding_rect[3])
-        output_bounds_path = os.path.join(os.path.dirname(output_gpkg), 'project_bounds.geojson')
-        merge_project.bounds = ProjectBounds(coords, bounding_box, os.path.basename(output_bounds_path))
+    merge_project.description = f"""This project was generated by scraping metrics from {len(projects)} Riverscapes Metric Engine projects together,
+        using the scrape_rme2.py script.  The project bounds are the union of the bounds of the individual projects."""
 
-        project_urls = [f'https://{"staging." if rs_stage == "STAGING" else ""}data.riverscapes.net/p/{project.id}' for proj_path, project in projects_lookup]
+    coords = Coords(centroid[0], centroid[1])
+    bounding_box = BoundingBox(bounding_rect[0], bounding_rect[2], bounding_rect[1], bounding_rect[3])
+    merge_project.bounds = ProjectBounds(coords, bounding_box, os.path.basename(output_bounds_path))
+    merge_project.meta_data = MetaData([Meta('Date Created',  str(datetime.now().isoformat()), type='isodate', ext=None)])
+    # merge_project.meta_data.add_meta('Date Created', str(datetime.now().isoformat()), meta_type='isodate', ext=None)
+    merge_project.warehouse = None
 
-        merge_project.meta_data = MetaData([Meta('projects', json.dumps(project_urls), 'json', None)])
-        merge_project.meta_data.add_meta('Date Created', str(datetime.now().isoformat()), meta_type='isodate', ext=None)
-        merge_project.warehouse = None
+    merged_project_xml = os.path.join(os.path.dirname(output_gpkg), 'project.rs.xml')
+    merge_project.write(merged_project_xml)
 
-        merged_project_xml = os.path.join(os.path.dirname(output_gpkg), 'project.rs.xml')
-        merge_project.write(merged_project_xml)
+
+def get_project_meta_value(project: Project, keys: List[str], required_length: int = None) -> str:
+    """
+    Get the value of a metadata item from a project.
+    """
+    for key in keys:
+        if key in project.project_meta:
+            value = project.project_meta[key]
+            if required_length is None or len(value) == required_length:
+                return value
+
+    return None
 
 
 def get_bounds(output_gpkg: str, spatialite_path: str) -> Tuple[str, str, str]:
@@ -162,22 +158,23 @@ def get_bounds(output_gpkg: str, spatialite_path: str) -> Tuple[str, str, str]:
     curs = conn.cursor()
     curs.execute('''
         SELECT AsGeoJSON(union_geom) AS geojson,
-            ST_Centroind(union_geom),
+            ST_X(ST_Centroid(union_geom)),
+            ST_Y(ST_Centroid(union_geom)),
             ST_MinX(union_geom),
             ST_MinY(union_geom),
             ST_MaxX(union_geom),
             ST_MaxY(union_geom) FROM (
-                SELECT ST_Union(geom) union_geom project_bounds
+                SELECT ST_Buffer(ST_Union(ST_Buffer(CastAutomagic(geom), 0.001)), -0.001) union_geom FROM project_bounds
             )''')
 
     bounds_row = curs.fetchone()
     geojson_geom = json.loads(bounds_row[0])
-    centroid = json.loads(bounds_row[1])
+    centroid = (bounds_row[1], bounds_row[2])
     bounding_box = [
-        bounds_row[2],
         bounds_row[3],
         bounds_row[4],
-        bounds_row[5]
+        bounds_row[5],
+        bounds_row[6]
     ]
 
     geojson_output = {
@@ -428,11 +425,11 @@ def main():
     # Set up some reasonable folders to store things
     working_folder = args.working_folder
     download_folder = os.path.join(working_folder, 'downloads')
-    output_gpkg = os.path.join(working_folder, 'rme_scrape.gpkg')
+    output_gpkg = os.path.join(working_folder, 'project', 'riverscapes_metrics.gpkg')
+    safe_makedirs(os.path.dirname(output_gpkg))
 
-    safe_makedirs(working_folder)
     log = Logger('Setup')
-    log.setup(log_path=os.path.join(working_folder, 'rme-scrape.log'), log_level=logging.DEBUG)
+    log.setup(log_path=os.path.join(os.path.dirname(output_gpkg), 'rme-scrape.log'), log_level=logging.DEBUG)
 
     # Data Exchange Search Params
     search_params = RiverscapesSearchParams({
