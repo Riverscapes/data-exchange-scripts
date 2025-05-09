@@ -41,7 +41,6 @@ cd data-exchange-scripts
 
 # Sync the environment using uv
 uv sync
-uv pip install -e .
 ```
 
 This will create a `.venv` folder in the root of the repository with the correct Python environment and dependencies installed.
