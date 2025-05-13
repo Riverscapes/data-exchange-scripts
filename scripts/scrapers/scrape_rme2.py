@@ -501,12 +501,26 @@ def clean_up_gpkg(output_gpkg: str, spatialite_path: str) -> None:
     curs.execute('ALTER TABLE dgos DROP COLUMN rme_fid')
 
     # Create the views using the IGO geometry and DGO metrics
-    curs.execute("SELECT name FROM sqlite_master WHERE (type = 'table') AND (name LIKE 'dgo_%') and (name != 'DGOVegetation');")
+    curs.execute("SELECT name FROM sqlite_master WHERE (type = 'table') AND (name LIKE 'dgo_%') and (name != 'DGOVegetation') and (name != 'dgos');")
     dgo_tables = [row[0] for row in curs.fetchall()]
 
     # Get the columns from the dgos table
     curs.execute('PRAGMA table_info(dgos)')
     dgo_cols = ['dgos.' + col[1] for col in curs.fetchall() if col[1] != 'dgoid' and col[1] != 'DGOID']
+
+    curs.execute('''
+        CREATE VIEW vw_dgo_metrics AS
+        SELECT dgo_desc.*, dgo_geomorph.*, dgo_veg.*, dgo_hydro.*, dgo_impacts.*, dgo_beaver.*, igos.geom, dgos.level_path, dgos.seg_distance, dgos.centerline_length, dgos.segment_area, dgos.FCode
+        FROM dgo_desc
+        INNER JOIN dgo_geomorph ON dgo_desc.dgoid = dgo_geomorph.dgoid
+        INNER JOIN dgo_veg ON dgo_desc.dgoid = dgo_veg.dgoid
+        INNER JOIN dgo_hydro ON dgo_desc.dgoid = dgo_hydro.dgoid
+        INNER JOIN dgo_impacts ON dgo_desc.dgoid = dgo_impacts.dgoid
+        INNER JOIN dgo_beaver ON dgo_desc.dgoid = dgo_beaver.dgoid
+        INNER JOIN dgos ON dgo_desc.dgoid = dgos.dgoid
+        INNER JOIN igos ON dgos.huc10 = igos.huc10 AND dgos.level_path = igos.level_path AND dgos.seg_distance = igos.seg_distance
+    ''')
+    new_views = ['vw_dgo_metrics']
 
     for dgo_table in dgo_tables:
         # Get the columns of the dgo side table
@@ -515,6 +529,7 @@ def clean_up_gpkg(output_gpkg: str, spatialite_path: str) -> None:
 
         # Create the view using the IGO geometry and DGO metrics
         view_name = f'vw_{dgo_table}_metrics'
+        new_views.append(view_name)
         curs.execute(f'''
             CREATE VIEW {view_name} AS
             SELECT igos.igoid,
@@ -524,14 +539,15 @@ def clean_up_gpkg(output_gpkg: str, spatialite_path: str) -> None:
             FROM {dgo_table} t INNER JOIN dgos ON t.dgoid=dgos.dgoid INNER JOIN igos ON dgos.huc10=igos.huc10 AND dgos.level_path=igos.level_path AND dgos.seg_distance=igos.seg_distance
         ''')
 
+    for view_name in new_views:
         curs.execute('''
             INSERT INTO gpkg_contents (table_name, data_type, identifier, min_x, min_y, max_x, max_y)
-            SELECT ?, 'features', ?, min_x, min_y, max_x, max_y FROM gpkg_contents WHERE table_name = 'igos'
+            SELECT ?, 'features', ?, min_x, min_y, max_x, max_y FROM gpkg_contents WHERE table_name='igos'
         ''', [view_name, view_name])
 
         curs.execute('''
             INSERT INTO gpkg_geometry_columns (table_name, column_name, geometry_type_name, srs_id, z, m)
-            SELECT ?, 'geom', 'POINT', 4326, 0, 0 FROM gpkg_geometry_columns WHERE table_name = 'igos'
+            SELECT ?, 'geom', 'POINT', 4326, 0, 0 FROM gpkg_geometry_columns WHERE table_name='igos'
         ''', [view_name])
 
     curs.execute('VACUUM')
