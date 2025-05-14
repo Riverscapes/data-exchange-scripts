@@ -190,9 +190,6 @@
         "production",
         "/opt/homebrew/lib/mod_spatialite.8.dylib",
         "{env:DATA_ROOT}/rme-scrape",
-        // "pgb_test_scrape",
-        "Idaho",
-        "RME Scrape Test of LCT"
       ]
     },
     {

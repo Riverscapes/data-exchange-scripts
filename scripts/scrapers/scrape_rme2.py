@@ -25,6 +25,7 @@ import logging
 import argparse
 import semver
 import apsw
+import inquirer
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
 from rsxml.project_xml import (
@@ -50,7 +51,7 @@ RME_PROJECT_REGEX = r'.*project\.rs\.xml$'
 MINIMUM_RME_VERSION = '3.0.1'
 
 
-def scrape_rme(rs_stage: str, rs_api: RiverscapesAPI, log_path: str, spatialite_path: str, search_params: RiverscapesSearchParams, download_dir: str, project_dir: str, project_name: str, delete_downloads: bool) -> None:
+def scrape_rme(rs_stage: str, rs_api: RiverscapesAPI, log_path: str, spatialite_path: str, search_params: RiverscapesSearchParams, download_dir: str, project_dir: str, project_name: str, delete_downloads: bool, min_rme_version) -> None:
     """
     Download RME output GeoPackages from Data Exchange and scrape the metrics into a single GeoPackage
     """
@@ -59,6 +60,10 @@ def scrape_rme(rs_stage: str, rs_api: RiverscapesAPI, log_path: str, spatialite_
 
     projects = {}
     bounds_gpkg = os.path.join(os.path.dirname(os.path.dirname(project_dir)), 'project_bounds.gpkg')
+    if os.path.isfile(bounds_gpkg):
+        # delete the file if it exists
+        os.remove(bounds_gpkg)
+
     output_gpkg = os.path.join(project_dir, 'outputs', 'riverscapes_metrics.gpkg')
     safe_makedirs(os.path.dirname(output_gpkg))
     for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
@@ -68,8 +73,8 @@ def scrape_rme(rs_stage: str, rs_api: RiverscapesAPI, log_path: str, spatialite_
             version = get_project_meta_value(project, ['ModelVersion', 'Model Version', 'model_version', 'ModelVersion', 'model_version'])
 
             sem_version = semver.VersionInfo.parse(version) if version else None
-            if sem_version is None or sem_version < semver.VersionInfo.parse(MINIMUM_RME_VERSION):
-                log.warning(f'Skipping project {project.id} with version {version} (less than {MINIMUM_RME_VERSION})')
+            if sem_version is None or sem_version < semver.VersionInfo.parse(min_rme_version):
+                log.warning(f'Skipping project {project.id} with version {version} (less than {min_rme_version})')
                 continue
 
             # While this allows for stopping and restarting the script, the output project file will only
@@ -561,11 +566,27 @@ def main():
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('spatialite_path', help='Path to the mod_spatialite library', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
-    parser.add_argument('tags', help='Data Exchange tags to search for projects', type=str)
-    parser.add_argument('project_name', help='Name for the output project', type=str)
-    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
-    parser.add_argument('--huc_filter', help='HUC filter begins with (e.g. 14)', type=str, default='')
     args = dotenv.parse_args_env(parser)
+
+    initial_answers = inquirer.prompt([
+        inquirer.Text('project-name', message='Output RME scrape project name?', default='rme-scrape-project'),
+        inquirer.Text('rme-version', message='Minimum RME version?', default=MINIMUM_RME_VERSION),
+        inquirer.List('delete', message='Delete downloaded GeoPackages?', choices=['Yes', 'No'], default='Yes'),
+        inquirer.List('selection-method', message='Select by Tag or Collection?', choices=['Tag', 'Collection'], default='Collection')
+    ])
+
+    search_params = RiverscapesSearchParams({
+        'projectTypeId': 'rs_metric_engine',
+    })
+
+    if initial_answers['selection-method'] == 'Collection':
+        collection_answer = inquirer.prompt([inquirer.Text('collection', message='Collection guid?')])
+        search_params.collection = collection_answer['collection']
+    elif initial_answers['selection-method'] == 'Tag':
+        tag_answer = inquirer.prompt([inquirer.Text('tags', message='Data Exchange comma separated tags to search for projects')])
+        search_params.tags = tag_answer['tags'].split(',')
+    else:
+        raise ValueError('Invalid selection method')
 
     # Set up some reasonable folders to store things
     working_folder = args.working_folder
@@ -577,20 +598,8 @@ def main():
     log_path = os.path.join(project_dir, 'rme-scrape.log')
     log.setup(log_path=log_path, log_level=logging.DEBUG)
 
-    # Data Exchange Search Params
-    search_params = RiverscapesSearchParams({
-        'tags': args.tags.split(','),
-        'projectTypeId': 'rs_metric_engine',
-    })
-
-    # Optional HUC filter
-    if args.huc_filter != '' and args.huc_filter != '.':
-        search_params.meta = {
-            "HUC": args.huc_filter
-        }
-
     with RiverscapesAPI(stage=args.stage) as api:
-        scrape_rme(args.stage, api, log_path, args.spatialite_path, search_params, download_folder, project_dir, args.project_name, args.delete)
+        scrape_rme(args.stage, api, log_path, args.spatialite_path, search_params, download_folder, project_dir, initial_answers['project-name'], initial_answers['delete'] == 'Yes', min_rme_version=initial_answers['rme-version'])
 
     log.info('Process complete')
 
