@@ -1252,5 +1252,31 @@
     "url": "https://konradhafen.github.io/beaver-dam-water-storage/index.html",
     "machineName": "BDWS",
     "state": "ACTIVE"
+  },
+  {
+    "name": "Grazing",
+    "summary": "GRAZING SUMMARY",
+    "description": "GRAZING DESCRIPTION.",
+    "meta": [
+      {
+        "key": "Resolution",
+        "value": "Reach,Cell"
+      },
+      {
+        "key": "Extent",
+        "value": "Reach"
+      },
+      {
+        "key": "Model Status",
+        "value": "Research Grade"
+      },
+      {
+        "key": "Riverscapes Project Class",
+        "value": "Model Output"
+      }
+    ],
+    "url": null,
+    "machineName": "Grazing",
+    "state": "ACTIVE"
   }
 ]
