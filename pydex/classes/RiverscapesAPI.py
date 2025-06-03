@@ -30,6 +30,7 @@ logging.getLogger("urllib3").propagate = False
 
 CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
 LOCAL_PORT = 4721
+ALT_PORT = 4723
 LOGIN_SCOPE = 'openid'
 
 AUTH_DETAILS = {
@@ -67,6 +68,10 @@ class RiverscapesAPI:
         self.dev_headers = dev_headers
         self.access_token = None
         self.token_timeout = None
+
+        # If the RSAPI_ALTPORT environment variable is set then we use an alternative port for authentication
+        # This is useful for keeping a local environment unblocked while also using this code inside a codespace
+        self.auth_port = LOCAL_PORT if not os.environ.get('RSAPI_ALTPORT') else ALT_PORT
 
         if self.stage.upper() == 'PRODUCTION':
             self.uri = 'https://api.data.riverscapes.net'
@@ -204,8 +209,7 @@ class RiverscapesAPI:
             code_verifier = self._generate_random(128)
             code_challenge = self._generate_challenge(code_verifier)
             state = self._generate_random(32)
-
-            redirect_url = f"http://localhost:{LOCAL_PORT}/rscli/"
+            redirect_url = f"http://localhost:{self.auth_port}/rscli/"
             login_url = urlparse(f"https://{AUTH_DETAILS['domain']}/authorize")
             query_params = {
                 "client_id": AUTH_DETAILS["clientId"],
@@ -295,7 +299,7 @@ class RiverscapesAPI:
                     # Now shut down the server and return
                     self.stop()
 
-        server = ThreadingHTTPServer(("localhost", LOCAL_PORT), AuthHandler)
+        server = ThreadingHTTPServer(("localhost", self.auth_port), AuthHandler)
         # Keep the server running until it is manually stopped
         try:
             print("Starting server to wait for auth, use <Ctrl-C> to stop")
@@ -577,7 +581,7 @@ class RiverscapesAPI:
                     self.refresh_token()
                     self.log.debug("   done. Re-trying query...")
                     return self.run_query(query, variables)
-                raise RiverscapesAPIException(f"Query failed to run by returning code of {request.status_code}. ERRORS: {json.dumps(resp_json, indent=4, sort_keys=True)}")
+
             else:
                 # self.last_pass = True
                 # self.retry = 0

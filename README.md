@@ -71,6 +71,26 @@ brew install gdal
 - **Dependency Management**: Use `uv sync` to ensure your environment is always up-to-date with the dependencies specified in `pyproject.toml`.
 
 
+## Port Conflicts
+
+This project uses port `4721` to authenticate locally and `4723` when used inside a codespace. This may conflict with other codespaces (such as `riverscapes-tools`).
+
+## Using this Repository from other places
+
+If you want to use this repository as a dependency in another project you can do so by adding it to your `pyproject.toml` file. For example:
+
+```toml
+[tool.uv.sources]
+pydex = { git = "https://github.com/Riverscapes/data-exchange-scripts.git", branch = "main" }
+```
+
+For legacy projects that use `pip` you can install it directly from the repository:
+
+```bash
+pip install git+https://github.com/Riverscapes/data-exchange-scripts.git
+```
+
+
 ## Contributing
 
 Contributions are welcome! Please follow these steps:

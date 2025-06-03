@@ -7,13 +7,18 @@
 	"features": {
 		"ghcr.io/va-h/devcontainers-features/uv:1": {}
 	},
+  "containerEnv": {
+    // Tell The API to use a different port inside codespaces so that it doesn't conflict with the user's root machine use
+    "RSAPI_ALTPORT": "TRUE"
+  },
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [
-    4721
+    // Note that we are usign the alternate port for authentication (we use 4721 outside the codespace)
+    4723
   ],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
