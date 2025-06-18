@@ -94,14 +94,14 @@ def rebuild_web_tiles(riverscapes_api: RiverscapesAPI):
         riverscapes_api.run_query(mutation_script, mutation_params)
 
     else:
-        search_params = RiverscapesSearchParams({"projectTypeId": "rcat"})
-        confirm(f"Ready to search for projects using search params: \n {json.dumps(search_params, indent=2)}. \n\n IF THIS IS NOT WHAT YOU WANT, HIT CTRL-C NOW!")
+        search_params = RiverscapesSearchParams({"projectTypeId": "topo"})
+        confirm(f"Ready to search for projects using search params: \n {search_params.to_gql()}. \n\n IF THIS IS NOT WHAT YOU WANT, HIT CTRL-C NOW!")
 
         changeable_projects: List[RiverscapesProject] = []
         total = 0
         for project, _stats, search_total, _prg in riverscapes_api.search(search_params, progress_bar=True):
             total = search_total
-            changeable_projects.append(project['item'])
+            changeable_projects.append(project)
 
         # Now write all projects to a log file as json
         logpath = os.path.join(logdir, 'rebuild_tiles.json')
@@ -109,12 +109,12 @@ def rebuild_web_tiles(riverscapes_api: RiverscapesAPI):
             f.write(json.dumps([x.json for x in changeable_projects]))
 
         # Ask the user to confirm using inquirer
-        confirm(f"Found {len(changeable_projects)} out of {total} projects to change rebuilt web tiles")
+        confirm(f"Found {len(changeable_projects)} out of {total} projects to change rebuilt web tiles.\n\n IF THIS IS NOT WHAT YOU WANT, HIT CTRL-C NOW!")
 
         # Now rebuilt web tiles all projects
         for project in changeable_projects:
-            print(f"Rebuilding web tiles of project: {project['name']} with id: {project['id']}")
-            mutation_params['projectId'] = project['id']
+            print(f"Rebuilding web tiles of project: {project.name} with id: {project.id}")
+            mutation_params['projectId'] = project.id
             riverscapes_api.run_query(mutation_script, mutation_params)
 
     log.info("Done!")

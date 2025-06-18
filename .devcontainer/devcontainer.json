@@ -17,8 +17,10 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [
-    // Note that we are usign the alternate port for authentication (we use 4721 outside the codespace)
-    4723
+    // Note that we are usign the alternate ports for authentication (we use 4721 outside the codespace)
+    4723,
+    // This is cybercastor's alternate port for the API (4722 outside the codespace)
+    4724
   ],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
