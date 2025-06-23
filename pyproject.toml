@@ -13,6 +13,7 @@ classifiers = [
 ]
 dependencies = [
   "apsw>=3.49.1.0",
+  "boto3>=1.7.84",
   "graphql-core==3.2.6",
   "inquirer==3.4.0",
   "lxml==5.3.1",

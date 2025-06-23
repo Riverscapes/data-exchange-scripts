@@ -192,6 +192,29 @@
         "{env:DATA_ROOT}/rme-scrape",
       ]
     },
+
+     {
+      "name": "RME to Athena",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/geo/rme_to_athena.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production",
+        "/opt/homebrew/lib/mod_spatialite.8.dylib",
+        "rme-athena",
+        "{env:DATA_ROOT}/rme-athena",
+        "UpperCO",
+        "--delete",
+      ]
+    },
+
+
     {
       "name": "TAGS - batch update project tags",
       "type": "debugpy",
