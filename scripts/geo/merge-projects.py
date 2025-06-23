@@ -53,7 +53,8 @@ def merge_projects(projects_lookup: Dict[str, RiverscapesProject], merged_dir: s
     log.info(f'Merging {len(projects_lookup)} project(s)')
 
     project_rasters = {}
-    project_vectors = {}
+    geopkge_vectors = {}
+    shpfile_vectors = {}
     bounds_geojson_files = []
 
     first_project_xml = None
@@ -65,12 +66,14 @@ def merge_projects(projects_lookup: Dict[str, RiverscapesProject], merged_dir: s
             continue
         first_project_xml = project_xml
 
-        get_raster_datasets(project_xml, project_rasters, regex_list)
-        get_vector_datasets(project_xml, project_vectors, regex_list)
+        # get_raster_datasets(project_xml, project_rasters, regex_list)
+        # get_geopackage_datasets(project_xml, project_vectors, regex_list)
+        get_shapefile_datasets(project_xml, shpfile_vectors, regex_list)
         get_bounds_geojson_file(project_xml, bounds_geojson_files)
 
     process_rasters(project_rasters, merged_dir, delete_source=delete_source)
-    process_vectors(project_vectors, merged_dir)
+    process_gpk_vectors(geopkge_vectors, merged_dir)
+    process_shp_vectors(shpfile_vectors, merged_dir)
 
     # build union of project bounds
     output_bounds_path = os.path.join(merged_dir, 'project_bounds.geojson')
@@ -118,7 +121,7 @@ def delete_unmerged_paths(merged_project_xml):
     parent_map = {c: p for p in root.iter() for c in p}
 
     for path_element in tree.findall('.//Path'):
-        file_ext = ['gpkg', 'geojson', 'tif', 'tiff', 'log']
+        file_ext = ['gpkg', 'geojson', 'tif', 'tiff', 'log', 'shp']
         matches = [ext for ext in file_ext if path_element.text.lower().endswith(ext)]
         if len(matches) == 0:
             log.info(f'Removing non GeoPackage, raster or log with contents {path_element.text}')
@@ -219,7 +222,7 @@ def get_bounds_geojson_file(project_xml_path: str, bounds_files):
         bounds_files.append(abs_path)
 
 
-def get_vector_datasets(project_xml_path: str, master_project: Dict, regex_list) -> None:
+def get_geopackage_datasets(project_xml_path: str, master_project: Dict, regex_list) -> None:
     """
     Discover all the vector datasets in the project.rs.xml file and incorporate them
     intro the master project dictionary.
@@ -227,7 +230,7 @@ def get_vector_datasets(project_xml_path: str, master_project: Dict, regex_list)
     master_project: Dict - The master list of GeoPackages and feature classes
     """
 
-    log = Logger('Vectors')
+    log = Logger('GeoPackages')
 
     tree = ET.parse(project_xml_path)
     # find each geopackage in the project
@@ -254,7 +257,44 @@ def get_vector_datasets(project_xml_path: str, master_project: Dict, regex_list)
             master_project[gpkg_id]['layers'][fc_name]['occurences'].append({'path': os.path.join(os.path.dirname(project_xml_path), path)})
 
 
-def process_vectors(master_project: Dict, output_dir: str) -> None:
+def get_shapefile_datasets(project_xml_path: str, master_project: Dict, regex_list) -> None:
+    """
+    Discover all the vector datasets in the project.rs.xml file and incorporate them
+    intro the master project dictionary.
+    project: str - Path to the project.rs.xml file
+    master_project: Dict - The master list of GeoPackages and feature classes
+    """
+
+    log = Logger('ShapeFiles')
+
+    tree = ET.parse(project_xml_path)
+
+    # ET does not provide a way to get the parent of an element, so we create a map
+    root = tree.getroot()
+    parent_map = {c: p for p in root.iter() for c in p}
+
+    # find each geopackage in the project
+    for shapefile in tree.findall('.//Vector'):
+
+        # Skip any GeoPackage vector datasets
+        if 'geopackage' == parent_map.get(parent_map.get(shapefile, ''), '').tag.lower():
+            continue
+
+        shp_id = shapefile.attrib['id']
+        path = shapefile.find('Path').text
+        name = shapefile.find('Name').text
+
+        if not any([re.compile(x, re.IGNORECASE).match(path) for x in regex_list]):
+            log.info(f'Skipping non-regex raster {name} with path {path}')
+            continue
+
+        if (shp_id not in master_project):
+            master_project[shp_id] = {'rel_path': path, 'abs_path': os.path.join(os.path.dirname(project_xml_path), path), 'name': name, 'id': shp_id, 'occurences': []}
+
+        master_project[shp_id]['occurences'].append({'path': os.path.join(os.path.dirname(project_xml_path), path)})
+
+
+def process_gpk_vectors(master_project: Dict, output_dir: str) -> None:
     """
     Process the vector datasets in the master project dictionary.  This will
     merge all the vector datasets within each GeoPackage into new GeoPackages
@@ -287,6 +327,38 @@ def process_vectors(master_project: Dict, output_dir: str) -> None:
                 cmd = f'ogr2ogr -f GPKG -makevalid -append  -nln {feature_class} "{output_gpkg_file}" "{input_gpkg_file}" {feature_class}'
                 log.debug(f'EXECUTING: {cmd}')
                 subprocess.call([cmd], shell=True, cwd=output_gpkg_dir)
+
+
+def process_shp_vectors(master_project: Dict, output_dir: str) -> None:
+    """
+    Process the vector datasets in the master project dictionary.  This will
+    merge all the vector datasets within each ShapeFile into new ShapeFiles
+    in the output directory.
+    master_project: Dict - The master list of shapefiles and feature classes
+    output_dir: str - The top level output directory
+    """
+
+    log = Logger('Vectors')
+
+    for shp_info in master_project.values():
+        log.info(f'Processing {shp_info["name"]} ShapeFile at {shp_info["rel_path"]} with {len(shp_info["occurences"])} layers.')
+
+        # output ShapeFile
+        output_shp = os.path.join(output_dir, shp_info['rel_path'])
+        output_shp_dir = os.path.dirname(output_shp)
+        safe_makedirs(output_shp_dir)
+
+        if os.path.isfile(output_shp):
+            os.remove(output_shp)
+
+        for input_shp in shp_info['occurences']:
+            input_shp_file = input_shp['path']
+
+            # -nlt {geometry_type}
+            input_shp_file = input_shp['path']
+            cmd = f'ogr2ogr -f "ESRI Shapefile" -makevalid -append "{output_shp}" "{input_shp_file}"'
+            log.debug(f'EXECUTING: {cmd}')
+            subprocess.call([cmd], shell=True, cwd=output_shp_dir)
 
 
 def process_rasters(master_project: Dict, output_dir: str, delete_source: bool = False) -> None:
