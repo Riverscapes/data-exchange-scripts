@@ -66,8 +66,8 @@ def merge_projects(projects_lookup: Dict[str, RiverscapesProject], merged_dir: s
             continue
         first_project_xml = project_xml
 
-        # get_raster_datasets(project_xml, project_rasters, regex_list)
-        # get_geopackage_datasets(project_xml, project_vectors, regex_list)
+        get_raster_datasets(project_xml, project_rasters, regex_list)
+        get_geopackage_datasets(project_xml, geopkge_vectors, regex_list)
         get_shapefile_datasets(project_xml, shpfile_vectors, regex_list)
         get_bounds_geojson_file(project_xml, bounds_geojson_files)
 
