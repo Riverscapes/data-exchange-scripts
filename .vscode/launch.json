@@ -57,6 +57,7 @@
         "PYTHONPATH": "${workspaceFolder}"
       },      
       "args": [
+        "production", // staging
         "{env:DATA_ROOT}/merge-projects",
       ]
     },
