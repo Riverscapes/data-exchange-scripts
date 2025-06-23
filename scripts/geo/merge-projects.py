@@ -430,12 +430,13 @@ def main():
     """
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('environment', help='production or staging', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     args = dotenv.parse_args_env(parser)
 
     default_file_regex = r'.*'
 
-    with RiverscapesAPI() as api:
+    with RiverscapesAPI(args.environment) as api:
         project_types = api.get_project_types()
         questions = [
             inquirer.Text('collection_id', message="Enter a valid Collection ID"),
