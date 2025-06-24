@@ -128,12 +128,11 @@ def batch_update_table(
     rows: dict[int, dict[str, Any]],
 ):
     """
-    UNTESTED 
     Batch update columns in a table using a temporary table.
     - table_name: name of the target table (e.g., 'public.watersheds_to_calib')
     - id_field: primary key field name (e.g., 'HydroID')
     - columns: list of columns to update (e.g., ['rscontext_rs_id', 'rscontext_rs_version'])
-    - rows: dict of {id: {col: val, ...}}
+    - rows: dict of {id: {col: val, ...}} The names of the col values have to match those supplied for columns
     """
     with conn:
         with conn.cursor() as cur:
@@ -168,6 +167,26 @@ def batch_update_table(
                   AND ({distinct_clause})
             """)
             print(f"Updated {cur.rowcount} rows in {table_name}.")
+
+def test_update_table_with_real_data():
+    x = {
+    61041: {'taudem_llp_rs_id':'952fe728-28bd-4398-b33c-22b9f7d84f54',},
+    115903: {'taudem_llp_rs_id':'e48edb2d-4c51-4b29-bd79-d88792ba0663',},
+    156911: {'taudem_llp_rs_id':'1dc63a4f-81c2-4d04-81eb-a62151802a06',},
+    237512: {'taudem_llp_rs_id':'728f760e-f054-46e0-a408-248d8ac2ff80',},
+    263375: {'taudem_llp_rs_id':'1e16b38b-e58f-4dbe-a37c-ba2109afc909',},
+    364256: {'taudem_llp_rs_id':'863a4d80-c0ea-4e9d-b440-ca1b6e14329c',},
+    424172: {'taudem_llp_rs_id':'dc6e5fbb-56d6-43f6-bfea-c64d4c99a637',},
+    481612: {'taudem_llp_rs_id':'2490f502-5465-48fb-8078-f7fe714fb598',},
+    588709: {'taudem_llp_rs_id':'232e7f93-3d8f-48f3-8b26-a048fa3867cd',},
+    593444: {'taudem_llp_rs_id':'e32a5b01-42fc-43e8-b484-c99fb661bf11',},
+    593468: {'taudem_llp_rs_id':'73693ed4-5a60-4105-a1c1-cefe5d8e659a',},
+    593481: {'taudem_llp_rs_id':'2987803c-2de4-4e59-b50c-0fa2bcdd63ec',}
+    }
+    import psycopg
+    conn = psycopg.connect(service="NZCalibrationService")
+    with conn:
+        batch_update_table(conn, 'public.watersheds_to_calib', '"HydroID"', ["taudem_llp_rs_id"], x)
 
 def update_table_rscontextcols(rows: dict[int, tuple[str, int]]) -> None:
     """
@@ -216,7 +235,7 @@ def update_table_rscontextcols(rows: dict[int, tuple[str, int]]) -> None:
 if __name__ == '__main__':
     log.debug("Starting...")
     starttime = time.time()
-
+    
     ws_ids = get_nz_ws_ids()
     # ws_ids = ws_ids[:1] # FOR TESTING ONLY LIMIT TO TOP 1
 
@@ -229,3 +248,4 @@ if __name__ == '__main__':
 
     log.debug("Total time: {:.2f} seconds".format(time.time()-starttime))
     log.info("Done!")
+
