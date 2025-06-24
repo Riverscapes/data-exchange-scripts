@@ -41,10 +41,10 @@ class RiverscapesProject:
     """
 
     def __init__(self, proj_obj):
-        """ Note that we do not check for the existence of the keys in the proj_obj. This is because the API is expected to return a 
+        """ Note that we do not always? check for the existence of the keys in the proj_obj. This is because the API is expected to return a 
         consistent structure. If it doesn't then we want to know about it. 
 
-        For example, you don not NEED to return "id" from your graphql query (even though you always should):
+        For example, you do not NEED to return "id" from your graphql query (even though you always should):
 
         THIS IS ONLY A CONVENIENCE CLASS. IT DOES NOT VALIDATE THE INPUTS. IT ASSUMES THE INPUTS ARE VALID.
         """
@@ -58,6 +58,7 @@ class RiverscapesProject:
             self.updated_date = dateparse(proj_obj['updatedOn']) if 'updatedOn' in proj_obj else None
 
             self.visibility = proj_obj['visibility'] if 'visibility' in proj_obj else None
+            self.archived = proj_obj['archived'] if 'archived' in proj_obj else None
             # Turn the meta into a dictionary
             self.project_meta = {x['key']: x['value'] for x in proj_obj['meta']}
             # make a lowercase version of the meta and strip away spaces, dashes, and underscores
@@ -103,14 +104,16 @@ class RiverscapesProjectType:
 
 class RiverscapesSearchParams:
     """ Search params are a bit of a pain to work with. This class will help us validate the input parameters.
-
-            # search_params = {
-        # keywords: "",          # [String]. Will search inside name, description, summary, meta data keys, metadata values, id and tags
-        # name: "",              # [String]. Will search within the project name only
-        # "editableOnly": True,  # [Boolean] Filter to Only items that I can edit as a user
-        # "createdOn": {
-        #     "from": "2024-01-01T00:00:00Z",
-        # },                     # [SearchDate] Search by date {from, to}. If both from AND to are provided it will search inside a window.
+        Example usage
+        ```
+          search_params = {
+          keywords: "",          # [String]. Will search inside name, description, summary, meta data keys, metadata values, id and tags
+          name: "",              # [String]. Will search within the project name only
+          "editableOnly": True,  # [Boolean] Filter to Only items that I can edit as a user
+          "excludeArchived": False # [Boolean] Unless you include this, Archived projects will be excluded
+          "createdOn": {
+              "from": "2024-01-01T00:00:00Z",
+          },                     # [SearchDate] Search by date {from, to}. If both from AND to are provided it will search inside a window.
         #                                       Otherwise it will search before, or after the date provided in the from or to field respecitvely
         # "updatedOn": {"from": "" },  [SearchDate] # search by date {from, to}
         # collection: "ID" # Filter to projects inside a collection
@@ -148,7 +151,9 @@ class RiverscapesSearchParams:
         self.keywords = input_obj.get('keywords', None)
         self.name = input_obj.get('name', None)
         self.editableOnly = input_obj.get('editableOnly', None)
-
+        if 'excludeArchived' not in input_obj:
+            self.log.info("Excluding archived projects by default.")
+        self.excludeArchived = input_obj.get('excludeArchived', True) # default to excluding if we don't specify 
         self.createdOnFrom = None
         self.createdOnTo = None
         self.updatedOnFrom = None
@@ -171,9 +176,9 @@ class RiverscapesSearchParams:
         self.tags = input_obj.get('tags', None)
         self.ownedBy = input_obj.get('ownedBy', None)
 
-        # Throw an error of the dictionary contains any keys that are not in the list above
+        # Throw an error if the dictionary contains any keys that are not in the list above
         for key in input_obj:
-            if key not in ['keywords', 'name', 'editableOnly', 'createdOn', 'updatedOn', 'collection', 'bbox', 'projectTypeId', 'meta', 'tags', 'ownedBy']:
+            if key not in ['keywords', 'name', 'editableOnly', 'excludeArchived', 'createdOn', 'updatedOn', 'collection', 'bbox', 'projectTypeId', 'meta', 'tags', 'ownedBy']:
                 raise ValueError(f"Invalid search parameter: {key}")
 
         # Make sure we have something to work with here
@@ -189,6 +194,7 @@ class RiverscapesSearchParams:
             "keywords": self.keywords,
             "name": self.name,
             "editableOnly": self.editableOnly,
+            "excludeArchived": self.excludeArchived,
             "createdOn": {
                 "from": format_date(self.createdOnFrom) if self.createdOnFrom else None,
                 "to": format_date(self.createdOnTo) if self.createdOnTo else None
@@ -233,6 +239,8 @@ class RiverscapesSearchParams:
 
         if self.editableOnly is not None and not isinstance(self.editableOnly, bool):
             raise ValueError("editableOnly must be a boolean")
+        if self.excludeArchived is not None and not isinstance(self.excludeArchived, bool):
+            raise ValueError("excludeArchived must be a boolean")
         # Make sure createdOn is a valid python date
         if self.createdOnFrom is not None and not isinstance(self.createdOnFrom, datetime):
             raise ValueError("createdOn.from must be a valid date")
