@@ -15,6 +15,21 @@ This project uses [uv](https://github.com/astral-sh/uv) to manage Python virtual
 1. Install `uv` by following the [installation instructions](https://github.com/astral-sh/uv#installation) for your operating system.
 2. Ensure you have Python 3.9 or higher installed.
 
+### Spatialite
+
+We have started using [Spatialite](https://www.gaia-gis.it) for some operations. This is a binary that sites on top of SQLite and provides several powerful geospatial operations as `ST_` functions, similar to PostGIS on top of Postgres.
+
+Spatialite is distributed as an extension to SQLite, but unfortunately the core SQLite3 Python package is not compiled to allow extensions to be loaded (presumably for security reasons). Therefore we use a package called [APSW](https://pypi.org/project/apsw/) that does. APSW can be installed with UV and then you have to load the extension with the following code, where `spatialite_path` is the path to the Spatialite binary. MacOS users can install Spatialite using homebrew and then search for the file `mod_spatialite.8.dylib`. Windows users can downloaded Spatialite binaries [here](https://www.gaia-gis.it/gaia-sins/windows-bin-amd64/). Our Python that uses Spatialite should all allow you to specify this path in the `launch.json` file. 
+
+```python
+conn = apsw.Connection(rme_gpkg)
+conn.enable_load_extension(True)
+conn.load_extension(spatialite_path)
+curs = conn.cursor()
+```
+
+
+
 ### Setting Up the Project
 
 To set up the project, follow these steps:
