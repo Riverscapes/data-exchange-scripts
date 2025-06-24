@@ -224,6 +224,7 @@ def main():
     parser.add_argument('s3_bucket', help='s3 bucket RME files will be placed', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('tags', help='Data Exchange tags to search for projects', type=str)
+    parser.add_argument('collection', help='Collection GUID', type=str)
     parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
     parser.add_argument('--huc_filter', help='HUC filter SQL prefix ("17%")', type=str, default='')
     args = dotenv.parse_args_env(parser)
@@ -238,10 +239,15 @@ def main():
 
     # Data Exchange Search Params
     search_params = RiverscapesSearchParams({
-        'tags': args.tags.split(','),
         'projectTypeId': 'rs_metric_engine',
-        "meta": {"ModelVersion": "3.0.1"}
+        "meta": {"ModelVersion": "3.0.4"}
     })
+
+    if args.collection != '.':
+        search_params.collection = args.collection
+
+    if args.tags != '.':
+        search_params.tags = args.tags.split(',')
 
     if args.huc_filter != '' and args.huc_filter != '.':
         search_params.meta['HUC'] = args.huc_filter

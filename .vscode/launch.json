@@ -210,7 +210,8 @@
         "/opt/homebrew/lib/mod_spatialite.8.dylib",
         "rme-athena",
         "{env:DATA_ROOT}/rme-athena",
-        "UpperCO",
+        "",
+        "0f0a4494-424b-4ed7-8597-766e99018895",
         "--delete",
       ]
     },
