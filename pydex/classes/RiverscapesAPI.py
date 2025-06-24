@@ -369,6 +369,7 @@ class RiverscapesAPI:
         stats = {}
 
         # NOTE: DO NOT CHANGE THE SORT ORDER HERE. IT WILL BREAK THE PAGINATION.
+        # why not make this the default argument instead of None? LSG
         sort = sort if sort else ['DATE_CREATED_DESC']
 
         if not search_params or not isinstance(search_params, RiverscapesSearchParams):
