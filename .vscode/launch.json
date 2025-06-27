@@ -55,7 +55,7 @@
       "envFile": "${workspaceFolder}/.env",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
-      },      
+      },
       "args": [
         "production", // staging
         "{env:DATA_ROOT}/merge-projects",
@@ -71,7 +71,7 @@
       "envFile": "${workspaceFolder}/.env",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
-      },      
+      },
       "args": [
         "{env:DATA_ROOT}/warehouse_report/riverscapes_${input:environment}.gpkg",
         // "${input:cc_environment}",
@@ -193,8 +193,7 @@
         "{env:DATA_ROOT}/rme-scrape",
       ]
     },
-
-     {
+    {
       "name": "RME to Athena",
       "type": "debugpy",
       "request": "launch",
@@ -215,8 +214,24 @@
         "--delete",
       ]
     },
-
-
+    {
+      "name": "Data Exchange Projects to Athena",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/dumpers/dump_projects_to_athena.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production",
+        "riverscapes-athena",
+        // "little_spokane" // "2024CONUS"
+        "--full_scrape"
+      ]
+    },
     {
       "name": "TAGS - batch update project tags",
       "type": "debugpy",
