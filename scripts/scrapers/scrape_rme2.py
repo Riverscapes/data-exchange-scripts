@@ -569,7 +569,7 @@ def main():
     args = dotenv.parse_args_env(parser)
 
     initial_answers = inquirer.prompt([
-        inquirer.Text('project-name', message='Output RME scrape project name?', default='rme-scrape-project'),
+        inquirer.Text('project-name', message='Output RME scrape project name?', default='Riverscapes IGOs'),
         inquirer.Text('rme-version', message='Minimum RME version?', default=MINIMUM_RME_VERSION),
         inquirer.List('delete', message='Delete downloaded GeoPackages?', choices=['Yes', 'No'], default='Yes'),
         inquirer.List('selection-method', message='Select by Tag or Collection?', choices=['Tag', 'Collection'], default='Collection')
