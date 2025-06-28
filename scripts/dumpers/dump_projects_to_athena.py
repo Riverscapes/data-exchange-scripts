@@ -23,7 +23,6 @@ and uploaded to an S3 bucket. The Athena table is expected to be created beforeh
 
 CREATE
 EXTERNAL TABLE rs_projects (
-    id              INT,
     project_id      STRING,
     name            STRING,
     project_type_id STRING,
@@ -36,7 +35,7 @@ EXTERNAL TABLE rs_projects (
     owned_by_name   STRING,
     owned_by_type   STRING
 )
-ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
 STORED AS TEXTFILE LOCATION 's3://riverscapes-athena/data_exchange_projects'
 TBLPROPERTIES ('skip.header.line.count'='1');
 ```
@@ -117,7 +116,7 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
     curs.execute('PRAGMA table_info(rs_projects)')
     columns = [col[1] for col in curs.fetchall()]
 
-    # Store the unique days for each project type. We will create a separate CSV file for 
+    # Store the unique days for each project type. We will create a separate CSV file for
     # each day and each project type. This should help partition the data better in Athena.
     curs.execute("""
         CREATE TEMP TABLE temp_projects AS
@@ -142,7 +141,7 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
         row = curs.fetchone()
         if row is None:
             break
-        
+
         project_type_id, unique_stamp, unique_date = row
         with tempfile.NamedTemporaryFile(delete=True, suffix='.csv', mode='w', newline='\n', encoding='utf-8') as csvfile:
             csvwriter = csv.writer(csvfile)
@@ -209,8 +208,7 @@ def get_max_existing_athena_date(s3_bucket: str) -> datetime:
 
 def main():
     """
-    Search the Data Exchange for RME projects that have the RME scrape and then
-    merge the contents into a single output database.
+    Search the Data Exchange for projects and upload them to an S3 bucket for Athena.
     """
 
     parser = argparse.ArgumentParser()
@@ -229,7 +227,7 @@ def main():
             search_params.created_on = {'from':  datetime.strftime(search_start, '%Y-%m-%d %H:%M:%S')}
             print(f'Existing max date in Athena: {existing_max_date}')
 
-    if args.tags or args.tags != '' or args.tags != '.':
+    if args.tags and args.tags != '' and args.tags != '.':
         search_params.tags = args.tags.split(',')
 
     # Create an in memory SQLite database to store the project data
@@ -237,8 +235,7 @@ def main():
         curs = conn.cursor()
 
         curs.execute('''CREATE TABLE rs_projects (
-            id INTEGER      PRIMARY KEY AUTOINCREMENT,
-            project_id      TEXT NOT NULL UNIQUE,
+            project_id      TEXT NOT NULL PRIMARY KEY,
             name            TEXT NOT NULL,
             project_type_id TEXT NOT NULL,
             tags            TEXT,
@@ -249,7 +246,9 @@ def main():
             owned_by_id     TEXT NOT NULL,
             owned_by_name   TEXT NOT NULL,
             owned_by_type   TEXT NOT NULL
-        )''')
+        ) WITHOUT ROWID''')
+
+        curs.execute('CREATE INDEX idx_created_on ON rs_projects (created_on)')
 
         with RiverscapesAPI(stage=args.stage) as api:
 
