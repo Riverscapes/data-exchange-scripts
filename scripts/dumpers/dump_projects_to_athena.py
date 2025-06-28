@@ -1,13 +1,25 @@
 """
-Scrapes RME and RCAT output GeoPackages from Data Exchange and extracts statistics for each HUC.
-Produced for the BLM 2024 September analysis of 2024 CONUS RME projects.
+Calls Data Exchange API to scrape projects into AWS Athena. The command line arguments allow
+for either a full scrape of all projects or a scrape of only new projects since the last scrape into Athena.
+This latter, partial scrape, is determined by checking the maximum `created_on` date in the existing Athena table
+and then searching for all projects since midnight UTC of that date.
 
-This script assumes that the `scrape_huc_statistics.py` script has been run on each RME project.
-The scrape_huc_statistics.py script extracts statistics from the RME and RCAT output GeoPackages
-and generates a new 'rme_scrape.sqlite' file in the project. This is then uploaded into the
-project on the Data Exchange.
+Philip Bailey
+27 June 2025
 
+The script creates an SQLite in-memory database to store the project data, which is then written to temporary CSV files
+and uploaded to an S3 bucket. The Athena table is expected to be created beforehand with the following DDL:
 
+```sql
+-- Athena table creation DDL
+-- This table is used to store project data scraped from the Data Exchange API.
+-- The table is expected to be created in the 'default' database in Athena.
+-- The S3 location is where the CSV files will be uploaded.
+-- The table properties are set to skip the header line in the CSV files.
+-- Make sure to adjust the S3 location to your specific bucket and path.
+-- Example S3 location: s3://your-bucket-name/data_exchange_projects
+-- The table is stored as TEXTFILE with tab-separated values.
+-- Make sure to run this DDL before running the script.
 
 CREATE
 EXTERNAL TABLE rs_projects (
@@ -27,18 +39,17 @@ EXTERNAL TABLE rs_projects (
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
 STORED AS TEXTFILE LOCATION 's3://riverscapes-athena/data_exchange_projects'
 TBLPROPERTIES ('skip.header.line.count'='1');
-
-
+```
 """
 import csv
 from datetime import datetime, timezone
 import tempfile
 import sqlite3
 import argparse
-import boto3
 import time
-from pydex import RiverscapesAPI, RiverscapesSearchParams
+import boto3
 from rsxml import dotenv
+from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 
 def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, search_params: RiverscapesSearchParams) -> int:
