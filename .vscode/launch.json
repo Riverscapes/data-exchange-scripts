@@ -228,7 +228,7 @@
       "args": [
         "production",
         "riverscapes-athena",
-        // "little_spokane" // "2024CONUS"
+        // "--tags", "little_spokane", // "2024CONUS"
         "--full_scrape"
       ]
     },

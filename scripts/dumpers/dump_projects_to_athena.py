@@ -59,7 +59,7 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
 
     print('Scraping projects to SQLite...')
 
-    for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
+    for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=500):
 
         # Attempt to retrieve the huc10 and model version from the project metadata if it exists
         huc10 = next((project.project_meta[k] for k in ['HUC10', 'huc10', 'HUC', 'huc'] if k in project.project_meta), None)
@@ -117,22 +117,44 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
     curs.execute('PRAGMA table_info(rs_projects)')
     columns = [col[1] for col in curs.fetchall()]
 
-    # Take the timestamp created_on column and return all the unique DAYS (86400000 milliseconds) as integers and dates
-    curs.execute("SELECT DISTINCT cast(created_on / 86400000 as INT) * 86400000, date(created_on / 1000, 'unixepoch') from rs_projects")
-    unique_dates = {row[0]: row[1] for row in curs.fetchall()}
+    # Store the unique days for each project type. We will create a separate CSV file for 
+    # each day and each project type. This should help partition the data better in Athena.
+    curs.execute("""
+        CREATE TEMP TABLE temp_projects AS
+        SELECT DISTINCT 
+            project_type_id,
+            CAST(created_on / 86400000 as INT) * 86400000 create_stamp,
+            date(created_on / 1000, 'unixepoch') create_date,
+            0 processed
+        FROM rs_projects
+        GROUP BY project_type_id, create_stamp, create_date""")
 
-    # Write the contents of the database to a temporary CSV file for each day
-    for unique_stamp, unique_date in unique_dates.items():
+    curs.execute('SELECT COUNT(*) FROM temp_projects')
+    total_temp_projects = curs.fetchone()[0]
+    print(f'Total unique project types and dates: {total_temp_projects:,}')
+
+    # curs.execute('SELECT * FROM temp_projects')
+    # rows = curs.fetchall()
+    # print(rows)
+
+    while True:
+        curs.execute("SELECT project_type_id, create_stamp, create_date FROM temp_projects WHERE processed = 0 LIMIT 1")
+        row = curs.fetchone()
+        if row is None:
+            break
+        
+        project_type_id, unique_stamp, unique_date = row
         with tempfile.NamedTemporaryFile(delete=True, suffix='.csv', mode='w', newline='\n', encoding='utf-8') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(columns)
-            for row in curs.execute(f'SELECT {", ".join(columns)} FROM rs_projects WHERE created_on >= ?', [unique_stamp]):
+            for row in curs.execute(f'SELECT {", ".join(columns)} FROM rs_projects WHERE project_type_id = ? AND CAST(created_on / 86400000 as INT) * 86400000 = ?', [project_type_id, unique_stamp]):
                 csvwriter.writerow(row)
             csvfile.flush()  # Ensure all data is written to the file
 
-            file_name = f'{unique_date}-projects.csv'
-            s3.upload_file(csvfile.name, s3_bucket, f'data_exchange_projects/{file_name}')
-            print(f'Upload complete: {file_name} uploaded to S3 key: {s3_bucket}/data_exchange_projects/{file_name}')
+            file_key = f'data_exchange_projects/{project_type_id}/{unique_date}-{project_type_id}.csv'
+            s3.upload_file(csvfile.name, s3_bucket, file_key)
+            # print(f'Upload complete to S3 key: {file_key}')
+            curs.execute("UPDATE temp_projects SET processed = 1 WHERE project_type_id = ? AND create_stamp = ?", [project_type_id, unique_stamp])
 
 
 def get_max_existing_athena_date(s3_bucket: str) -> datetime:
@@ -194,7 +216,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('s3_bucket', help='s3 bucket RME files will be placed', type=str)
-    # parser.add_argument('tags', help='Data Exchange tags to search for projects', type=str)
+    parser.add_argument('--tags', help='Data Exchange tags to search for projects', type=str, default='')
     parser.add_argument('--full_scrape', help='Full scrape of all projects, or just new projects', action='store_true', default=False)
     args = dotenv.parse_args_env(parser)
 
@@ -206,6 +228,9 @@ def main():
             search_start = existing_max_date.replace(hour=0, minute=0, second=0, microsecond=0)
             search_params.created_on = {'from':  datetime.strftime(search_start, '%Y-%m-%d %H:%M:%S')}
             print(f'Existing max date in Athena: {existing_max_date}')
+
+    if args.tags or args.tags != '' or args.tags != '.':
+        search_params.tags = args.tags.split(',')
 
     # Create an in memory SQLite database to store the project data
     with sqlite3.connect(":memory:") as conn:
