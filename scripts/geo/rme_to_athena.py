@@ -1,27 +1,33 @@
 """
-Scrapes RME and RCAT output GeoPackages from Data Exchange and extracts statistics for each HUC.
-Produced for the BLM 2024 September analysis of 2024 CONUS RME projects.
+Searches for RME projects in the Data Exchange, downloads the RME output GeoPackages,
+scrapes the DGO metrics from the GeoPackages, and uploads the results to an S3 bucket.
 
-This script assumes that the `scrape_huc_statistics.py` script has been run on each RME project.
-The scrape_huc_statistics.py script extracts statistics from the RME and RCAT output GeoPackages
-and generates a new 'rme_scrape.sqlite' file in the project. This is then uploaded into the 
-project on the Data Exchange. 
+Philip Bailey
+June 2025
 """
 import shutil
 import csv
 import re
 import os
-import sqlite3
 import logging
 import argparse
 import apsw
 import boto3
-from pydex import RiverscapesAPI, RiverscapesSearchParams
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
+from pydex import RiverscapesAPI, RiverscapesSearchParams
 
-# RegEx for finding RME and RCAT output GeoPackages
+# RegEx for finding RME output GeoPackages
 RME_SCRAPE_GPKG_REGEX = r'.*riverscapes_metrics.gpkg'
+
+# Number of decimal places to truncate floats
+FLOAT_DEC_PLACES = 4
+
+# Float columns that should keep their full decimal places.
+FULL_FLOAT_COLS = ['latitude', 'longitude', 'prim_channel_gradient']
+
+MAJOR = 1000000
+MINOR = 1000
 
 
 def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: RiverscapesSearchParams, download_dir: str, s3_bucket: str, delete_downloads: bool) -> None:
@@ -35,44 +41,51 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
     # Create a timedelta object with a difference of 1 day
     for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
 
-        # Attempt to retrieve the huc10 from the project metadata if it exists
-        huc10 = None
-        try:
-            for key in ['HUC10', 'huc10', 'HUC', 'huc']:
-                if key in project.project_meta:
-                    value = project.project_meta[key]
-                    huc10 = value if len(value) == 10 else None
-                    break
+        if project.huc is None or project.huc == '':
+            log.warning(f'Project {project.id} does not have a HUC. Skipping.')
+            continue
 
-            huc_dir = os.path.join(download_dir, huc10)
+        if project.model_version is None:
+            log.warning(f'Project {project.id} does not have a model version. Skipping.')
+            continue
+
+        model_version_int = project.model_version.major * MAJOR + project.model_version.minor * MINOR + project.model_version.patch
+
+        try:
+            huc_dir = os.path.join(download_dir, project.huc)
             safe_makedirs(huc_dir)
             rme_gpkg = download_file(rs_api, project.id, huc_dir, RME_SCRAPE_GPKG_REGEX)
-            rme_tsv = os.path.join(huc_dir, f'rme_{huc10}.tsv')
-            s3_key = os.path.join('raw_huc10_rme', os.path.basename(rme_tsv))
+            rme_tsv = os.path.join(huc_dir, f'rme_{project.huc}.tsv')
+            s3_key = os.path.join('raw_rme', os.path.basename(rme_tsv))
 
             conn = apsw.Connection(rme_gpkg)
             conn.enable_load_extension(True)
             conn.load_extension(spatialite_path)
+
+            def dict_row_factory(cursor, row):
+                return {description[0]: value for description, value in zip(cursor.getdescription(), row)}
+
             curs = conn.cursor()
+            curs.setrowtrace(dict_row_factory)
 
             curs.execute('''
                 SELECT
-                    ?,
+                    ? as rme_version,
+                    ? as rme_version_int,
                     dgos.level_path,
                     dgos.seg_distance,
                     dgos.centerline_length,
                     dgos.segment_area,
-                    dgos.FCode,
-                    ST_AsText(dgo_geom) dgo_geom,
-                    ST_AsText(castAutomagic(igos.geom)) igo_geom,
-                    ST_AsText(castautomagic(igos.geom)) longitude,
-                    ST_AsText(castautomagic(igos.geom)) latitude,
+                    dgos.FCode as fcode,
+                    ST_X(castautomagic(igos.geom)) longitude,
+                    ST_Y(castautomagic(igos.geom)) latitude,
                     dgo_desc.*,
                     dgo_geomorph.*,
                     dgo_veg.*,
                     dgo_hydro.*,
                     dgo_impacts.*,
-                    dgo_beaver.*
+                    dgo_beaver.*,
+                    ST_AsText(dgo_geom) dgo_geom
                 FROM dgo_desc
                     INNER JOIN dgo_geomorph ON dgo_desc.dgoid = dgo_geomorph.dgoid
                     INNER JOIN dgo_veg ON dgo_desc.dgoid = dgo_veg.dgoid
@@ -94,17 +107,36 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
                         HAVING GeometryType(dgo_geom) = 'POLYGON'
                     ) dgos ON dgo_desc.dgoid = dgos.dgoid
                     INNER JOIN igos ON dgos.level_path = igos.level_path AND dgos.seg_distance = igos.seg_distance
-            ''', [huc10])
+            ''', [str(project.model_version), model_version_int])
 
             with open(rme_tsv, "w", newline='', encoding="utf-8") as f:
                 writer = csv.writer(f, delimiter="\t")
-                # writer.writerow([description[0] for description in cursor.description])
-                writer.writerows(curs.fetchall())
+                cols = [description[0] for description in curs.description]
+                # remove any columns called DGOID
+                cols = [col for col in cols if col.lower() != 'dgoid']
+                writer.writerow(cols)
+                for row in curs.fetchall():
+                    values = []
+                    for col in cols:
+                        value = row[col]
+                        if isinstance(value, float):
+                            # Truncate floats to FLOAT_DEC_PLACES decimal places, except for FULL_FLOAT_COLS
+                            if col in FULL_FLOAT_COLS:
+                                values.append(str(value))
+                            else:
+                                values.append(f'{value:.{FLOAT_DEC_PLACES}f}')
+                        elif isinstance(value, str):
+                            values.append(value.replace(',','|'))
+                        elif value is None:
+                            values.append('')
+                        else:
+                            values.append(str(value))
+                    writer.writerow(values)
 
             s3.upload_file(rme_tsv, s3_bucket, s3_key)
 
         except Exception as e:
-            log.error(f'Error scraping HUC {huc10}: {e}')
+            log.error(f'Error scraping HUC {project.huc}: {e}')
 
         if delete_downloads is True and os.path.isdir(huc_dir):
             try:
@@ -151,65 +183,6 @@ def get_matching_file(parent_dir: str, regex: str) -> str:
                 return os.path.join(root, file_name)
 
     return None
-
-
-def copy_table_between_cursors(src_cursor, dest_cursor, table_name, create_table: bool):
-    """
-    Copy a table structure and data from the source cursor to destination cursor
-    """
-
-    if create_table is True:
-        # Get table schema from the source database
-        src_cursor.execute(f"SELECT sql FROM sqlite_master WHERE type='table' AND name='{table_name}'")
-        create_table_sql = src_cursor.fetchone()[0]
-        dest_cursor.execute(create_table_sql)
-
-    # Get all data from the source table
-    src_cursor.execute(f"SELECT * FROM {table_name}")
-    rows = src_cursor.fetchall()
-
-    # Get the column names from the source table
-    src_cursor.execute(f"PRAGMA table_info({table_name})")
-    columns = [info[1] for info in src_cursor.fetchall()]  # info[1] gives the column names
-    columns_str = ', '.join(columns)
-
-    # Insert data into the destination table
-    placeholders = ', '.join(['?' for _ in columns])  # Create placeholders for SQL insert
-    insert_sql = f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders})"
-    dest_cursor.executemany(insert_sql, rows)
-
-
-def create_output_db(output_db: str, delete: bool) -> None:
-    """ 
-    Build the output SQLite database by running the schema file.
-    """
-    log = Logger('Create Output DB')
-
-    # As a precaution, do not overwrite or delete the output database.
-    # Force the user to delete it manually if they want to rebuild it.
-    if os.path.isfile(output_db):
-        if delete is True:
-            log.info(f'Deleting existing output database {output_db}')
-            os.remove(output_db)
-        else:
-            log.info('Output database already exists. Skipping creation.')
-            return
-
-    schema_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'packages', 'rme', 'rme', 'database')
-    if not os.path.isdir(schema_dir):
-        raise FileNotFoundError(f'Could not find database schema directory {schema_dir}')
-
-    safe_makedirs(os.path.dirname(output_db))
-
-    with sqlite3.connect(output_db) as conn:
-        curs = conn.cursor()
-        log.info('Creating output database schema')
-        with open(os.path.join(schema_dir, 'rme_scrape_huc_statistics.sql'), encoding='utf-8') as sqlfile:
-            sql_commands = sqlfile.read()
-            curs.executescript(sql_commands)
-            conn.commit()
-
-    log.info(f'Output database at {output_db}')
 
 
 def main():

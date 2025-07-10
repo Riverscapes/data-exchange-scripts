@@ -25,19 +25,20 @@ CREATE
 EXTERNAL TABLE rs_projects (
     project_id      STRING,
     name            STRING,
-    project_type_id STRING,
     tags            STRING,
     huc10           STRING,
-    model_version   STRING,
     created_on      BIGINT,
     created_on_date STRING,
     owned_by_id     STRING,
     owned_by_name   STRING,
     owned_by_type   STRING
 )
+PARTITIONED BY (project_type_id STRING, model_version STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
 STORED AS TEXTFILE LOCATION 's3://riverscapes-athena/data_exchange_projects'
 TBLPROPERTIES ('skip.header.line.count'='1');
+
+MSCK REPAIR TABLE rs_projects;
 ```
 """
 import csv
@@ -89,7 +90,7 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
             project.id,
             project.name.replace(',', ' '),
-            '|'.join(project.tags),
+            ','.join(project.tags) if project.tags else None,
             huc10,
             model_version,
             project.project_type,
@@ -116,6 +117,10 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
     curs.execute('PRAGMA table_info(rs_projects)')
     columns = [col[1] for col in curs.fetchall()]
 
+    # Remove the columns that are not needed for the CSV file because they are partition keys
+    columns.remove('project_type_id')
+    columns.remove('model_version')
+
     # Store the unique days for each project type. We will create a separate CSV file for
     # each day and each project type. This should help partition the data better in Athena.
     curs.execute("""
@@ -124,9 +129,10 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
             project_type_id,
             CAST(created_on / 86400000 as INT) * 86400000 create_stamp,
             date(created_on / 1000, 'unixepoch') create_date,
+            model_version,
             0 processed
         FROM rs_projects
-        GROUP BY project_type_id, create_stamp, create_date""")
+        GROUP BY project_type_id, create_stamp, create_date, model_version""")
 
     curs.execute('SELECT COUNT(*) FROM temp_projects')
     total_temp_projects = curs.fetchone()[0]
@@ -137,20 +143,20 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
     # print(rows)
 
     while True:
-        curs.execute("SELECT project_type_id, create_stamp, create_date FROM temp_projects WHERE processed = 0 LIMIT 1")
+        curs.execute("SELECT project_type_id, create_stamp, create_date, model_version FROM temp_projects WHERE processed = 0 LIMIT 1")
         row = curs.fetchone()
         if row is None:
             break
 
-        project_type_id, unique_stamp, unique_date = row
-        with tempfile.NamedTemporaryFile(delete=True, suffix='.csv', mode='w', newline='\n', encoding='utf-8') as csvfile:
-            csvwriter = csv.writer(csvfile)
+        project_type_id, unique_stamp, unique_date, model_version = row
+        with tempfile.NamedTemporaryFile(delete=True, suffix='.tsv', mode='w', newline='\n', encoding='utf-8') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter='\t', escapechar='\\', quoting=csv.QUOTE_NONE)
             csvwriter.writerow(columns)
             for row in curs.execute(f'SELECT {", ".join(columns)} FROM rs_projects WHERE project_type_id = ? AND CAST(created_on / 86400000 as INT) * 86400000 = ?', [project_type_id, unique_stamp]):
                 csvwriter.writerow(row)
             csvfile.flush()  # Ensure all data is written to the file
 
-            file_key = f'data_exchange_projects/{project_type_id}/{unique_date}-{project_type_id}.csv'
+            file_key = f'data_exchange/projects/project_type_id={project_type_id}/model_version={model_version}/{unique_date}-{project_type_id}.tsv'
             s3.upload_file(csvfile.name, s3_bucket, file_key)
             # print(f'Upload complete to S3 key: {file_key}')
             curs.execute("UPDATE temp_projects SET processed = 1 WHERE project_type_id = ? AND create_stamp = ?", [project_type_id, unique_stamp])
@@ -162,9 +168,28 @@ def get_max_existing_athena_date(s3_bucket: str) -> datetime:
     This is used to determine if we need to delete the existing Athena table.
     """
 
+    rows = athena_query(s3_bucket, 'SELECT MAX(created_on) FROM rs_projects')
+    data = rows[1]['Data'][0].get('VarCharValue')
+    if data:
+        try:
+            date_timestamp = int(data)
+            return datetime.fromtimestamp(date_timestamp / 1000, tz=timezone.utc)
+        except ValueError:
+            try:
+                return datetime.strptime(data, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+            except Exception:
+                pass
+    return None
+
+
+def athena_query(s3_bucket: str, query: str):
+    """
+    Perform an Athena query and return the result.
+    """
+
     athena = boto3.client('athena', region_name='us-west-2')
     response = athena.start_query_execution(
-        QueryString='SELECT MAX(created_on) FROM rs_projects',
+        QueryString=query,
         QueryExecutionContext={
             'Database': 'default',
             'Catalog': 'AwsDataCatalog'
@@ -192,17 +217,9 @@ def get_max_existing_athena_date(s3_bucket: str) -> datetime:
 
     # Athena returns header row as first row, data as second row
     rows = result['ResultSet']['Rows']
-    if len(rows) > 1:
-        data = rows[1]['Data'][0].get('VarCharValue')
-        if data:
-            try:
-                date_timestamp = int(data)
-                return datetime.fromtimestamp(date_timestamp / 1000, tz=timezone.utc)
-            except ValueError:
-                try:
-                    return datetime.strptime(data, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
-                except Exception:
-                    pass
+    if rows and len(rows) > 1:
+        return result['ResultSet']['Rows']
+
     return None
 
 
@@ -257,6 +274,10 @@ def main():
                 print('No projects found with the specified tags. Exiting...')
                 return
             upload_sqlite_to_s3(curs, args.s3_bucket)
+
+            # Need to refresh partitions after uploading new data to S3
+            print('Refreshing Athena partitions...')
+            athena_query(args.s3_bucket, 'MSCK REPAIR TABLE rs_projects')
 
         print('Process complete')
 
