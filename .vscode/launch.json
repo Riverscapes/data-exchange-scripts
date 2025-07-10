@@ -207,7 +207,7 @@
       "args": [
         "production",
         "/opt/homebrew/lib/mod_spatialite.8.dylib",
-        "rme-athena",
+        "riverscapes-athena",
         "{env:DATA_ROOT}/rme-athena",
         "",
         "0f0a4494-424b-4ed7-8597-766e99018895",
@@ -228,7 +228,7 @@
       "args": [
         "production",
         "riverscapes-athena",
-        // "--tags", "little_spokane", // "2024CONUS"
+        "--tags", "acequias", // "2024CONUS"
         "--full_scrape"
       ]
     },
