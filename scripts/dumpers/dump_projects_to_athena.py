@@ -57,7 +57,7 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
     Loop over all the projects, download the RME and RCAT output GeoPackages, and scrape the statistics
     """
 
-    print('Scraping projects to SQLite...')
+    print('Scraping projects to temporary, in-memory SQLite...')
 
     for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=500):
 
@@ -74,6 +74,7 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
             continue
 
         # Insert project data
+        # The pipe separating tags is vital. It must correspond wtith the Athena table definition.
         curs.execute('''
             INSERT INTO rs_projects (
                 project_id,
@@ -90,7 +91,7 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
             project.id,
             project.name.replace(',', ' '),
-            ','.join(project.tags) if project.tags else None,
+            '|'.join(project.tags) if project.tags else None,
             huc10,
             model_version,
             project.project_type,
@@ -241,8 +242,9 @@ def main():
         existing_max_date = get_max_existing_athena_date(args.s3_bucket)
         if existing_max_date:
             search_start = existing_max_date.replace(hour=0, minute=0, second=0, microsecond=0)
-            search_params.created_on = {'from':  datetime.strftime(search_start, '%Y-%m-%d %H:%M:%S')}
+            search_params.createdOnFrom = search_start
             print(f'Existing max date in Athena: {existing_max_date}')
+            print(f'Searching Data Exchange from: {search_start}')
 
     if args.tags and args.tags != '' and args.tags != '.':
         search_params.tags = args.tags.split(',')
