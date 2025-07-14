@@ -25,8 +25,9 @@ CREATE
 EXTERNAL TABLE rs_projects (
     project_id      STRING,
     name            STRING,
-    tags            STRING,
-    huc10           STRING,
+    tags            ARRAY<STRING>,
+    huc10           CHAR(10),
+    model_version_int INT,
     created_on      BIGINT,
     created_on_date STRING,
     owned_by_id     STRING,
@@ -34,9 +35,11 @@ EXTERNAL TABLE rs_projects (
     owned_by_type   STRING
 )
 PARTITIONED BY (project_type_id STRING, model_version STRING)
-ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-STORED AS TEXTFILE LOCATION 's3://riverscapes-athena/data_exchange_projects'
-TBLPROPERTIES ('skip.header.line.count'='1');
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+STORED AS TEXTFILE LOCATION 's3://riverscapes-athena/data_exchange/projects'
+TBLPROPERTIES ('skip.header.line.count'='1',
+'collection.delim' = '|'
+);
 
 MSCK REPAIR TABLE rs_projects;
 ```
@@ -54,12 +57,14 @@ from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, search_params: RiverscapesSearchParams) -> int:
     """
-    Loop over all the projects, download the RME and RCAT output GeoPackages, and scrape the statistics
+    Loop over all the projects that match the search params. Store them in a temporary SQLite database.
+    Then query this database by project type and (UNIQUE) project creation date and create CSV files that
+    are then uploaded to S3 for Athena.
     """
 
     print('Scraping projects to temporary, in-memory SQLite...')
 
-    for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=500):
+    for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
 
         # Attempt to retrieve the huc10 and model version from the project metadata if it exists
         huc10 = next((project.project_meta[k] for k in ['HUC10', 'huc10', 'HUC', 'huc'] if k in project.project_meta), None)
@@ -73,6 +78,8 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
             print(f'Project {project.id} does not have a model version. Skipping...')
             continue
 
+        model_version_int = int(model_version.split('.')[0]) * 1000000 + int(model_version.split('.')[1]) * 1000 + int(model_version.split('.')[2])
+
         # Insert project data
         # The pipe separating tags is vital. It must correspond wtith the Athena table definition.
         curs.execute('''
@@ -82,18 +89,20 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
                 tags,
                 huc10,
                 model_version,
+                model_version_int,
                 project_type_id,
                 created_on,
                 created_on_date,
                 owned_by_id,
                 owned_by_name,
                 owned_by_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
             project.id,
             project.name.replace(',', ' '),
             '|'.join(project.tags) if project.tags else None,
             huc10,
             model_version,
+            model_version_int,
             project.project_type,
             int(project.created_date.timestamp() * 1000),
             project.created_date.strftime('%Y-%m-%d %H:%M:%S'),
@@ -245,6 +254,8 @@ def main():
             search_params.createdOnFrom = search_start
             print(f'Existing max date in Athena: {existing_max_date}')
             print(f'Searching Data Exchange from: {search_start}')
+    else:
+        print('Full scrape of all projects requested. Ignoring existing Athena dates.')
 
     if args.tags and args.tags != '' and args.tags != '.':
         search_params.tags = args.tags.split(',')
@@ -260,6 +271,7 @@ def main():
             tags            TEXT,
             huc10           TEXT NOT NULL,
             model_version   TEXT NOT NULL,
+            model_version_int INTEGER NOT NULL,
             created_on      INTEGER NOT NULL,
             created_on_date TEXT NOT NULL,
             owned_by_id     TEXT NOT NULL,

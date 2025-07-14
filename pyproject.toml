@@ -14,9 +14,11 @@ classifiers = [
 dependencies = [
   "apsw>=3.49.1.0",
   "boto3>=1.7.84",
+  "geopandas>=1.0.1",
   "graphql-core==3.2.6",
   "inquirer==3.4.0",
   "lxml==5.3.1",
+  "matplotlib>=3.9.4",
   "python-dateutil==2.9.0.post0",
   "requests==2.32.3",
   "rsxml==2.0.6",

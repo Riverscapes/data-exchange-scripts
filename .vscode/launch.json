@@ -77,7 +77,7 @@
         // "${input:cc_environment}",
         "production",
         "/Users/philipbailey/GISData/riverscapes/warehouse_report/watershed_boundary_template.gpkg",
-        "2024CONUS",
+        "2025CONUS",
       ]
     },
     {
@@ -228,8 +228,24 @@
       "args": [
         "production",
         "riverscapes-athena",
-        "--tags", "acequias", // "2024CONUS"
-        "--full_scrape"
+        // "--tags", "2025CONUS_TEST_2" //"little_spokane", // "2024CONUS"
+        // "--full_scrape"
+      ]
+    },
+    {
+      "name": "Generate Status Maps",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/geo/status_maps.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+       "/Users/philipbailey/GISData/riverscapes/warehouse_report/riverscapes_production.gpkg",
+        "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps"
       ]
     },
     {
