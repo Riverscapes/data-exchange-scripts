@@ -46,6 +46,7 @@ MSCK REPAIR TABLE rs_projects;
 """
 import csv
 from datetime import datetime, timezone
+import os
 import tempfile
 import sqlite3
 import argparse
@@ -159,17 +160,19 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
             break
 
         project_type_id, unique_stamp, unique_date, model_version = row
-        with tempfile.NamedTemporaryFile(delete=True, suffix='.tsv', mode='w', newline='\n', encoding='utf-8') as csvfile:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.tsv', mode='w', newline='\n', encoding='utf-8') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter='\t', escapechar='\\', quoting=csv.QUOTE_NONE)
             csvwriter.writerow(columns)
             for row in curs.execute(f'SELECT {", ".join(columns)} FROM rs_projects WHERE project_type_id = ? AND CAST(created_on / 86400000 as INT) * 86400000 = ?', [project_type_id, unique_stamp]):
                 csvwriter.writerow(row)
             csvfile.flush()  # Ensure all data is written to the file
-
-            file_key = f'data_exchange/projects/project_type_id={project_type_id}/model_version={model_version}/{unique_date}-{project_type_id}.tsv'
-            s3.upload_file(csvfile.name, s3_bucket, file_key)
-            # print(f'Upload complete to S3 key: {file_key}')
-            curs.execute("UPDATE temp_projects SET processed = 1 WHERE project_type_id = ? AND create_stamp = ?", [project_type_id, unique_stamp])
+            temp_filename = csvfile.name
+        
+        file_key = f'data_exchange/projects/project_type_id={project_type_id}/model_version={model_version}/{unique_date}-{project_type_id}.tsv'
+        s3.upload_file(csvfile.name, s3_bucket, file_key)
+        os.remove(temp_filename)
+        print(f'Upload complete to S3 key: {file_key}')
+        curs.execute("UPDATE temp_projects SET processed = 1 WHERE project_type_id = ? AND create_stamp = ?", [project_type_id, unique_stamp])
 
 
 def get_max_existing_athena_date(s3_bucket: str) -> datetime:
