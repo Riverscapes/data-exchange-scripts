@@ -245,7 +245,8 @@
       },
       "args": [
        "/Users/philipbailey/GISData/riverscapes/warehouse_report/riverscapes_production.gpkg",
-        "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps"
+        "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps",
+        "--s3_bucket", "s3://releases.northarrowresearch.com/images/2025_conus_model_run_status_maps/"
       ]
     },
     {
