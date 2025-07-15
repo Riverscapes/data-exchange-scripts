@@ -170,6 +170,20 @@
       "args": [
         "production",
       ]
+    },{
+      "name": "💀💀💀 Archive Projects CSV - DANGER 💀💀💀",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/utility/archive_projects.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "staging",
+      ]
     },
     // {
     //   "name": "Scrape RME",
