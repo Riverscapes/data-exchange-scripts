@@ -168,7 +168,7 @@
         "PYTHONPATH": "${workspaceFolder}"
       },
       "args": [
-        "staging",
+        "production",
       ]
     },
     // {

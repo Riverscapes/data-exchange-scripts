@@ -56,5 +56,6 @@ if __name__ == '__main__':
     parser.add_argument('stage', help='Production or staging Data Exchange', type=str, default='production')
     args = parser.parse_args()
 
+    print(f'Deleting projects from {args.stage} environment')
     with RiverscapesAPI(stage=args.stage) as api:
         delete_projects_by_csv(api, args.stage)
