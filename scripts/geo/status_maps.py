@@ -114,7 +114,7 @@ def upload_to_s3(image_paths: List[str], s3_bucket: str) -> None:
     for image_path in image_paths:
         filename = os.path.basename(image_path)
         s3_key_full = f'{s3_key}/{filename}'
-        s3.upload_file(image_path, s3_bucket, s3_key_full)
+        s3.upload_file(image_path, s3_bucket, s3_key_full, ExtraArgs={'ACL': 'public-read'})
         print(f"Uploaded {filename} to S3 bucket {s3_bucket} at {s3_key_full}")
 
 
