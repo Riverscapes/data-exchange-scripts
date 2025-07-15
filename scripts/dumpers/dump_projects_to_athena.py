@@ -91,19 +91,21 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
                 huc10,
                 model_version,
                 model_version_int,
+                archived,
                 project_type_id,
                 created_on,
                 created_on_date,
                 owned_by_id,
                 owned_by_name,
                 owned_by_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
             project.id,
             project.name.replace(',', ' '),
             '|'.join(project.tags) if project.tags else None,
             huc10,
             model_version,
             model_version_int,
+            1 if project.archived else 0,
             project.project_type,
             int(project.created_date.timestamp() * 1000),
             project.created_date.strftime('%Y-%m-%d %H:%M:%S'),
@@ -167,7 +169,7 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
                 csvwriter.writerow(row)
             csvfile.flush()  # Ensure all data is written to the file
             temp_filename = csvfile.name
-        
+
         file_key = f'data_exchange/projects/project_type_id={project_type_id}/model_version={model_version}/{unique_date}-{project_type_id}.tsv'
         s3.upload_file(csvfile.name, s3_bucket, file_key)
         os.remove(temp_filename)
@@ -275,6 +277,7 @@ def main():
             huc10           TEXT NOT NULL,
             model_version   TEXT NOT NULL,
             model_version_int INTEGER NOT NULL,
+            archived        INTEGER NOT NULL DEFAULT 0,
             created_on      INTEGER NOT NULL,
             created_on_date TEXT NOT NULL,
             owned_by_id     TEXT NOT NULL,
