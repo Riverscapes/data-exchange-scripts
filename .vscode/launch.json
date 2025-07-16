@@ -258,7 +258,7 @@
         "production",
         "riverscapes-athena",
         "--tags", "2025CONUS", //"little_spokane", // "2024CONUS"
-        "--full_scrape"
+        // "--full_scrape"
       ]
     },
     {
