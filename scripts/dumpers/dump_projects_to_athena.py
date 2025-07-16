@@ -183,7 +183,7 @@ def get_max_existing_athena_date(s3_bucket: str) -> datetime:
     This is used to determine if we need to delete the existing Athena table.
     """
 
-    rows = athena_query(s3_bucket, 'SELECT MAX(created_on) FROM rs_projects')
+    rows = athena_query(s3_bucket, 'SELECT MAX(created_on) FROM vw_projects')
     data = rows[1]['Data'][0].get('VarCharValue')
     if data:
         try:
