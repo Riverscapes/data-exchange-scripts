@@ -1304,5 +1304,31 @@
     "url": "https://doi.org/10.1371/journal.pwat.0000119",
     "machineName": "streamtemp",
     "state": "ACTIVE"
+  },
+  {
+    "name": "Riverscapes Dynamics",
+    "summary": "Datasets describing the changes between water, gravel and other land cover types..",
+    "description": "",
+    "meta": [
+      {
+        "key": "Resolution",
+        "value": "Watershed"
+      },
+      {
+        "key": "Extent",
+        "value": "Network"
+      },
+      {
+        "key": "Model Status",
+        "value": "Research Grade"
+      },
+      {
+        "key": "Riverscapes Project Class",
+        "value": "Model Output"
+      }
+    ],
+    "url": "",
+    "machineName": "RSDynamics",
+    "state": "ACTIVE"
   }
 ]
