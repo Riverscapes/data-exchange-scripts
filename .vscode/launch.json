@@ -265,7 +265,7 @@
       "name": "Generate Status Maps",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/scripts/geo/status_maps.py",
+      "program": "${workspaceFolder}/scripts/geo/status_maps_athena.py",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "envFile": "${workspaceFolder}/.env",
@@ -273,7 +273,7 @@
         "PYTHONPATH": "${workspaceFolder}"
       },
       "args": [
-       "/Users/philipbailey/GISData/riverscapes/warehouse_report/riverscapes_production.gpkg",
+        "s3://riverscapes-athena/output/",
         "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps",
         "--s3_bucket", "s3://releases.northarrowresearch.com/images/2025_conus_model_run_status_maps/"
       ]

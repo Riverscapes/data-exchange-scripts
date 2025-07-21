@@ -475,6 +475,15 @@ wheels = [
 ]
 
 [[package]]
+name = "fsspec"
+version = "2025.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8b/02/0835e6ab9cfc03916fe3f78c0956cfcdb6ff2669ffa6651065d5ebf7fc98/fsspec-2025.7.0.tar.gz", hash = "sha256:786120687ffa54b8283d942929540d8bc5ccfa820deb555a2b5d0ed2b737bf58", size = 304432 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/e0/014d5d9d7a4564cf1c40b5039bc882db69fd881111e03ab3657ac0b218e2/fsspec-2025.7.0-py3-none-any.whl", hash = "sha256:8b012e39f63c7d5f10474de957f3ab793b47b45ae7d39f2fb735f8bbe25c0e21", size = 199597 },
+]
+
+[[package]]
 name = "gdal"
 version = "3.10.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1328,6 +1337,44 @@ wheels = [
 ]
 
 [[package]]
+name = "pyathena"
+version = "2.9.4"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.10'",
+]
+dependencies = [
+    { name = "boto3", version = "1.7.84", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "botocore", version = "1.10.84", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "tenacity", marker = "python_full_version < '3.10'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5d/b9/8d1732f8e560ff82d68ec02157abc15f22cfb0d2561304077d7cad9a5b2b/PyAthena-2.9.4.tar.gz", hash = "sha256:c1ce4d78c6014e5c88468cbf4368449979c8d5fbbb13e1b87a231d1fdd60e647", size = 63175 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/7c/b7f8ea9c5cd72efdae3ba61c71afc0a6085a9258f291967577dea3d6b80d/PyAthena-2.9.4-py3-none-any.whl", hash = "sha256:32356d43e2e7cf56bb53a392a7c001bdab4e7a1629c4de743203fcd3536708c5", size = 56833 },
+]
+
+[[package]]
+name = "pyathena"
+version = "3.15.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version == '3.11.*'",
+    "python_full_version == '3.10.*'",
+]
+dependencies = [
+    { name = "boto3", version = "1.38.39", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "botocore", version = "1.38.39", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "fsspec", marker = "python_full_version >= '3.10'" },
+    { name = "python-dateutil", marker = "python_full_version >= '3.10'" },
+    { name = "tenacity", marker = "python_full_version >= '3.10'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cb/44/43b3dfc08e962230907511afd17b537366bd7de22e4e1c96c31ceb3bc978/pyathena-3.15.0.tar.gz", hash = "sha256:1775eab9162fc1614ba861e8931691c6c34ce2900d7a60b0794ded566867d0ce", size = 57022 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/16/6fa5a52e6ceeaa51bde98fc68d6e57a9d5aa289f24d24cb0d142527074c9/pyathena-3.15.0-py3-none-any.whl", hash = "sha256:e69f5efdb87fbad1e52a053af6fcc102bee8b01ff116139055dfbbe30b73cb1c", size = 77050 },
+]
+
+[[package]]
 name = "pydex"
 version = "0.1.0"
 source = { virtual = "." }
@@ -1342,6 +1389,8 @@ dependencies = [
     { name = "lxml" },
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "pyathena", version = "2.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "pyathena", version = "3.15.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "python-dateutil" },
     { name = "requests" },
     { name = "rsxml" },
@@ -1368,6 +1417,7 @@ requires-dist = [
     { name = "inquirer", specifier = "==3.4.0" },
     { name = "lxml", specifier = "==5.3.1" },
     { name = "matplotlib", specifier = ">=3.9.4" },
+    { name = "pyathena", specifier = ">=2.9.4" },
     { name = "python-dateutil", specifier = "==2.9.0.post0" },
     { name = "requests", specifier = "==2.32.3" },
     { name = "rsxml", specifier = "==2.0.6" },
@@ -1692,6 +1742,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050 },
+]
+
+[[package]]
+name = "tenacity"
+version = "9.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248 },
 ]
 
 [[package]]
