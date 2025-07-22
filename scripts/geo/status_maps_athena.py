@@ -19,7 +19,7 @@ from pyathena import connect
 from shapely import wkt
 
 
-def generate_status_maps(athena_output_dir: str, output_image_dir: str) -> List[str]:
+def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_gpkgs: bool) -> List[str]:
     """
     Generate status maps for different project types and save them as PNG images.
     """
@@ -61,6 +61,12 @@ def generate_status_maps(athena_output_dir: str, output_image_dir: str) -> List[
         if projects_gdf.empty:
             print(f"Skipping {project_type}: no matching features.")
             continue
+
+        # Optionally output the filled polygons to a new GeoPackage layer
+        if output_gpkgs is True:
+            projects_gdf.drop(columns=['geom'], inplace=True)  # Remove the original WKT column
+            projects_gdf.to_file(os.path.join(output_image_dir,'rs_complete.gpkg'), layer=project_type, driver="GPKG")
+
 
         # Plot the filled and unfilled polygons
         __fig, ax = plt.subplots(figsize=(10, 10))
@@ -120,9 +126,10 @@ def main():
     parser.add_argument('athena_output_dir', type=str, help='s3 path where Athena output is stored')
     parser.add_argument('output_image_dir', type=str, help='Directory to save output images')
     parser.add_argument('--s3_bucket', type=str, default=None, help='Optional S3 bucket to upload images.')
+    parser.add_argument('--output_gpkgs', action='store_true', default=False, help='Output filled polygons to GeoPackage layers')
     args = parser.parse_args()
 
-    image_paths = generate_status_maps(args.athena_output_dir, args.output_image_dir)
+    image_paths = generate_status_maps(args.athena_output_dir, args.output_image_dir, args.output_gpkgs)
     upload_to_s3(image_paths, args.s3_bucket)
 
     print(f'Status maps generation complete. {len(image_paths)} images saved to {args.output_image_dir}.')
