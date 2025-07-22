@@ -18,6 +18,8 @@ def delete_projects_by_csv(rs_api: RiverscapesAPI, stage: str) -> None:
     """Delete projects from the Riverscapes API using a CSV file of project IDs"""
 
     answers = inquirer.prompt([inquirer.Text("csv_path", message="Path to CSV file with project IDs")])
+    if not answers:
+        return 
     csv_path = answers['csv_path']
     print(f'Deleting projects from {stage} using CSV file: {csv_path}')
     project_ids = []
@@ -28,7 +30,7 @@ def delete_projects_by_csv(rs_api: RiverscapesAPI, stage: str) -> None:
                 project_ids.append(project_id)
 
     confirm_delete = inquirer.prompt([inquirer.Text("confirm", message=f'Type the word DELETE to delete {len(project_ids)} projects')])
-    if confirm_delete['confirm'] != 'DELETE':
+    if not confirm_delete or confirm_delete['confirm'] != 'DELETE':
         print('Aborting')
         return
 
@@ -38,8 +40,10 @@ def delete_projects_by_csv(rs_api: RiverscapesAPI, stage: str) -> None:
     for project_id in project_ids:
         try:
             result = rs_api.run_query(delete_qry, {'projectId': project_id, 'options': {}})
-            if result is None or result['data']['deleteProject']['error'] is not None:
-                raise Exception(result['data']['deleteProject']['error'])
+            if result is None:
+                raise Exception('run query returned None')
+            elif result['data']['deleteProject']['error'] is not None:
+                raise Exception(result['data']['deleteProject']['error']) 
             else:
                 deleted += 1
         except Exception as e:
