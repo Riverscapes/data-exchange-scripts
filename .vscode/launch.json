@@ -182,7 +182,8 @@
         "PYTHONPATH": "${workspaceFolder}"
       },
       "args": [
-        "staging",
+        "production",
+        "/Users/philipbailey/GISData/riverscapes/archive_projects_csv",
       ]
     },
     // {
