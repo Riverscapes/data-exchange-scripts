@@ -246,6 +246,29 @@
       ]
     },
     {
+      "name": "DGO Cartography Geoms to Athena",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/geo/dgos_to_athena.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production",
+        "/opt/homebrew/lib/mod_spatialite.8.dylib",
+        "riverscapes-athena",
+        "{env:DATA_ROOT}/rme-athena",
+        "11",
+        "--tags", "2025CONUS", //"little_spokane", // "2024CONUS"
+        // "--collection", "0f0a4494-424b-4ed7-8597-766e99018895",
+        "--huc_filter", "1601010101",
+        "--delete",
+      ]
+    },
+    {
       "name": "Data Exchange Projects to Athena",
       "type": "debugpy",
       "request": "launch",
@@ -278,7 +301,7 @@
         "s3://riverscapes-athena/output/",
         "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps",
         "--s3_bucket", "s3://releases.northarrowresearch.com/images/2025_conus_model_run_status_maps/",
-        // "--output_gpkgs"
+        "--output_gpkgs"
       ]
     },
     {
