@@ -206,23 +206,23 @@
     //     "--delete",
     //   ]
     // },
-    {
-      "name": "Scrape RME - NEW Format",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/scripts/scrapers/scrape_rme2.py",
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "envFile": "${workspaceFolder}/.env",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      },
-      "args": [
-        "production",
-        "/opt/homebrew/lib/mod_spatialite.8.dylib",
-        "{env:DATA_ROOT}/rme-scrape",
-      ]
-    },
+    // {
+    //   "name": "Scrape RME - NEW Format",
+    //   "type": "debugpy",
+    //   "request": "launch",
+    //   "program": "${workspaceFolder}/scripts/scrapers/scrape_rme2.py",
+    //   "cwd": "${workspaceFolder}",
+    //   "console": "integratedTerminal",
+    //   "envFile": "${workspaceFolder}/.env",
+    //   "env": {
+    //     "PYTHONPATH": "${workspaceFolder}"
+    //   },
+    //   "args": [
+    //     "production",
+    //     "/opt/homebrew/lib/mod_spatialite.8.dylib",
+    //     "{env:DATA_ROOT}/rme-scrape",
+    //   ]
+    // },
     {
       "name": "RME to Athena",
       "type": "debugpy",
@@ -239,8 +239,9 @@
         "/opt/homebrew/lib/mod_spatialite.8.dylib",
         "riverscapes-athena",
         "{env:DATA_ROOT}/rme-athena",
-        "",
-        "0f0a4494-424b-4ed7-8597-766e99018895",
+        "--tags", "2025CONUS", //"little_spokane", // "2024CONUS"
+        // "--collection", "0f0a4494-424b-4ed7-8597-766e99018895",
+        // "--huc_filter", "1601010101",
         "--delete",
       ]
     },

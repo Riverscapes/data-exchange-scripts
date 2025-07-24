@@ -16,6 +16,7 @@ import boto3
 from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
 from pydex import RiverscapesAPI, RiverscapesSearchParams
+from pydex.lib.athena import athena_query
 
 # RegEx for finding RME output GeoPackages
 RME_SCRAPE_GPKG_REGEX = r'.*riverscapes_metrics.gpkg'
@@ -38,11 +39,21 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
     log = Logger('Merge RME Scrapes')
     s3 = boto3.client('s3')
 
+    # Build a list of existing RME runs that are stored in Athena.
+    results = athena_query(s3_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme')
+    existing_rme = {row['Data'][0]['VarCharValue']: int(row['Data'][1]['VarCharValue']) for row in results[1:]}
+
     # Create a timedelta object with a difference of 1 day
     for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
 
         if project.huc is None or project.huc == '':
             log.warning(f'Project {project.id} does not have a HUC. Skipping.')
+            continue
+
+        # check whether the project is already in Athena with the same or newer date
+        project_created_date_ts = int(project.created_date.timestamp()) * 1000
+        if project.huc in existing_rme and existing_rme[project.huc] <= project_created_date_ts:
+            log.info(f'Skipping project {project.id} as it is already in Athena with the same or newer date.')
             continue
 
         if project.model_version is None:
@@ -56,7 +67,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
             safe_makedirs(huc_dir)
             rme_gpkg = download_file(rs_api, project.id, huc_dir, RME_SCRAPE_GPKG_REGEX)
             rme_tsv = os.path.join(huc_dir, f'rme_{project.huc}.tsv')
-            s3_key = os.path.join('raw_rme', os.path.basename(rme_tsv))
+            s3_key = os.path.join('rme', 'raw', os.path.basename(rme_tsv))
 
             conn = apsw.Connection(rme_gpkg)
             conn.enable_load_extension(True)
@@ -72,6 +83,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
                 SELECT
                     ? as rme_version,
                     ? as rme_version_int,
+                    ? as rme_date_created_ts,
                     dgos.level_path,
                     dgos.seg_distance,
                     dgos.centerline_length,
@@ -107,7 +119,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
                         HAVING GeometryType(dgo_geom) = 'POLYGON'
                     ) dgos ON dgo_desc.dgoid = dgos.dgoid
                     INNER JOIN igos ON dgos.level_path = igos.level_path AND dgos.seg_distance = igos.seg_distance
-            ''', [str(project.model_version), model_version_int])
+            ''', [str(project.model_version), model_version_int, project_created_date_ts])
 
             with open(rme_tsv, "w", newline='', encoding="utf-8") as f:
                 writer = csv.writer(f, delimiter="\t")
@@ -218,11 +230,11 @@ def main():
     if args.collection != '.':
         search_params.collection = args.collection
 
-    if args.tags != '.':
+    if args.tags is not None and args.tags != '.':
         search_params.tags = args.tags.split(',')
 
     if args.huc_filter != '' and args.huc_filter != '.':
-        search_params.meta['HUC'] = args.huc_filter
+        search_params.meta = {'HUC':  args.huc_filter}
 
     with RiverscapesAPI(stage=args.stage) as api:
         scrape_rme(api, args.spatialite_path, search_params, download_folder, args.s3_bucket, args.delete)
