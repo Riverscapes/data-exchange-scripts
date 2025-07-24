@@ -13,9 +13,10 @@ import logging
 import argparse
 import apsw
 import boto3
-from rsxml import dotenv, Logger
 from rsxml.util import safe_makedirs
+from rsxml import dotenv, Logger, ProgressBar
 from pydex import RiverscapesAPI, RiverscapesSearchParams
+from pydex.classes.riverscapes_helpers import RiverscapesProject
 from pydex.lib.athena import athena_query
 
 # RegEx for finding RME output GeoPackages
@@ -44,7 +45,10 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
     existing_rme = {row['Data'][0]['VarCharValue']: int(row['Data'][1]['VarCharValue']) for row in results[1:]}
 
     # Create a timedelta object with a difference of 1 day
-    for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
+    count = 0
+    for project, _stats, _searchtotal, prg in rs_api.search(search_params, progress_bar=True, page_size=100):
+        project: RiverscapesProject
+        prg: ProgressBar
 
         if project.huc is None or project.huc == '':
             log.warning(f'Project {project.id} does not have a HUC. Skipping.')
@@ -146,6 +150,8 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
                     writer.writerow(values)
 
             s3.upload_file(rme_tsv, s3_bucket, s3_key)
+            count += 1
+            prg.update(count)
 
         except Exception as e:
             log.error(f'Error scraping HUC {project.huc}: {e}')
