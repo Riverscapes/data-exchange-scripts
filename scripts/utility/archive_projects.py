@@ -13,6 +13,7 @@ import os
 import argparse
 import inquirer
 from pydex import RiverscapesAPI
+from rsxml import ProgressBar
 
 
 def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str) -> None:
@@ -46,7 +47,8 @@ def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str)
     not_found = 0
     archived = 0
     archive_qry = rs_api.load_mutation('archiveProject')
-    for project_id in project_ids:
+    prg = ProgressBar(total=len(project_ids), text='Archiving projects')
+    for i, project_id in enumerate(project_ids):
         try:
             result = rs_api.run_query(archive_qry, {'projectId': project_id, 'project': {'archived': True}})
             if result is None:
@@ -60,7 +62,9 @@ def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str)
                 not_found += 1
             else:
                 raise e
+        prg.update(i+1)
 
+    prg.finish()
     print(f'Process complete. {archived} projects archived. {not_found} projects not found.')
 
 
