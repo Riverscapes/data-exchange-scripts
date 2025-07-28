@@ -65,13 +65,13 @@ def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_g
         # Optionally output the filled polygons to a new GeoPackage layer
         if output_gpkgs is True:
             projects_gdf.drop(columns=['geom'], inplace=True)  # Remove the original WKT column
-            projects_gdf.to_file(os.path.join(output_image_dir,'rs_complete.gpkg'), layer=project_type, driver="GPKG")
+            projects_gdf.to_file(os.path.join(output_image_dir, 'rs_complete.gpkg'), layer=project_type, driver="GPKG")
 
-
-        # Plot the filled and unfilled polygons
+        # Plot the fillpremed and unfilled polygons
         __fig, ax = plt.subplots(figsize=(10, 10))
+        gdf_outline.plot(ax=ax, facecolor="#BBCD3F", edgecolor="#828F2C", linewidth=0.15, alpha=0.5)
         projects_gdf.plot(ax=ax, facecolor="#004793", edgecolor="none", alpha=1.0)
-        gdf_outline.plot(ax=ax, facecolor="none", edgecolor="#C8D765", linewidth=0.15, alpha=0.5)
+        gdf_outline.plot(ax=ax, facecolor="none", edgecolor="#4DCBDC", linewidth=0.15, alpha=0.5)
 
         # Main title (centered at top of figure)
         percent_complete = project_count / huc10_count * 100 if huc10_count > 0 else 0
