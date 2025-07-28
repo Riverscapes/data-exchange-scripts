@@ -93,8 +93,10 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
                 huc12_tsv = os.path.join(huc_dir, f'rme_{huc12}.tsv')
                 s3_key = os.path.join('rme', 'huc12-geom-cartography', os.path.basename(huc12_tsv))
 
-                curs.execute('''SELECT d.level_path, d.seg_distance, st_astext(CastAutomagic(geom)) geom
-                             FROM dgos d inner join rme.dgo_desc dd on d.dgoid = dd.dgoid
+                curs.execute('''SELECT d.level_path, d.seg_distance, st_astext(CastAutomagic(d.geom)) geom
+                             FROM simplified_dgos d 
+                             inner join rme.dgos rmed on d.level_path = rmed.level_path and d.seg_distance = rmed.seg_distance
+                             inner join rme.dgo_desc dd on rmed.dgoid = dd.dgoid
                              WHERE dd.huc12 = ?''', [huc12])
                 with open(huc12_tsv, "w", newline='', encoding="utf-8") as f:
                     writer = csv.writer(f, delimiter="\t")
@@ -166,7 +168,7 @@ def simplify_dgo_geometries(gpkg_path: str, output_path: str, tolerance: int) ->
     gdf = gdf.to_crs(epsg=5070)  # Reproject to EPSG:5070 so we can use linear tolerance
     gdf["geometry"] = gdf.geometry.simplify_coverage(tolerance=tolerance)
     gdf = gdf.to_crs(epsg=4326)
-    gdf.to_file(output_path, driver="GPKG")
+    gdf.to_file(output_path, driver="GPKG", layer='simplified_dgos')
 
 
 def main():
