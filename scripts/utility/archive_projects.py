@@ -30,6 +30,9 @@ def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str)
         return
 
     answers = inquirer.prompt([inquirer.List("csv_path", message="Select a CSV file to use", choices=csv_files)])
+    if not answers:
+        print('Aborting')
+        return
     csv_path = os.path.join(csv_folder, answers['csv_path'])
     print(f'Archiving projects from {stage} using CSV file: {csv_path}')
     project_ids = []
@@ -40,7 +43,7 @@ def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str)
                 project_ids.append(project_id)
 
     confirm_archive = inquirer.prompt([inquirer.Confirm("confirm", message=f'Are you sure you want to archive {len(project_ids)} projects?', default=False)])
-    if not confirm_archive['confirm']:
+    if not confirm_archive or not confirm_archive['confirm']:
         print('Aborting')
         return
 
