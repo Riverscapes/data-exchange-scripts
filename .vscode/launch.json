@@ -32,6 +32,7 @@
     }
   ],
   "configurations": [
+  
     {
       "name": "🚀 Python: Run/Debug Current File (with .env)",
       "type": "debugpy",
@@ -299,7 +300,7 @@
       },
       "args": [
         "s3://riverscapes-athena/output/",
-        "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps",
+        "c:/nardata/temp/dexstatusmaps",
         "--s3_bucket", "s3://releases.northarrowresearch.com/images/2025_conus_model_run_status_maps/",
         "--output_gpkgs"
       ]
@@ -320,6 +321,20 @@
         "{env:DATA_ROOT}/warehouse_report/riverscapes_production.gpkg",
       ]
     },
+    {
+            "name": "Python: athena_to_rme",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/geo/athena_to_rme.py",
+            "console": "integratedTerminal",
+            "args": [
+                "s3://riverscapes-athena",
+                "adhoc/yct.csv",
+                "yct.gpkg",
+                "rme_table_column_defs.csv"
+            ],
+            "justMyCode": true
+        }
     // {
     //   "name": "Scrape HUC statistics - BATCH",
     //   "type": "debugpy",
