@@ -328,7 +328,7 @@
             "program": "${workspaceFolder}/scripts/geo/athena_to_rme.py",
             "console": "integratedTerminal",
             "args": [
-                "s3://riverscapes-athena",
+                "riverscapes-athena",
                 "adhoc/yct.csv",
                 "yct.gpkg",
                 "rme_table_column_defs.csv"

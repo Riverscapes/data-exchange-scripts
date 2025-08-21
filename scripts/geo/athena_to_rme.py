@@ -1,7 +1,8 @@
 """
 Reads a CSV file from S3 and generates a GeoPackage (SQLite) file with tables
-such as dgos, dgos_veg, dgo_hydro, etc., based on a column-to-table-and-type mapping
-from rme_table_column_defs.csv. All tables will include a sequentially generated dgoid column.
+such as dgos, dgos_veg, dgo_hydro, etc.,
+column-to-table-and-type mapping extracted from rme geopackage pragma
+into rme_table_column_defs.csv. All tables will include a sequentially generated dgoid column.
 
 Lorin Gaertner
 August 2025
