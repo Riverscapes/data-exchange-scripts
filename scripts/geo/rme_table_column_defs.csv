@@ -125,4 +125,4 @@ dgos,2,level_path,TEXT,0,,0
 dgos,3,seg_distance,MEDIUMINT,0,,0
 dgos,4,centerline_length,REAL,0,,0
 dgos,5,segment_area,REAL,0,,0
-dgos,6,FCode,MEDIUMINT,0,,0
+dgos,6,fcode,MEDIUMINT,0,,0
