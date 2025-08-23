@@ -122,10 +122,22 @@ def create_geopackage(gpkg_path: str, table_schema_map: dict, table_col_order: d
 
         # Add FK syntax for child tables
         fk = ''
-        if table in fk_tables:
-            fk = ', FOREIGN KEY(dgoid) REFERENCES dgos(dgoid)'
+        # if table in fk_tables:
+        #     fk = ', FOREIGN KEY(dgoid) REFERENCES dgos(dgoid)'
         curs.execute(f"CREATE TABLE IF NOT EXISTS {table} ({', '.join(col_defs)}{fk})")
         log.info(f"Created table {table}")       
+
+    # register relations 
+    # for table in fk_tables:
+    #     curs.execute("""
+    #         INSERT INTO gpkg_relations (
+    #             name, type, base_table_name, base_primary_column, related_table_name, related_primary_column
+    #         ) VALUES (?, 'association', ?, ?, ?, ?)
+    #     """, (
+    #         f'dgos_{table}',
+    #         'dgos', 'dgoid',
+    #         table, 'dgoid'
+    #     ))
 
     # add and register geometry columns
     for table, columns in table_schema_map.items():
@@ -178,10 +190,12 @@ def populate_tables_from_csv(csv_path: str, conn: apsw.Connection, table_schema_
                             insert_values.append(dgoid)
                         elif coltype in GEOMETRY_COL_TYPES:
                             insert_cols.append(col)
-                            # for now there is only one, and it is geom which we want to pop with dgo_geom
-                            geom_wkt = wkt_from_csv(row.get('dgo_geom', ''))
-                            if not geom_wkt:
-                                raise ValueError(f"Missing or malformed geometry in row {idx}")
+                            # assume the only col of this coltype is geom, which we will build from 
+                            geom_wkt = f"POINT({row.get('longitude')} {row.get('latitude')})"
+                            # assume the only col of this coltype is geom, which we want to pop with dgo_geom
+                            # geom_wkt = wkt_from_csv(row.get('dgo_geom', ''))
+                            # if not geom_wkt:
+                            #     raise ValueError(f"Missing or malformed geometry in row {idx}")
                             insert_values.append(geom_wkt)
                         else:
                             val = row.get(col, None)
@@ -202,9 +216,11 @@ def populate_tables_from_csv(csv_path: str, conn: apsw.Connection, table_schema_
                         else:
                             sql_placeholders.append("?")
                     sqlstatement = f"INSERT INTO {table} ({', '.join(insert_cols)}) VALUES ({', '.join(sql_placeholders)})"
-                    if idx == 1: log.debug(sqlstatement)
+                    if idx == 1: 
+                        log.debug(sqlstatement)
+                        log.debug(insert_values)
                     curs.execute(sqlstatement, insert_values)
-                # TODO (enhance) use file size and progress bar instead of this status emssage
+                # TODO (enhance) use file size and progress bar instead of this status message
                 if idx % 10000 == 0:
                     log.info(f"Inserted {idx} rows...")
             conn.execute('COMMIT')
@@ -218,73 +234,66 @@ def populate_tables_from_csv(csv_path: str, conn: apsw.Connection, table_schema_
 def add_geopackage_tables(conn: apsw.Connection):
     """
     Create required GeoPackage spatial_ref_sys and metadata tables: gpkg_contents and gpkg_geometry_columns.
-    # there is also a spatialite function `gpkgCreateBaseTables` that does all this 
-    Spatialite gpkgInsertEpsgSRID(4326) - not needed because CreateBaseTables inserts that one already 
+    # initially I inserted with CREATE TABLE statements but the single spatialite function `gpkgCreateBaseTables` does all this 
+    the Spatialite function gpkgInsertEpsgSRID(4326) is not needed because CreateBaseTables inserts that one already 
     """
     curs = conn.cursor()
     curs.execute("SELECT gpkgCreateBaseTables();")
-    return
-    curs.execute("""
-        CREATE TABLE IF NOT EXISTS gpkg_spatial_ref_sys (
-            srs_name TEXT NOT NULL,
-            srs_id INTEGER NOT NULL PRIMARY KEY,
-            organization TEXT NOT NULL,
-            organization_coordsys_id INTEGER NOT NULL,
-            definition TEXT NOT NULL,
-            description TEXT
-        );
-    """)
-    curs.execute("""
-        INSERT OR IGNORE INTO gpkg_spatial_ref_sys (
-            srs_name, srs_id, organization, organization_coordsys_id, definition, description
-        ) VALUES (
-            'WGS 84', 4326, 'EPSG', 4326,
-            'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]',
-            'WGS 84 geographic coordinate system'
-        );
-    """)
-
-    # Create gpkg_contents table
-    curs.execute("""
-        CREATE TABLE IF NOT EXISTS gpkg_contents (
-            table_name TEXT NOT NULL PRIMARY KEY,
-            data_type TEXT NOT NULL,
-            identifier TEXT UNIQUE,
-            description TEXT DEFAULT '',
-            last_change DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            min_x DOUBLE,
-            min_y DOUBLE,
-            max_x DOUBLE,
-            max_y DOUBLE,
-            srs_id INTEGER,
-            CONSTRAINT fk_gc_r_srs_id FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys(srs_id)
-        );
-    """)
-    # Create gpkg_geometry_columns table
-    curs.execute("""
-        CREATE TABLE IF NOT EXISTS gpkg_geometry_columns (
-            table_name TEXT NOT NULL,
-            column_name TEXT NOT NULL,
-            geometry_type_name TEXT NOT NULL,
-            srs_id INTEGER NOT NULL,
-            z TINYINT NOT NULL,
-            m TINYINT NOT NULL,
-            CONSTRAINT pk_geom_cols PRIMARY KEY (table_name, column_name),
-            CONSTRAINT uk_gc_table_name UNIQUE (table_name),
-            CONSTRAINT fk_gc_tn FOREIGN KEY (table_name) REFERENCES gpkg_contents(table_name),
-            CONSTRAINT fk_gc_srs FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys (srs_id)
-        );
-    """)
+    
+    # copilot says the GeoPackage specification does not include the gpkg_relations table by default, and the Spatialite function gpkgCreateBaseTables() does not create it
+    # so we create it to avoid warning in qgis 
+    # curs.execute("""
+    #     CREATE TABLE IF NOT EXISTS gpkg_relations (
+    #         id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #         name TEXT NOT NULL,
+    #         type TEXT NOT NULL,
+    #         mapping_table_name TEXT,
+    #         base_table_name TEXT NOT NULL,
+    #         base_primary_column TEXT NOT NULL,
+    #         related_table_name TEXT NOT NULL,
+    #         related_primary_column TEXT NOT NULL
+    #     );
+    # """)
 
 def create_views(conn: apsw.Connection, table_col_order: dict):
+    """
+    create spatial views for each attribute table joined with the dgos (spatial) table 
+    modeled after clean_up_gpkg in scrape_rme2 but using the dgo geom (which is a point)"""
     curs = conn.cursor()
-    dgo_tables = table_col_order.keys()
+    
+    dgo_tables = [t for t in table_col_order.keys() if t != 'dgos']
     print (dgo_tables)
+
+    # Get the columns from the dgos table
+    curs.execute('PRAGMA table_info(dgos)')
+    dgo_cols = [f"dgos.{col[1]}" for col in curs.fetchall() if col[1] != 'dgoid' and col[1] != 'DGOID']
+
     new_views = []
     for dgo_table in dgo_tables:
+        # Get the columns of the dgo side table
+        curs.execute(f'PRAGMA table_info({dgo_table})')
+        dgo_table_cols = ['t.' + col[1] for col in curs.fetchall() if col[1] != 'dgoid' and col[1] != 'DGOID']
+ 
         view_name = f'vw_{dgo_table}_metrics'
         new_views.append(view_name)
-        # curs.execute('SELECT 1;')
+        curs.execute(f'''
+            CREATE VIEW {view_name} AS
+            SELECT dgos.dgoid,
+            dgos.geom,
+            {",".join(dgo_table_cols)},
+            {",".join(dgo_cols)}
+            FROM {dgo_table} t INNER JOIN dgos ON t.dgoid=dgos.dgoid
+        ''')
+    for view_name in new_views:
+        curs.execute('''
+            INSERT INTO gpkg_contents (table_name, data_type, identifier, min_x, min_y, max_x, max_y)
+            SELECT ?, 'features', ?, min_x, min_y, max_x, max_y FROM gpkg_contents WHERE table_name='dgos'
+        ''', [view_name, view_name])
+
+        curs.execute('''
+            INSERT INTO gpkg_geometry_columns (table_name, column_name, geometry_type_name, srs_id, z, m)
+            SELECT ?, 'geom', 'POINT', 4326, 0, 0 FROM gpkg_geometry_columns WHERE table_name='dgos'
+        ''', [view_name])
 
 def main():
     """

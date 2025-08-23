@@ -120,7 +120,7 @@ dgo_veg,54,grass_shrub_conversion,REAL,0,,0
 dgo_veg,55,conifer_encroachment,REAL,0,,0
 dgo_veg,56,invasive_conversion,REAL,0,,0
 dgo_veg,57,riparian_condition,REAL,0,,0
-dgos,1,geom,MULTIPOLYGON,0,,0
+dgos,1,geom,POINT,0,,0
 dgos,2,level_path,TEXT,0,,0
 dgos,3,seg_distance,MEDIUMINT,0,,0
 dgos,4,centerline_length,REAL,0,,0
