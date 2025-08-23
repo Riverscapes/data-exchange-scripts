@@ -329,9 +329,9 @@
             "console": "integratedTerminal",
             "args": [
                 "C:\\OSGeo4W\\bin\\mod_spatialite.dll",
-                "riverscapes-athena",
-                "adhoc/yct_sample4.csv",
-                "yct.gpkg",
+                "C:\\Users\\narlorin\\AppData\\Local\\Temp\\tmpl_wxjuk9.csv",
+                //"s3://riverscapes-athena/adhoc/yct10.csv",
+                "yct_sample10.gpkg",
                 "${workspaceFolder}/scripts/geo/rme_table_column_defs.csv"
             ],
             "justMyCode": true

@@ -1,5 +1,5 @@
 """
-Reads a CSV file from S3 and generates a GeoPackage (SQLite) file with tables
+Reads a CSV file (optionally, first copies it from S3) and generates a GeoPackage (SQLite) file with tables
 such as dgos, dgos_veg, dgo_hydro, etc.,
 column-to-table-and-type mapping extracted from rme geopackage pragma
 into rme_table_column_defs.csv. All tables will include a sequentially generated dgoid column.
@@ -8,10 +8,13 @@ Lorin Gaertner (with copilot)
 August 2025
 
 IMPLEMENTED: Sequential dgoid (integer), geometry handling for dgo_geom (SRID 4326, WKT conversion), foreign key syntax in table creation, error handling (throws on missing/malformed required columns), debug output for skipped/invalid rows.
-INCOMPLETE: Actual column names/types must be supplied in rme_table_column_defs.csv. Geometry column creation and spatialite extension loading are stubbed (see TODOs). No batching/optimization for very large CSVs. No advanced validation or transformation beyond geometry and required columns.
-ASSUMPTION: All columns are TEXT unless otherwise specified in rme_table_column_defs.csv. Foreign key constraints are defined but not enforced unless PRAGMA foreign_keys=ON is set.
+TODO Look at scrape_rme2.py as that kind of project is what we are trying to build - this similar but a bit different 
+Actual column names/types must be supplied in rme_table_column_defs.csv. 
+Geometry column creation and spatialite extension loading are stubbed (see TODOs). 
+No batching/optimization for very large CSVs - but it handled 1.5 M records okay as is.
+No advanced validation or transformation beyond geometry and required columns.
+Foreign key constraints are defined but not enforced unless PRAGMA foreign_keys=ON is set.
 """
-
 
 import os
 import csv
@@ -19,13 +22,15 @@ import logging
 import argparse
 import boto3
 import apsw
-import uuid
+import tempfile
 from rsxml import dotenv, Logger, ProgressBar
+
+GEOMETRY_COL_TYPES = ('MULTIPOLYGON','POINT')
 
 def parse_table_defs(defs_csv_path):
     """
-    Parse rme_table_column_defs.csv and return a dict of table schemas and column order.
-    Returns: {table_name: {col_name: col_type, ...}, ...}, {table_name: [col_order]}
+    Parse rme_table_column_defs.csv and return a dict of table schemas; a list of column order; list of foreign key tables
+    Returns: {table_name: {col_name: col_type, ...}, ...}, {table_name: [col_order]}, set(table_names)
     Adds sequential integer dgoid to all tables.
     """
     table_schema_map = {}
@@ -51,64 +56,91 @@ def parse_table_defs(defs_csv_path):
                 table_col_order[table].insert(0, 'dgoid')
     return table_schema_map, table_col_order, fk_tables
 
-def download_csv_from_s3(s3_bucket: str, s3_key: str, local_path: str) -> None:
+def download_file_from_s3(s3_uri: str, local_path: str) -> None:
     """
-    Download a CSV file from S3 to a local path.
+    Download a file from S3 to a local path.
+
+    Args:
+        s3_uri (str): S3 URI of the file, e.g. 's3://bucket/key'.
+        local_path (str): Local filesystem path to save the downloaded file.
+
+    Raises:
+        ValueError: If s3_uri is not a valid S3 URI.
+
+    Example:
+        download_file_from_s3('s3://riverscapes-athena/adhoc/yct_sample4.csv', '/tmp/yct_sample4.csv')
     """
-    log = Logger('Download CSV')
-    s3 = boto3.client('s3')
+    log = Logger('Download File')
+    # Validate and parse S3 URI
+    if not isinstance(s3_uri, str) or not s3_uri.startswith('s3://'):
+        raise ValueError(f"Invalid S3 URI: {s3_uri}. Must start with 's3://'")
+    parts = s3_uri[5:].split('/', 1)
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise ValueError(f"Invalid S3 URI: {s3_uri}. Must be in format 's3://bucket/key'")
+    s3_bucket, s3_key = parts
+
     log.info(f"Downloading {s3_key} from bucket {s3_bucket} to {local_path}")
+    s3 = boto3.client('s3')
+    response = s3.head_object(Bucket=s3_bucket, Key=s3_key)
+    size_bytes = response['ContentLength']
+    log.info(f"ContentType: {response['ContentType']}\n File size: {size_bytes} bytes")
+    # TODO if very large, add progress bar
     s3.download_file(s3_bucket, s3_key, local_path)
     log.info("Download complete.")
 
 def create_geopackage(gpkg_path: str, table_schema_map: dict, table_col_order: dict, fk_tables: set, spatialite_path: str) -> apsw.Connection:
     """
-    Create a GeoPackage (SQLite) file and tables as specified in table_schema_map.
+    Create a GeoPackage (SQLite) file and tables as specified in table_schema_map. 
     Returns the APSW connection.
-
-    IMPLEMENTED: Geometry column for dgo_geom in dgos table (as TEXT for now, TODO: convert to spatialite geometry).
-    IMPLEMENTED: Foreign key syntax for dgoid in child tables.
-    TODO: Enable spatialite extension and create geometry columns properly.
     """
     log = Logger('Create GeoPackage')
     log.info(f"Creating GeoPackage at {gpkg_path}")
+    # apsw.Connection = The database is opened for reading and writing, and is created if it does not already exist. 
+    # this can be a problem if this script is run more than once
+    # Delete the file if it exists
+    if os.path.exists(gpkg_path):
+        os.remove(gpkg_path)
+        log.info(f"Deleted existing file {gpkg_path}")
+
     conn = apsw.Connection(gpkg_path)
-    # TODO: Enable spatialite extension and initialize spatial metadata
+    # Enable spatialite extension and initialize spatial metadata
     conn.enable_load_extension(True)
     conn.load_extension(spatialite_path)
     add_geopackage_tables(conn)
     curs = conn.cursor()
+    # create tables
     for table, columns in table_schema_map.items():
         col_defs = []
-        for col, coltype in columns.items():
-            if table == 'dgos' and col == 'dgo_geom':
-                # TODO: Use geometry type and spatialite
-                col_defs.append(f"{col} TEXT")  # Placeholder
-            else:
+        for col in table_col_order[table]:
+            coltype = columns[col]
+            # treat dgoid specially
+            if col == 'dgoid' and table == 'dgos':
+                col_defs.append(f"{col} {coltype} PRIMARY KEY")
+            # don't add geometry cols here - we'll do it 
+            elif coltype not in GEOMETRY_COL_TYPES:
                 col_defs.append(f"{col} {coltype}")
+
         # Add FK syntax for child tables
         fk = ''
         if table in fk_tables:
             fk = ', FOREIGN KEY(dgoid) REFERENCES dgos(dgoid)'
         curs.execute(f"CREATE TABLE IF NOT EXISTS {table} ({', '.join(col_defs)}{fk})")
-        log.info(f"Created table {table} with columns: {list(columns.keys())}")
+        log.info(f"Created table {table}")       
 
-        # Register spatial table as a layer if it has a geometry column
-        if table == 'dgos':
-            # Insert into gpkg_contents
-            curs.execute(f"""
-                INSERT OR REPLACE INTO gpkg_contents (
-                    table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id
-                ) VALUES (?, 'features', ?, '', CURRENT_TIMESTAMP, NULL, NULL, NULL, NULL, 4326)
-            """, (table, table))
-            # Insert into gpkg_geometry_columns
-            curs.execute(f"""
-                INSERT OR REPLACE INTO gpkg_geometry_columns (
-                    table_name, column_name, geometry_type_name, srs_id, z, m
-                ) VALUES (?, 'geom', 'MULTIPOLYGON', 4326, 0, 0)
-            """, (table,))
-            log.info(f"Registered {table} as a spatial layer in GeoPackage.")
-    
+    # add and register geometry columns
+    for table, columns in table_schema_map.items():
+        for col, coltype in columns.items():
+            if coltype in GEOMETRY_COL_TYPES:
+                curs.execute(
+                    "SELECT gpkgAddGeometryColumn (?, ?, ?, 0, 0, 4326)",
+                    (table, col, coltype)
+                )
+                curs.execute(
+                    "SELECT gpkgAddSpatialIndex(?, ?);", 
+                    (table, col)
+                )
+                log.info(f"Registered {table} as a spatial layer in GeoPackage with {col} as {coltype}.")
+
     return conn
 
 def wkt_from_csv(csv_geom: str) -> str:
@@ -124,56 +156,74 @@ def populate_tables_from_csv(csv_path: str, conn: apsw.Connection, table_schema_
     Read the CSV and insert rows into the appropriate tables based on column mapping.
 
     IMPLEMENTED: Sequential dgoid, geometry handling for dgo_geom (called geom in dgos table), error handling, debug output for skipped/invalid rows.
-    TODO: Use spatialite GeomFromText for geometry column, batch inserts for large CSVs, advanced validation.
     """
     log = Logger('Populate Tables')
     log.info(f"Populating tables from {csv_path}")
     curs = conn.cursor()
-    dgoid_counter = 1
     with open(csv_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         conn.execute('BEGIN')
-        for idx, row in enumerate(reader, start=1):
-            try:
-                # Generate sequential dgoid
-                dgoid = dgoid_counter
-                dgoid_counter += 1
+        try:
+            for idx, row in enumerate(reader, start=1):
+                # Use index as sequential dgoid -- assumes there is no existing data
+                dgoid = idx
                 for table, columns in table_schema_map.items():
-                    values = []
+                    insert_cols = []
+                    insert_values = []
+                    geom_col_idx = None
                     for col in table_col_order[table]:
+                        coltype = columns[col]                        
                         if col == 'dgoid':
-                            values.append(dgoid)
-                        elif col == 'geom' and table == 'dgos':
-                            wkt = wkt_from_csv(row.get('dgo_geom', ''))
-                            if not wkt:
+                            insert_cols.append(col)
+                            insert_values.append(dgoid)
+                        elif coltype in GEOMETRY_COL_TYPES:
+                            insert_cols.append(col)
+                            # for now there is only one, and it is geom which we want to pop with dgo_geom
+                            geom_wkt = wkt_from_csv(row.get('dgo_geom', ''))
+                            if not geom_wkt:
                                 raise ValueError(f"Missing or malformed geometry in row {idx}")
-                            values.append(wkt)
+                            insert_values.append(geom_wkt)
                         else:
                             val = row.get(col, None)
                             # Check for required columns (notnull)
                             if val is None:
-                                # raise ValueError(f"Missing required column '{col}' in row {idx}")
-                                print (f"Missing required column '{col}' in row {idx}")
-                                values.append(None)
+                                raise ValueError(f"Missing required column '{col}' in row {idx}")
+                                # alternatively, warn and keep going
+                                # print (f"Missing required column '{col}' in row {idx}")
+                                # values.append(None)
                             else:
-                                values.append(val)
-                    placeholders = ', '.join(['?'] * len(table_col_order[table]))
-                    curs.execute(f"INSERT INTO {table} ({', '.join(table_col_order[table])}) VALUES ({placeholders})", values)
+                                insert_cols.append(col)
+                                insert_values.append(val)
+                    sql_placeholders = [] 
+                    for i, col in enumerate (insert_cols):
+                        coltype = columns[col]
+                        if coltype in GEOMETRY_COL_TYPES:
+                            sql_placeholders.append("AsGPB(GeomFromText(?, 4326))")
+                        else:
+                            sql_placeholders.append("?")
+                    sqlstatement = f"INSERT INTO {table} ({', '.join(insert_cols)}) VALUES ({', '.join(sql_placeholders)})"
+                    if idx == 1: log.debug(sqlstatement)
+                    curs.execute(sqlstatement, insert_values)
+                # TODO (enhance) use file size and progress bar instead of this status emssage
                 if idx % 10000 == 0:
                     log.info(f"Inserted {idx} rows...")
-            except Exception as e:
-                log.error(f"Row {idx} skipped: {e}\nRow data: {row}")
-        log.info(f"Inserted {idx} rows.")    
-        conn.execute('COMMIT')
+            conn.execute('COMMIT')
+            log.info(f"Inserted {idx} rows.")    
+        except Exception as e:
+            log.error(f"Error at row {idx}: {e}\nRow data: {row}\nSQL: {sqlstatement}")
+            conn.execute('ROLLBACK')
+            raise             
     log.info("Table population complete.")
 
 def add_geopackage_tables(conn: apsw.Connection):
     """
     Create required GeoPackage spatial_ref_sys and metadata tables: gpkg_contents and gpkg_geometry_columns.
-    
+    # there is also a spatialite function `gpkgCreateBaseTables` that does all this 
+    Spatialite gpkgInsertEpsgSRID(4326) - not needed because CreateBaseTables inserts that one already 
     """
     curs = conn.cursor()
-
+    curs.execute("SELECT gpkgCreateBaseTables();")
+    return
     curs.execute("""
         CREATE TABLE IF NOT EXISTS gpkg_spatial_ref_sys (
             srs_name TEXT NOT NULL,
@@ -226,29 +276,46 @@ def add_geopackage_tables(conn: apsw.Connection):
         );
     """)
 
+def create_views(conn: apsw.Connection, table_col_order: dict):
+    curs = conn.cursor()
+    dgo_tables = table_col_order.keys()
+    print (dgo_tables)
+    new_views = []
+    for dgo_table in dgo_tables:
+        view_name = f'vw_{dgo_table}_metrics'
+        new_views.append(view_name)
+        # curs.execute('SELECT 1;')
+
 def main():
     """
     Main entry point: parses arguments, downloads CSV, parses table defs, creates GeoPackage, and populates tables.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('spatialite_path', help='Path to the mod_spatialite library', type=str)
-    parser.add_argument('s3_bucket', help='S3 bucket containing the CSV file', type=str)
-    parser.add_argument('s3_key', help='S3 key/path to the CSV file', type=str)
+    parser.add_argument('raw_rme_csv_path', help='full path to csv file containing the raw_rme extract (can be s3 URI e.g. s3://riverscapes-athena/adhoc/yct_sample4.csv)')
     parser.add_argument('output_gpkg', help='Path to output GeoPackage file', type=str)
     parser.add_argument('table_defs_csv', help='Path to rme_table_column_defs.csv', type=str)
     # note rsxml.dotenv screws up s3 paths! we'll need to address that see issue #895 in RiverscapesXML repo
     # args = dotenv.parse_args_env(parser)
+    # instead, use standard parser:
     args = parser.parse_args()
-    print(repr(args.s3_key))
 
     log = Logger('Setup')
-    log.setup(log_level=logging.INFO)
+    log.setup(log_level=logging.DEBUG)
 
-    local_csv = r"C:\nardata\work\rme_extraction\20250820-yct\yct19.csv"
-    # download_csv_from_s3(args.s3_bucket, args.s3_key, local_csv)
+    # csv can be either a local path or an s3 path. parse and handle accordingly
+    # TODO (enhancement) - stream/process without storing the tempfile
+    if args.raw_rme_csv_path.startswith('s3:'):
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmpfile:
+            local_csv = tmpfile.name
+        download_file_from_s3(args.raw_rme_csv_path, local_csv)
+    else:
+        local_csv = args.raw_rme_csv_path   
+
     table_schema_map, table_col_order, fk_tables = parse_table_defs(args.table_defs_csv)
     conn = create_geopackage(args.output_gpkg, table_schema_map, table_col_order, fk_tables, args.spatialite_path)
     populate_tables_from_csv(local_csv, conn, table_schema_map, table_col_order)
+    create_views(conn, table_col_order)
     log.info('Process complete.')
 
 if __name__ == '__main__':
