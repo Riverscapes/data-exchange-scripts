@@ -24,6 +24,7 @@ import boto3
 import apsw
 import tempfile
 from rsxml import dotenv, Logger, ProgressBar
+from rsxml.util import safe_makedirs
 
 GEOMETRY_COL_TYPES = ('MULTIPOLYGON','POINT')
 
@@ -240,6 +241,7 @@ def add_geopackage_tables(conn: apsw.Connection):
     curs = conn.cursor()
     curs.execute("SELECT gpkgCreateBaseTables();")
     
+    # commented out because defined relationships not required and setting them up is more work
     # copilot says the GeoPackage specification does not include the gpkg_relations table by default, and the Spatialite function gpkgCreateBaseTables() does not create it
     # so we create it to avoid warning in qgis 
     # curs.execute("""
@@ -255,6 +257,10 @@ def add_geopackage_tables(conn: apsw.Connection):
     #     );
     # """)
 
+def create_igos_project(project_dir: str, project_name: str):
+    # Build the bounds for the new RME scrape project
+    return
+
 def create_views(conn: apsw.Connection, table_col_order: dict):
     """
     create spatial views for each attribute table joined with the dgos (spatial) table 
@@ -268,7 +274,22 @@ def create_views(conn: apsw.Connection, table_col_order: dict):
     curs.execute('PRAGMA table_info(dgos)')
     dgo_cols = [f"dgos.{col[1]}" for col in curs.fetchall() if col[1] != 'dgoid' and col[1] != 'DGOID']
 
-    new_views = []
+    new_views = ['vw_dgo_metrics']
+    # we don't have IGO trable but we put the point geom in the DGO geom - same idea
+    # I'm a little confused about whether we have DGO metrics or IGO metrics or some mix in raw_rme
+    curs.execute('''
+        CREATE VIEW vw_dgo_metrics AS
+        SELECT dgo_desc.*, dgo_geomorph.*, dgo_veg.*, dgo_hydro.*, dgo_impacts.*, dgo_beaver.*, dgos.geom, dgos.level_path, dgos.seg_distance, dgos.centerline_length, dgos.segment_area, dgos.FCode
+        FROM dgo_desc
+        INNER JOIN dgo_geomorph ON dgo_desc.dgoid = dgo_geomorph.dgoid
+        INNER JOIN dgo_veg ON dgo_desc.dgoid = dgo_veg.dgoid
+        INNER JOIN dgo_hydro ON dgo_desc.dgoid = dgo_hydro.dgoid
+        INNER JOIN dgo_impacts ON dgo_desc.dgoid = dgo_impacts.dgoid
+        INNER JOIN dgo_beaver ON dgo_desc.dgoid = dgo_beaver.dgoid
+        INNER JOIN dgos ON dgo_desc.dgoid = dgos.dgoid
+        '''
+        )
+
     for dgo_table in dgo_tables:
         # Get the columns of the dgo side table
         curs.execute(f'PRAGMA table_info({dgo_table})')
@@ -302,18 +323,28 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('spatialite_path', help='Path to the mod_spatialite library', type=str)
     parser.add_argument('raw_rme_csv_path', help='full path to csv file containing the raw_rme extract (can be s3 URI e.g. s3://riverscapes-athena/adhoc/yct_sample4.csv)')
-    parser.add_argument('output_gpkg', help='Path to output GeoPackage file', type=str)
+    parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('table_defs_csv', help='Path to rme_table_column_defs.csv', type=str)
     # note rsxml.dotenv screws up s3 paths! we'll need to address that see issue #895 in RiverscapesXML repo
-    # args = dotenv.parse_args_env(parser)
-    # instead, use standard parser:
-    args = parser.parse_args()
+    args = dotenv.parse_args_env(parser)
+    # instead, can use standard parser. However this doesn't handle {env:DATA_ROOT} the way rsxml does
+    # args = parser.parse_args()
 
     log = Logger('Setup')
     log.setup(log_level=logging.DEBUG)
 
+    # Set up some reasonable folders to store things
+    working_folder = args.working_folder
+    download_folder = os.path.join(working_folder, 'downloads')
+    project_dir = os.path.join(working_folder, 'project')  # , 'outputs', 'riverscapes_metrics.gpkg')
+    safe_makedirs(project_dir)
+    project_name = os.path.basename(args.raw_rme_csv_path)
+
+    # parser.add_argument('output_gpkg', help='Path to output GeoPackage file', type=str)
+    gpkg_path = os.path.join(project_dir, 'outputs', 'riverscape_metrics.gpkg') 
+
     # csv can be either a local path or an s3 path. parse and handle accordingly
-    # TODO (enhancement) - stream/process without storing the tempfile
+    # TODO (enhancement) - stream and process file without storing the tempfile
     if args.raw_rme_csv_path.startswith('s3:'):
         with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmpfile:
             local_csv = tmpfile.name
@@ -322,9 +353,10 @@ def main():
         local_csv = args.raw_rme_csv_path   
 
     table_schema_map, table_col_order, fk_tables = parse_table_defs(args.table_defs_csv)
-    conn = create_geopackage(args.output_gpkg, table_schema_map, table_col_order, fk_tables, args.spatialite_path)
+    conn = create_geopackage(gpkg_path, table_schema_map, table_col_order, fk_tables, args.spatialite_path)
     populate_tables_from_csv(local_csv, conn, table_schema_map, table_col_order)
     create_views(conn, table_col_order)
+    create_igos_project(project_dir, project_name)
     log.info('Process complete.')
 
 if __name__ == '__main__':
