@@ -3,13 +3,17 @@
 import os
 from typing import List
 import json
+import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-import inquirer
 from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
 
 
 def add_tag(riverscapes_api: RiverscapesAPI):
+    """Add essential tags to projects from the server.
+
+    """
+
     log = Logger('AddTag')
     log.title('Add Essential Tag to Projects from the server')
 
@@ -53,9 +57,9 @@ def add_tag(riverscapes_api: RiverscapesAPI):
         # Fallback in case it needs attribute assignment:
         print("Error finding orgId, using RiverscapesSearchParams with kwargs failed.")
 
-    # # -------------------------------------------------------------------------
-    # # 3) Fixed tag list for this script
-    # # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # 3) Fixed tag list for this script
+    # -------------------------------------------------------------------------
     tags = ["ESSENTIAL"]
 
     # Instead of command-line arguments, we'll use inquirer to ask the user for the stage and tags
@@ -66,9 +70,9 @@ def add_tag(riverscapes_api: RiverscapesAPI):
     ]
     answers = inquirer.prompt(questions)
 
-    # tags = [x.strip() for x in answers['tags'].split(',')]
-    # logdir = answers['logdir']
-    # safe_makedirs(logdir)
+    tags = [x.strip() for x in answers['tags'].split(',')]
+    logdir = answers['logdir']
+    safe_makedirs(logdir)
 
     # logdir = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs"
     # safe_makedirs(logdir)
