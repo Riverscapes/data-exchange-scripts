@@ -98,6 +98,7 @@ fragment paginated on Pagination {
 fragment dbobjSm on DBObj {
   id
   name
+  __typename
 }
 
 fragment dataset on Dataset {

@@ -1,0 +1,30 @@
+query requestUploadProject(
+  $projectId: String
+  $token: String
+  $files: [String!]!
+  $etags: [String!]!
+  $sizes: [BigInt!]!
+  $noDelete: Boolean
+  $owner: OwnerInput
+  $tags: [String!]
+  $visibility: ProjectVisibilityEnum
+) {
+  requestUploadProject(
+    projectId: $projectId
+    token: $token
+    files: $files
+    etags: $etags
+    sizes: $sizes
+    noDelete: $noDelete
+    owner: $owner
+    tags: $tags
+    visibility: $visibility
+  ) {
+    newId
+    create
+    delete
+    token
+    update
+    __typename
+  }
+}

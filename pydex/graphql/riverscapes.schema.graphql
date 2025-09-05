@@ -1,3 +1,7 @@
+directive @admin_only on FIELD_DEFINITION
+
+directive @logged_in on FIELD_DEFINITION
+
 scalar BigInt
 
 type Collection implements DBObj & HasOwner & HasStar & HasTags {
@@ -19,7 +23,7 @@ type Collection implements DBObj & HasOwner & HasStar & HasTags {
   permissions: ObjectPermissions!
 
   """Paginated, ordered list of projects this collection contains"""
-  projects(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
+  projects(excludeArchived: Boolean, limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
   starred: Boolean!
   starredCount: Int!
   summary: String!
@@ -277,9 +281,11 @@ input DatasetInput {
 type DatasetLayer {
   citation: String
   description: String
+  extRef: ID
   lyrName: String!
   meta: [MetaData!]
   name: String!
+  refProject: Project
   summary: String
 }
 
@@ -287,6 +293,7 @@ type DatasetLayer {
 input DatasetLayerInput {
   citation: String
   description: String
+  extRef: ID
   lyrName: String!
   meta: [MetaDataInput!]
   name: String
@@ -341,6 +348,17 @@ input DatasetUpdate {
 
 scalar DateTime
 
+"""
+Instead of using a createdOn SearchDateInput you can specify this
+and it will search within a certain time period from the date of the search
+"""
+enum DateWithinEnum {
+  ONE_DAY
+  ONE_MONTH
+  ONE_WEEK
+  SIX_MONTHS
+}
+
 scalar EmailAddress
 
 enum EntitiesWithImagesEnum {
@@ -348,6 +366,7 @@ enum EntitiesWithImagesEnum {
   ORGANIZATION
   PROJECT
   PROJECT_TYPE
+  SAVED_SEARCH
   USER
 }
 
@@ -419,6 +438,33 @@ type HeroImage {
   sm: URL
 }
 
+type HiddenResult {
+  id: ID!
+}
+
+"""
+HivebriteProfile is a type that represents the user's profile in Hivebrite.
+This is the integration where we pull hivebrite information into the data exchange
+"""
+type HivebriteProfile {
+  avatar: URL
+  email: String
+  firstname: String
+  headline: String
+  hivebriteUrl: URL!
+
+  """
+  The Hivebrite user ID: This will let us build the url to the hivebrite profile
+  Note that most fields have access permissions on hivebrite and we will not show those fields on the 
+  data exchange unless the user has given us permission to do so in their hivebrite profile.
+  """
+  id: ID!
+  lastname: String
+  linkedIn: URL
+  summary: String
+  website: URL
+}
+
 enum ImageTypeEnum {
   AVATAR
   HERO
@@ -478,7 +524,7 @@ type MapCluster {
   coords: [Float!]!
   count: Int!
 
-  """check out npm's 'ngeogrid' for how to turn this back into coordinates """
+  """check out npm's 'ngeogrid' for how to turn this back into coordinates"""
   hash: String!
 }
 
@@ -487,7 +533,7 @@ type MetaData {
   key: String!
   locked: Boolean
   type: MetaDataTypeEnum
-  value: String!
+  value: String
 }
 
 enum MetaDataExtEnum {
@@ -515,8 +561,11 @@ input MetaDataInput {
   """Optional meta type value. Defaults to String"""
   type: MetaDataTypeEnum
 
-  """Strignified metadata value"""
-  value: String!
+  """
+  Strignified metadata value
+  NOTE: In the XML spec null is allowed so technically it is allowed here too.
+  """
+  value: String
 }
 
 """
@@ -558,9 +607,6 @@ type Mutation {
   ADMIN: Recreate/empty opensearch indeces (you will need to run adminRebuildOpenSearch after this)
   """
   adminRecreateOpenSearch: Boolean
-
-  """ADMIN: Wipe DynamoDB except for users"""
-  adminWipeDynamo: Int
   changeProjectOwner(owner: OwnerInput!, projectId: ID!): Project
 
   """Create a collection of projects"""
@@ -789,7 +835,7 @@ type Organization implements DBObj & HasStar {
   """
   permissions: ObjectPermissions!
   preferences: JSONObject
-  projects(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
+  projects(excludeArchived: Boolean, limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
   savedSearches(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedSavedSearches!
   social: SocialLinks
   starred: Boolean!
@@ -943,7 +989,7 @@ type PaginatedProjectTypes implements Pagination {
 }
 
 type PaginatedProjects implements Pagination {
-  items: [Project!]!
+  items: [ProjectResult!]!
   limit: Int!
   offset: Int!
   total: Int!
@@ -989,14 +1035,15 @@ type Profile implements DBObj & UserInterface {
   createdBy: User!
   createdOn: DateTime!
   description: String!
+  hivebriteProfile: HivebriteProfile
   id: ID!
 
   """If the user has never logged in here this is uninitialized"""
   initialized: Boolean
   isAdmin: Boolean!
-  jobTitle: String!
+  jobTitle: String
   lastLogin: DateTime!
-  location: String!
+  location: String
   meta: [MetaData!]!
   name: String!
   notifications(limit: Int!, offset: Int!, op: NotificationOperationEnum): PaginatedNotifications!
@@ -1007,7 +1054,7 @@ type Profile implements DBObj & UserInterface {
   preferences: JSONObject!
 
   """Projects this user owns. Filtered if the querying user is someone else"""
-  projects(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
+  projects(excludeArchived: Boolean, limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
 
   """
   Saved Searches this user owns. Filtered if the querying user is someone else
@@ -1060,6 +1107,8 @@ input ProfileInput {
 }
 
 type Project implements DBObj & HasOwner & HasStar {
+  archived: Boolean!
+
   """Banner image (optional)"""
   bounds: ProjectBounds
   citation: String
@@ -1155,6 +1204,11 @@ enum ProjectGroupVisibilityEnum {
 
 input ProjectInput {
   """
+  Set the archived status of the project: True or False affect the status. Leave it blank to not change it
+  """
+  archived: Boolean
+
+  """
   Project bounds object code you were given from the checkUploadBounds endpoint
   """
   boundsToken: String
@@ -1210,9 +1264,11 @@ input ProjectInput {
   visibility: ProjectVisibilityEnum
 }
 
+union ProjectResult = HiddenResult | Project
+
 type ProjectSearchMeta {
   """
-  The area covered by all projects returned 
+  The area covered by all projects returned
   (all overlaps are included)
   """
   area: Float
@@ -1231,6 +1287,11 @@ type ProjectSearchMeta {
   geoBuckets: JSONObject
   maxScore: Float
   metaDataBuckets: JSONObject!
+
+  """
+  OpenSearch query/results for development. Only present when debug=true on the query and the user is an admin.
+  """
+  openSearch: JSONObject
 
   """
   ProjectTypes: Key-balue pairs of project types and counts
@@ -1260,8 +1321,19 @@ type ProjectSearchParams {
   """
   createdOn: SearchDate
 
-  """Only projects that I can edit as a user """
+  """
+  Filter to projects within a certain time period from the time the search is being made (Now)
+  Cannot be used with createdOn
+  """
+  createdWithin: DateWithinEnum
+
+  """Only projects that I can edit as a user"""
   editableOnly: Boolean
+
+  """
+  Exclude Archived projects. Setting this to true will exclude archived projects from the search results.
+  """
+  excludeArchived: Boolean
   keywords: String
   meta: [MetaData!]
   name: String
@@ -1302,8 +1374,19 @@ input ProjectSearchParamsInput {
   """
   createdOn: SearchDateInput
 
-  """Only projects that I can edit as a user """
+  """
+  Filter to projects within a certain time period from the time the search is being made (Now)
+  Cannot be used with createdOn
+  """
+  createdWithin: DateWithinEnum
+
+  """Only projects that I can edit as a user"""
   editableOnly: Boolean
+
+  """
+  Exclude Archived projects. Setting this to true will exclude archived projects from the search results.
+  """
+  excludeArchived: Boolean
   keywords: String
   meta: [MetaDataInput!]
   name: String
@@ -1321,6 +1404,9 @@ input ProjectSearchParamsInput {
   or you can specify both 'from' AND 'to' to specify projects BETWEEN two dates
   """
   updatedOn: SearchDateInput
+
+  """Filter to projects of a certain visibility"""
+  visibility: ProjectVisibilityEnum
 }
 
 type ProjectTree {
@@ -1425,6 +1511,7 @@ type ProjectType implements DBObj {
   """
   meta: [MetaData!]!
   name: String!
+  permissions: ObjectPermissions!
   state: ProjectTypeStateEnum!
   summary: String!
   updatedBy: User!
@@ -1556,6 +1643,9 @@ type Query {
   downloadZip(projectId: ID!): ZipFileDownloadMeta
   getLayerTiles(projectId: ID!, projectTypeId: String, rsXPath: String!): TileService
 
+  """Detailed logs for single dataset layer"""
+  getTilerizerLogs(projectId: ID!, projectTypeId: String, rsXPath: String!): String
+
   """
   getWebSymbology for a given project type. These types will be retrived from the curated WebRave Symbology repo
   """
@@ -1608,7 +1698,7 @@ type Query {
   """
   requestUploadProjectFilesUrl(files: [String!]!, token: String!): [UploadProjectFileUrls]
   savedSearch(id: ID!): SavedSearch
-  searchCollections(limit: Int!, minScore: Float, offset: Int!, params: SearchParamsInput!, sort: [SearchSortEnum!]): SearchCollectionPagination!
+  searchCollections(debug: Boolean, limit: Int!, minScore: Float, offset: Int!, params: SearchParamsInput!, sort: [SearchSortEnum!]): SearchCollectionPagination!
 
   """
   This is a complementary search to "searchProjects". It can be run with essentially the same
@@ -1617,27 +1707,30 @@ type Query {
   Note: params.bbox MUST be included for the searchProjectsMap
   clusters: the number of clusters we should aim for
   """
-  searchMapBounds(limit: Int!, minScore: Float, params: ProjectSearchParamsInput!): SearchMapBoundsResult!
+  searchMapBounds(debug: Boolean, limit: Int!, minScore: Float, params: ProjectSearchParamsInput!): SearchMapBoundsResult!
 
   """
   Discussion here https://github.com/Riverscapes/rs-web-monorepo/discussions/251
   limit: the maximum number of clusters to get back. After this number the list is truncated and any remaining projects are simply represented by the "remaining" property
   precision: The size of the grid to place the clusters on. We use npm's ngeohash for gridding
   """
-  searchMapClusters(limit: Int!, minScore: Float, params: ProjectSearchParamsInput!, precision: Int!): SearchMapClusterResult!
-  searchOrganizations(limit: Int!, minScore: Float, offset: Int!, params: SearchParamsInput!, sort: [SearchSortEnum!]): SearchOrganizationPagination!
-  searchProjects(limit: Int!, minScore: Float, offset: Int!, params: ProjectSearchParamsInput!, sort: [SearchSortEnum!]): SearchProjectPagination!
-  searchSavedSearches(limit: Int!, minScore: Float, offset: Int!, params: SearchParamsInput!, sort: [SearchSortEnum!]): SearchSavedSearchPagination!
+  searchMapClusters(debug: Boolean, limit: Int!, minScore: Float, params: ProjectSearchParamsInput!, precision: Int!): SearchMapClusterResult!
+  searchOrganizations(debug: Boolean, limit: Int!, minScore: Float, offset: Int!, params: SearchParamsInput!, sort: [SearchSortEnum!]): SearchOrganizationPagination!
+  searchProjects(debug: Boolean, limit: Int!, minScore: Float, offset: Int!, params: ProjectSearchParamsInput!, sort: [SearchSortEnum!]): SearchProjectPagination!
+  searchSavedSearches(debug: Boolean, limit: Int!, minScore: Float, offset: Int!, params: SearchParamsInput!, sort: [SearchSortEnum!]): SearchSavedSearchPagination!
 
   """
   As-you-type suggestions:
   TODO: this needs to be typed but for now it's just pure JSON
   """
   searchSuggest(minScore: Float, text: String!, type: StarrableTypesEnum): SearchSuggestionResults
-  searchUsers(limit: Int!, minScore: Float, offset: Int!, params: SearchParamsInput!, sort: [SearchSortEnum!]): SearchUserPagination!
+  searchUsers(debug: Boolean, limit: Int!, minScore: Float, offset: Int!, params: SearchParamsInput!, sort: [SearchSortEnum!]): SearchUserPagination!
 
   """A User is any user in the system"""
   user(id: ID!): User
+
+  """A reverse lookup is often useful"""
+  userByAuth0Id(auth0Id: ID!): User
 
   """
   Validate a raw project.rs.xml file to check if it is a valida candidate for uploading
@@ -1663,6 +1756,8 @@ type RebuildWebTilesResponse {
 }
 
 type SavedSearch implements DBObj & HasOwner & HasStar & HasTags {
+  """Citation string"""
+  citation: String
   createdBy: User!
   createdOn: DateTime!
 
@@ -1671,6 +1766,9 @@ type SavedSearch implements DBObj & HasOwner & HasStar & HasTags {
   """
   defaultSort: [SearchSortEnum!]
   description: String!
+
+  """Banner image (optional)"""
+  heroImage: HeroImage
   id: ID!
   meta: [MetaData!]!
   name: String!
@@ -1690,6 +1788,12 @@ type SavedSearch implements DBObj & HasOwner & HasStar & HasTags {
 }
 
 input SavedSearchInput {
+  """Citation string"""
+  citation: String
+
+  """Resets/deletes the user's avatar back to the default"""
+  clearHeroImage: Boolean
+
   """
   The default sort to use. The UI may offer a way to change this on the fly
   """
@@ -1697,6 +1801,9 @@ input SavedSearchInput {
 
   """Verbose description of the object (< SOME_LIMIT kb of text)"""
   description: String
+
+  """The Code you were given from the checkUploadImage endpoint"""
+  heroImageToken: String
 
   """Metadata for this object"""
   meta: [MetaDataInput!]
@@ -1784,6 +1891,11 @@ type SearchMapClusterResult {
 type SearchMeta {
   maxScore: Float
   metaDataBuckets: JSONObject!
+
+  """
+  OpenSearch query/results for development. Only present when debug=true on the query and the user is an admin.
+  """
+  openSearch: JSONObject
 
   """OpenSearch time to retrieve results (ms)"""
   searchTime: Float
@@ -1873,7 +1985,13 @@ input SearchParamsInput {
   """
   createdOn: SearchDateInput
 
-  """Only items that I can edit as a user """
+  """
+  Filter to projects within a certain time period from the time the search is being made (Now)
+  Cannot be used with createdOn
+  """
+  createdWithin: DateWithinEnum
+
+  """Only items that I can edit as a user"""
   editableOnly: Boolean
   keywords: String
   meta: [MetaDataInput!]
@@ -1889,6 +2007,11 @@ input SearchParamsInput {
   or you can specify both 'from' AND 'to' to specify items BETWEEN two dates
   """
   updatedOn: SearchDateInput
+
+  """
+  Filter to items of a certain visibility (valid for collections and saved searches only)
+  """
+  visibility: ProjectGroupVisibilityEnum
 }
 
 type SearchProject implements SearchResult {
@@ -1983,6 +2106,8 @@ enum SearchSortEnum {
   DATE_UPDATED_ASC
   DATE_UPDATED_DESC
   MINE
+  MODEL_VERSION_ASC
+  MODEL_VERSION_DESC
   NAME_ASC
   NAME_DESC
 }
@@ -2093,7 +2218,7 @@ type TileIndexOriginFile implements FileDownloadMetaInterface {
 }
 
 type TileService {
-  bounds: [Float]
+  bounds: [Float!]
   duration: Float
   errorMsg: String
   format: String
@@ -2240,10 +2365,11 @@ type User implements DBObj & UserInterface {
   createdBy: User!
   createdOn: DateTime!
   description: String!
+  hivebriteProfile: HivebriteProfile
   id: ID!
-  jobTitle: String!
+  jobTitle: String
   lastLogin: DateTime!
-  location: String!
+  location: String
   meta: [MetaData!]!
   name: String!
 
@@ -2251,7 +2377,7 @@ type User implements DBObj & UserInterface {
   organizations(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedOrganizations!
 
   """Projects this user owns. Filtered if the querying user is someone else"""
-  projects(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
+  projects(excludeArchived: Boolean, limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
 
   """
   Saved Searches this user owns. Filtered if the querying user is someone else
@@ -2309,10 +2435,11 @@ interface UserInterface {
   createdBy: User!
   createdOn: DateTime!
   description: String!
+  hivebriteProfile: HivebriteProfile
   id: ID!
 
   """Simple job title string field"""
-  jobTitle: String!
+  jobTitle: String
 
   """When did we last see the user?"""
   lastLogin: DateTime!
@@ -2320,12 +2447,12 @@ interface UserInterface {
   """
   Simple location string (Optional) eg: "Vancouver, Canada"
   """
-  location: String!
+  location: String
   meta: [MetaData!]!
   name: String!
 
   """Projects this user owns. Filtered if the querying user is someone else"""
-  projects(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
+  projects(excludeArchived: Boolean, limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
 
   """
   Saved Searches this user owns. Filtered if the querying user is someone else

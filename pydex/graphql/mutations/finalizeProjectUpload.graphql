@@ -1,0 +1,5 @@
+mutation finalizeProjectUpload($token: String!) {
+  finalizeProjectUpload(token: $token) {
+    __typename
+  }
+}

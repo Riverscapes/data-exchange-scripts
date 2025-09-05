@@ -1,4 +1,4 @@
-query requestUploadImage_queries(
+query checkUpload(
   $token: String!
 ) {
   checkUpload(token: $token) {

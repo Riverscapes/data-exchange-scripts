@@ -13,13 +13,17 @@
         archived
         visibility
         totalSize
+        bounds {
+          id # Don't ask for any more than the ID or it will cause an extra dynamo record fetch
+        }
         meta {
           key
           value
         }
-        projectType { id }
+        projectType { id } # Don't ask for any more than the ID or it will cause an extra dynamo record fetch
         createdOn
         updatedOn
+        # The extra record fetch here is unfortunate but the user/org name is just too useful
         ownedBy {
           ... on Organization {
             id
@@ -34,6 +38,7 @@
       }
     }
     total
+    # Stats are pretty cheap to calculate so we always get them
     stats {
     ... on ProjectSearchMeta {
       searchTime

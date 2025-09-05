@@ -1,0 +1,7 @@
+query requestUploadProjectFilesUrl($files: [String!]!, $token: String!) {
+  requestUploadProjectFilesUrl(files: $files, token: $token) {
+    relPath
+    urls
+    __typename
+  }
+}
