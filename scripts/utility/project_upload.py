@@ -31,7 +31,7 @@ def upload_project_files(riverscapes_api: RiverscapesAPI):
     # This part is not actually uploading. We're just downloading the existing project files so we can modify them
     # ================================================================================================================
     # The download dir is the /data folder in this repo
-    download_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'upload_project_files'))
+    download_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'upload_project_files'))
     # Create the directory recursively if it doesn't exist
     safe_makedirs(download_dir)
     # Download the project.rs.xml and project_bounds.geojson files to the download_dir
