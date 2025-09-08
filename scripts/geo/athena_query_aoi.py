@@ -23,9 +23,30 @@ Future enhancements:
 * check for gaps in raw_rme coverage (query huc10_geom and vw_projects)
 """
 
+import geopandas as gpd
+from shapely.geometry import box
+
 def main():
     """get an AOI geometry and query athena raw_rme for data within"""
-    path_to_shape = r"C:\"
+    path_to_shape = r"C:\nardata\work\rme_extraction\20250827-rkymtn\physio_rky_mtn_system.geojson"
+
+    # Read the GeoJSON
+    gdf = gpd.read_file(path_to_shape)
+
+    # Get the total bounds (minx, miny, maxx, maxy)
+    minx, miny, maxx, maxy = gdf.total_bounds
+
+    # Create a bounding box geometry
+    bbox = box(minx, miny, maxx, maxy)
+
+    print("Unbuffered bounding box WKT:", bbox.wkt)
+    
+    # Buffer the bounding box (e.g., by 0.01 degrees)
+    # this produces rounded corners and smooth edges - no longer a straightforward box
+    buffered_bbox = bbox.buffer(0.01)
+    # print("Buffered bounding box WKT:", buffered_bbox.wkt)
+
+
 
 if __name__ == '__main__':
     main()

@@ -257,8 +257,55 @@ def add_geopackage_tables(conn: apsw.Connection):
     #     );
     # """)
 
-def create_igos_project(project_dir: str, project_name: str):
+def get_bounds(bounds_gpkg: str, spatialite_path: str) -> tuple[str, str, str]:
+    """
+    Union all the polygons in the bounds GeoPackage and return the centroid, bounding box and GeoJSON
+    This was copied from scrape_rme2.py
+    There is also code in riverscapes tools that does this:
+      https://github.com/Riverscapes/riverscapes-tools/blob/master/lib/commons/rscommons/project_bounds.py
+    todo: consolidate so we don't repeat yourself (DRY)
+    """
+
+    conn = apsw.Connection(bounds_gpkg)
+    conn.enable_load_extension(True)
+    conn.load_extension(spatialite_path)
+    curs = conn.cursor()
+    curs.execute('''
+        SELECT AsGeoJSON(union_geom) AS geojson,
+            ST_X(ST_Centroid(union_geom)),
+            ST_Y(ST_Centroid(union_geom)),
+            ST_MinX(union_geom),
+            ST_MinY(union_geom),
+            ST_MaxX(union_geom),
+            ST_MaxY(union_geom) FROM (
+                SELECT ST_Simplify(ST_Buffer(ST_Union(ST_Buffer(CastAutomagic(geom), 0.001)), -0.001), 0.01) union_geom FROM project_bounds
+            )''')
+
+    bounds_row = curs.fetchone()
+    geojson_geom = json.loads(bounds_row[0])
+    centroid = (bounds_row[1], bounds_row[2])
+    bounding_box = [
+        bounds_row[3],
+        bounds_row[4],
+        bounds_row[5],
+        bounds_row[6]
+    ]
+
+    geojson_output = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": geojson_geom,
+            "properties": {}
+        }]
+    }
+
+    return geojson_output, centroid, bounding_box
+
+def create_igos_project(project_dir: str, project_name: str, spatialite_path: str, bounds_gpkg_path: str):
     # Build the bounds for the new RME scrape project
+    bounds, centroid, bounding_rect = get_bounds(bounds_gpkg_path, spatialite_path)
+    print(f"centroid = {centroid}")
     return
 
 def create_views(conn: apsw.Connection, table_col_order: dict):
@@ -356,7 +403,7 @@ def main():
     conn = create_geopackage(gpkg_path, table_schema_map, table_col_order, fk_tables, args.spatialite_path)
     populate_tables_from_csv(local_csv, conn, table_schema_map, table_col_order)
     create_views(conn, table_col_order)
-    create_igos_project(project_dir, project_name)
+    create_igos_project(project_dir, project_name, args.spatialite_path, r"C:\nardata\work\rme_extraction\20250820-yct\yct_range.gpkg")
     log.info('Process complete.')
 
 if __name__ == '__main__':

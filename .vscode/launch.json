@@ -322,10 +322,10 @@
       ]
     },
     {
-      "name": "Python: athena_to_rme",
+      "name": "Python: athenacsv_to_rme",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/scripts/geo/athena_to_rme.py",
+      "program": "${workspaceFolder}/scripts/geo/athenacsv_to_rme.py",
       "console": "integratedTerminal",
       "args": [
           "C:\\OSGeo4W\\bin\\mod_spatialite.dll",
