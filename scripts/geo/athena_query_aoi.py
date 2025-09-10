@@ -9,10 +9,10 @@ August 2025
 2. buffer it 
 3. sql prequery on lat lon within buffered bounding box
 4. get the shape in queryable format
-    option 1 - upload the shape to s3/create athena table 
-    option 2 - just get wkt, wkb string
+    option 1 (chosen) - produce and use wkt or wkb string for query
+    option 2 - upload the shape to s3/create athena table
 5. query the dgos for the actual aoi
-    option 1 - (most accurate way) query st_intersects aoi and dgo geometry 
+    option 1 (chosen) - (most accurate way) query st_intersects aoi and dgo geometry 
     option 2 - (faster way) query dgo point within aoi 
 
 Output can then be further processed with athena_to_rme.py
@@ -22,7 +22,7 @@ Assumption:
 
 Future enhancements: 
 * attach attributes from aoi to result - especially useful for multi-polygon aoi 
-* check if shape is simple enough to handle in query without uploading it - and if not simplify it
+* provide ability to simplify the shape if it is not simple enough to handle in query 
 * check for gaps in raw_rme coverage (query huc10_geom and vw_projects)
 """
 
@@ -34,6 +34,15 @@ from rsxml import Logger
 # buffer, in decimal degrees, on centroids to capture DGO. 
 # value of 0.47 is based on an analysis of distance between centroid and corners of bounding boxes of raw_rme 2025-09-08
 BUFFER_CENTROID_TO_BB_DD = 0.47 
+
+def simplify_aoi_gdf(gdf: gpd.GeoDataFrame, tolerance_meters: float = 11) -> gpd.GeoDataFrame:
+    # Reproject to a projected CRS (EPSG:5070 is good for CONUS)
+    gdf_proj = gdf.to_crs(epsg=5070)
+    # Simplify geometries in projected CRS (tolerance in meters)
+    gdf_proj["geometry"] = gdf_proj.geometry.simplify(tolerance=tolerance_meters, preserve_topology=True)
+    # Reproject back to EPSG:4326 for Athena
+    gdf_simplified = gdf_proj.to_crs(epsg=4326)
+    return gdf_simplified
 
 def get_aoi_geom_sql_expression(gdf: gpd.GeoDataFrame, max_size_bytes=261000) -> str | None: 
     """check the geometry, union 
@@ -112,17 +121,26 @@ def run_aoi_athena_query(path_to_shape: str, s3_bucket: str) -> str | None:
     prefilter_where_clause = generate_sql_where_clause_for_bounds(gdf)
 
     # count the prefiltered records - uncomment for debugging only
-    query_str = f'SELECT count(*) FROM raw_rme {prefilter_where_clause}'
+    query_str = f'SELECT count(*) AS record_count FROM raw_rme {prefilter_where_clause}'
     raw_results = (athena_query(s3_bucket, query_str))
-    print (parse_athena_results(raw_results))
+    log.debug (f'Prefiltered records: {parse_athena_results(raw_results)}')
 
-    aoi_geom_str = get_aoi_geom_sql_expression(gdf) # test lower max
-    if not aoi_geom_str: 
-        log.error('Unable to get a valid AOI geometry - quitting.')
-        return
-    print (f'aoi_geo_str is {len(aoi_geom_str)} long')
+    # Try with original geometry
+    aoi_geom_str = get_aoi_geom_sql_expression(gdf)
+    simplified = False
+
+    # If too large, try with simplified geometry
     if not aoi_geom_str:
-        raise ValueError('Could not create suitable geometry from supplied value.')
+        log.info("AOI geometry too large, simplifying and retrying...")
+        gdf = simplify_aoi_gdf(gdf, tolerance_meters=11)  # Adjust tolerance as needed
+        aoi_geom_str = get_aoi_geom_sql_expression(gdf)
+        simplified = True
+
+    if not aoi_geom_str:
+        log.error('Could not create suitable geometry from supplied value, even after simplification.')
+        return
+
+    log.debug(f'aoi_geo_str is {len(aoi_geom_str)} long ({"simplified" if simplified else "original"})')
 
     # For a query to pull just the lat/lon of DGOs that intersect, use this instead
     # fields_str = "longitude, latitude"
@@ -148,12 +166,14 @@ def run_aoi_athena_query(path_to_shape: str, s3_bucket: str) -> str | None:
         );
     """
 
-    print (f'Query is {len(query_str.encode('utf-8'))} bytes')
-    print(f"Query ends with: {repr(query_str[-30:])}")
-    print("Full query:")
-    print(query_str)
-    with open("athena_query.sql", "w", encoding="utf-8") as f:
-        f.write(query_str)
+    # Debugging output
+    log.debug(f'Query is {len(query_str.encode('utf-8'))} bytes')
+    log.debug(f"Query starts with: {query_str[:50]}")
+    log.debug(f"Query ends with: {query_str[-30:]}")
+    # print("Full query:")
+    # print(query_str)
+    # with open("athena_query.sql", "w", encoding="utf-8") as f:
+    #     f.write(query_str)
 
     results = athena_query(s3_bucket, query_str, return_output_path=True)
     return results
@@ -161,7 +181,7 @@ def run_aoi_athena_query(path_to_shape: str, s3_bucket: str) -> str | None:
 def main():
     """get an AOI geometry and query athena raw_rme for data within"""
     # path_to_shape = r"C:\nardata\work\rme_extraction\20250827-rkymtn\physio_rky_mtn_system.geojson"
-    path_to_shape = r"C:\nardata\work\rme_extraction\small_test_aoi_one_huc10.geojson"
+    path_to_shape = r"C:\nardata\work\rme_extraction\Price-riv\pricehuc10s.geojson"
     s3_bucket = "riverscapes-athena"
 
     path_to_results = run_aoi_athena_query(path_to_shape, s3_bucket)

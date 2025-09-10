@@ -8,7 +8,6 @@ Lorin Gaertner (with copilot)
 August 2025
 
 IMPLEMENTED: Sequential dgoid (integer), geometry handling for dgo_geom (SRID 4326, WKT conversion), foreign key syntax in table creation, error handling (throws on missing/malformed required columns), debug output for skipped/invalid rows.
-TODO Look at scrape_rme2.py as that kind of project is what we are trying to build - this similar but a bit different 
 Actual column names/types must be supplied in rme_table_column_defs.csv. 
 Geometry column creation and spatialite extension loading are stubbed (see TODOs). 
 No batching/optimization for very large CSVs - but it handled 1.5 M records okay as is.
