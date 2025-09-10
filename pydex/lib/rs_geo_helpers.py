@@ -2,7 +2,11 @@ import apsw
 import json
 from rsxml import Logger
 
-def get_bounds(bounds_gpkg: str, spatialite_path: str, bounds_layer: str = 'project_bounds', ) -> tuple[dict, tuple[float, float], tuple[float, float, float, float]]:
+def get_bounds(
+        bounds_gpkg: str, 
+        spatialite_path: str, 
+        bounds_layer: str = 'project_bounds'
+        ) -> tuple[dict, tuple[float, float], tuple[float, float, float, float]]:
     """
     Union all the polygons in the bounds_gpkg layer named project_bounds
     Simplifies as well. 
@@ -10,11 +14,11 @@ def get_bounds(bounds_gpkg: str, spatialite_path: str, bounds_layer: str = 'proj
 
     Returns: GeoJSOn dictionary, the centroid, the bounding box
 
-    This was copied from scrape_rme2.py
-    There is also code in riverscapes tools that does this:
+    This was copied from scrape_rme2.py and then modified
+    There is also code in riverscapes tools that does similar work:
       https://github.com/Riverscapes/riverscapes-tools/blob/master/lib/commons/rscommons/project_bounds.py
     And in QRAVE https://github.com/Riverscapes/QRAVEPlugin/blob/master/src/frm_project_bounds.py 
-    todo: consolidate so we don't repeat yourself (DRY)
+    Todo: consolidate or at least annotate the other versions, so we don't repeat yourself (DRY)
     """
     log = Logger('get bounds')
     conn = apsw.Connection(bounds_gpkg)

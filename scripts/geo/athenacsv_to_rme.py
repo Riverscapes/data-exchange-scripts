@@ -237,9 +237,11 @@ def populate_tables_from_csv(csv_path: str, conn: apsw.Connection, table_schema_
                     #     log.debug(sqlstatement)
                     #     log.debug(insert_values)
                     curs.execute(sqlstatement, insert_values)
-                # TODO (enhance) use file size and progress bar instead of this status message
+                # TODO (enhance) use progress bar instead of this status message
+                # thought to use file size and tell() but that doesn't work - would have to read the number of rows first
+                # need to check if that slows things down much - probably not
                 if idx % 10000 == 0:
-                    log.info(f"Inserted {idx} rows...")
+                    log.info(f"Inserted {idx} rows.")
             conn.execute('COMMIT')
             log.info(f"Inserted {idx} rows.")    
         except Exception as e:
@@ -302,7 +304,7 @@ def create_igos_project(project_dir: str, project_name: str, spatialite_path: st
     """
     log = Logger ('Create IGOS project')
     # Build the bounds for the new RME scrape project
-    # dgos table has geom but it is point... should work
+    # dgos table has point geom but buffering them works
     # Alternate approach : we could use the AOI that was used to select the dgos to begin with
     bounds, centroid, bounding_rect = get_bounds(gpkg_path, spatialite_path, bounds_layer='dgos')
     output_bounds_path = os.path.join(project_dir, 'project_bounds.geojson')
@@ -312,7 +314,9 @@ def create_igos_project(project_dir: str, project_name: str, spatialite_path: st
     rs_project = Project(
         project_name,
         project_type='igos',
-        description=f"""This project was generated ...""",
+        description=f"""This project was generated as an extract from raw_rme which is itself an extract of Riverscapes Metric Engine projects in the Riverscapes Data Exchange produced as part of the 2025 CONUS run of Riverscapes tools. See https://docs.riverscapes.net/initiatives/CONUS-runs for more about this initiative. 
+        At the time of extraction this dataset has *not* yet been thoroughly quality controlled and may contain errors or gaps. 
+        """,
         bounds=ProjectBounds(
             Coords(centroid[0], centroid[1]),
             BoundingBox(bounding_rect[0], bounding_rect[1], bounding_rect[2], bounding_rect[3]),
