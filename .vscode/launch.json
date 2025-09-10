@@ -327,10 +327,14 @@
       "request": "launch",
       "program": "${workspaceFolder}/scripts/geo/athenacsv_to_rme.py",
       "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
       "args": [
           "C:\\OSGeo4W\\bin\\mod_spatialite.dll",
+          "s3://riverscapes-athena/athena_query_results/d40eac38-0d04-4249-8d55-ad34901fee82.csv",
           //"s3://riverscapes-athena/output/lorin/Unsaved/2025/08/22/561fc758-c653-45c3-857a-9d0095b57cd8.csv",
-          "C:\\Users\\narlorin\\AppData\\Local\\Temp\\tmpl_wxjuk9.csv",
+          // "C:\\Users\\narlorin\\AppData\\Local\\Temp\\tmpl_wxjuk9.csv",
           //"s3://riverscapes-athena/adhoc/yct10.csv",
           // "yct10.gpkg",
           "{env:DATA_ROOT}/athena_to_rme",

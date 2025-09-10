@@ -16,15 +16,31 @@ No advanced validation or transformation beyond geometry and required columns.
 Foreign key constraints are defined but not enforced unless PRAGMA foreign_keys=ON is set.
 """
 
+from datetime import datetime
 import os
 import csv
 import logging
 import argparse
 import boto3
 import apsw
+import json
 import tempfile
+from pydex.lib.rs_geo_helpers import get_bounds
 from rsxml import dotenv, Logger, ProgressBar
 from rsxml.util import safe_makedirs
+from rsxml.project_xml import (
+    Project,
+    MetaData,
+    Meta,
+    ProjectBounds,
+    Coords,
+    BoundingBox,
+    Realization,
+    Geopackage,
+    GeopackageLayer,
+    GeoPackageDatasetTypes,
+    Dataset
+)
 
 GEOMETRY_COL_TYPES = ('MULTIPOLYGON','POINT')
 
@@ -84,7 +100,7 @@ def download_file_from_s3(s3_uri: str, local_path: str) -> None:
     s3 = boto3.client('s3')
     response = s3.head_object(Bucket=s3_bucket, Key=s3_key)
     size_bytes = response['ContentLength']
-    log.info(f"ContentType: {response['ContentType']}\n File size: {size_bytes} bytes")
+    log.info(f"ContentType: {response['ContentType']}\t File size: {size_bytes} bytes")
     # TODO if very large, add progress bar
     s3.download_file(s3_bucket, s3_key, local_path)
     log.info("Download complete.")
@@ -217,9 +233,10 @@ def populate_tables_from_csv(csv_path: str, conn: apsw.Connection, table_schema_
                         else:
                             sql_placeholders.append("?")
                     sqlstatement = f"INSERT INTO {table} ({', '.join(insert_cols)}) VALUES ({', '.join(sql_placeholders)})"
-                    if idx == 1: 
-                        log.debug(sqlstatement)
-                        log.debug(insert_values)
+                    # uncomment for debug printing first SQL statement - noisy
+                    # if idx == 1: 
+                    #     log.debug(sqlstatement)
+                    #     log.debug(insert_values)
                     curs.execute(sqlstatement, insert_values)
                 # TODO (enhance) use file size and progress bar instead of this status message
                 if idx % 10000 == 0:
@@ -257,72 +274,95 @@ def add_geopackage_tables(conn: apsw.Connection):
     #     );
     # """)
 
-def get_bounds(bounds_gpkg: str, spatialite_path: str) -> tuple[str, str, str]:
+def get_datasets(output_gpkg: str) -> list[GeopackageLayer]:
     """
-    Union all the polygons in the bounds GeoPackage and return the centroid, bounding box and GeoJSON
-    This was copied from scrape_rme2.py
-    There is also code in riverscapes tools that does this:
-      https://github.com/Riverscapes/riverscapes-tools/blob/master/lib/commons/rscommons/project_bounds.py
-    todo: consolidate so we don't repeat yourself (DRY)
+    Returns a list of the datasets from the output GeoPackage.
+    These are the spatial views that are created from the igos and dgos tables.
+    ***COPIED FROM scrape_rme2.py***
     """
 
-    conn = apsw.Connection(bounds_gpkg)
+    conn = apsw.Connection(output_gpkg)
     conn.enable_load_extension(True)
-    conn.load_extension(spatialite_path)
     curs = conn.cursor()
-    curs.execute('''
-        SELECT AsGeoJSON(union_geom) AS geojson,
-            ST_X(ST_Centroid(union_geom)),
-            ST_Y(ST_Centroid(union_geom)),
-            ST_MinX(union_geom),
-            ST_MinY(union_geom),
-            ST_MaxX(union_geom),
-            ST_MaxY(union_geom) FROM (
-                SELECT ST_Simplify(ST_Buffer(ST_Union(ST_Buffer(CastAutomagic(geom), 0.001)), -0.001), 0.01) union_geom FROM project_bounds
-            )''')
 
-    bounds_row = curs.fetchone()
-    geojson_geom = json.loads(bounds_row[0])
-    centroid = (bounds_row[1], bounds_row[2])
-    bounding_box = [
-        bounds_row[3],
-        bounds_row[4],
-        bounds_row[5],
-        bounds_row[6]
-    ]
+    # Get the names of all the tables in the database
+    curs.execute("SELECT table_name FROM gpkg_contents WHERE data_type='features'")
+    datasets = [GeopackageLayer(
+        lyr_name=row[0],
+        ds_type=GeoPackageDatasetTypes.VECTOR,
+        name=row[0]
+    ) for row in curs.fetchall()]
+    return datasets
 
-    geojson_output = {
-        "type": "FeatureCollection",
-        "features": [{
-            "type": "Feature",
-            "geometry": geojson_geom,
-            "properties": {}
-        }]
-    }
+def create_igos_project(project_dir: str, project_name: str, spatialite_path: str, gpkg_path: str, log_path: str):
+    """
+    Create a Riverscapes project of type 
+    Modelled after scrape_rme2.py 
 
-    return geojson_output, centroid, bounding_box
-
-def create_igos_project(project_dir: str, project_name: str, spatialite_path: str, bounds_gpkg_path: str):
+    
+    """
+    log = Logger ('Create IGOS project')
     # Build the bounds for the new RME scrape project
-    bounds, centroid, bounding_rect = get_bounds(bounds_gpkg_path, spatialite_path)
+    # dgos table has geom but it is point... should work
+    # Alternate approach : we could use the AOI that was used to select the dgos to begin with
+    bounds, centroid, bounding_rect = get_bounds(gpkg_path, spatialite_path, bounds_layer='dgos')
+    output_bounds_path = os.path.join(project_dir, 'project_bounds.geojson')
+    with open(output_bounds_path, "w", encoding='utf8') as f:
+        json.dump(bounds, f, indent=2)
     print(f"centroid = {centroid}")
-    return
+    rs_project = Project(
+        project_name,
+        project_type='igos',
+        description=f"""This project was generated ...""",
+        bounds=ProjectBounds(
+            Coords(centroid[0], centroid[1]),
+            BoundingBox(bounding_rect[0], bounding_rect[1], bounding_rect[2], bounding_rect[3]),
+            os.path.basename(gpkg_path)),
+            realizations=[Realization(
+                name='Realization1',
+                xml_id='REALIZATION1',
+                date_created=datetime.now(),
+                product_version='1.0.0',
+                datasets=[
+                    Geopackage(
+                        name='Riverscapes Metrics',
+                        xml_id='RME',
+                        path=os.path.relpath(gpkg_path, project_dir),
+                        layers=get_datasets(gpkg_path)
+                    ),
+                    Dataset(
+                        xml_id='LOG',
+                        ds_type='LogFile',
+                        name='Lof File',
+                        description='Processing log file',
+                        path=os.path.relpath(log_path, project_dir),
+                    ),
+                ]
+            )]
+    )
+    merged_project_xml = os.path.join(project_dir, 'project.rs.xml')
+    rs_project.write(merged_project_xml)
+    log.info(f'Project XML file written to {merged_project_xml}')
 
 def create_views(conn: apsw.Connection, table_col_order: dict):
     """
     create spatial views for each attribute table joined with the dgos (spatial) table 
-    modeled after clean_up_gpkg in scrape_rme2 but using the dgo geom (which is a point)"""
+    also creates a combined view 'vw_dgo_metrics' joining all attribute tables and `dgos`
+    Registers each view in gpkg_contents and gpkg_geometry_columns so GIS tools recognize them as spatial layers.
+    modeled after clean_up_gpkg in scrape_rme2 but using the dgo geom (which is a point)
+    """
+    log = Logger ('Create views')
     curs = conn.cursor()
     
     dgo_tables = [t for t in table_col_order.keys() if t != 'dgos']
-    print (dgo_tables)
+    log.debug(f'Attribute tables to create views for: {dgo_tables}')
 
     # Get the columns from the dgos table
     curs.execute('PRAGMA table_info(dgos)')
     dgo_cols = [f"dgos.{col[1]}" for col in curs.fetchall() if col[1] != 'dgoid' and col[1] != 'DGOID']
 
     new_views = ['vw_dgo_metrics']
-    # we don't have IGO trable but we put the point geom in the DGO geom - same idea
+    # we don't have IGO table but we put the point geom in the DGO geom - same idea
     # I'm a little confused about whether we have DGO metrics or IGO metrics or some mix in raw_rme
     curs.execute('''
         CREATE VIEW vw_dgo_metrics AS
@@ -352,6 +392,7 @@ def create_views(conn: apsw.Connection, table_col_order: dict):
             {",".join(dgo_cols)}
             FROM {dgo_table} t INNER JOIN dgos ON t.dgoid=dgos.dgoid
         ''')
+    # Register each view as a spatial layer in the GeoPackage metadata tables
     for view_name in new_views:
         curs.execute('''
             INSERT INTO gpkg_contents (table_name, data_type, identifier, min_x, min_y, max_x, max_y)
@@ -362,6 +403,20 @@ def create_views(conn: apsw.Connection, table_col_order: dict):
             INSERT INTO gpkg_geometry_columns (table_name, column_name, geometry_type_name, srs_id, z, m)
             SELECT ?, 'geom', 'POINT', 4326, 0, 0 FROM gpkg_geometry_columns WHERE table_name='dgos'
         ''', [view_name])
+    log.info(f"{len(new_views)} views created and registered as spatial layers.")
+
+def fix_s3_uri(argstr: str) -> str:
+    """the parser is messing up s3 paths this should fix them
+    launch.json value (a valid s3 string): "s3://riverscapes-athena/athena_query_results/d40eac38-0d04-4249-8d55-ad34901fee82.csv" 
+    agrstr (input to this function) 's3:\\\\riverscapes-athena\\\\athena_query_results\\\\d40eac38-0d04-4249-8d55-ad34901fee82.csv'
+    ouput: back to a valid s3 string 
+    """
+    import re
+    # Replace all backslashes with slashes
+    uri = argstr.replace("\\", "/")
+    # Ensure exactly two slashes after 's3:'
+    uri = re.sub(r'^s3:/+', 's3://', uri)
+    return uri
 
 def main():
     """
@@ -372,13 +427,10 @@ def main():
     parser.add_argument('raw_rme_csv_path', help='full path to csv file containing the raw_rme extract (can be s3 URI e.g. s3://riverscapes-athena/adhoc/yct_sample4.csv)')
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('table_defs_csv', help='Path to rme_table_column_defs.csv', type=str)
-    # note rsxml.dotenv screws up s3 paths! we'll need to address that see issue #895 in RiverscapesXML repo
+    # note rsxml.dotenv screws up s3 paths! we'll need to address that see issue #895 in RiverscapesXML repo - meanwhile we'll fix it 
     args = dotenv.parse_args_env(parser)
     # instead, can use standard parser. However this doesn't handle {env:DATA_ROOT} the way rsxml does
     # args = parser.parse_args()
-
-    log = Logger('Setup')
-    log.setup(log_level=logging.DEBUG)
 
     # Set up some reasonable folders to store things
     working_folder = args.working_folder
@@ -387,15 +439,21 @@ def main():
     safe_makedirs(project_dir)
     project_name = os.path.basename(args.raw_rme_csv_path)
 
+    log = Logger('Setup')
+    log_path = os.path.join(project_dir, 'rme-scrape.log')
+    log.setup(log_path=log_path, log_level=logging.DEBUG)
+
     # parser.add_argument('output_gpkg', help='Path to output GeoPackage file', type=str)
     gpkg_path = os.path.join(project_dir, 'outputs', 'riverscape_metrics.gpkg') 
+    safe_makedirs(os.path.join(project_dir,'outputs'))
 
     # csv can be either a local path or an s3 path. parse and handle accordingly
     # TODO (enhancement) - stream and process file without storing the tempfile
     if args.raw_rme_csv_path.startswith('s3:'):
         with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmpfile:
             local_csv = tmpfile.name
-        download_file_from_s3(args.raw_rme_csv_path, local_csv)
+        s3_uri = fix_s3_uri(args.raw_rme_csv_path)
+        download_file_from_s3(s3_uri, local_csv)
     else:
         local_csv = args.raw_rme_csv_path   
 
@@ -403,7 +461,7 @@ def main():
     conn = create_geopackage(gpkg_path, table_schema_map, table_col_order, fk_tables, args.spatialite_path)
     populate_tables_from_csv(local_csv, conn, table_schema_map, table_col_order)
     create_views(conn, table_col_order)
-    create_igos_project(project_dir, project_name, args.spatialite_path, r"C:\nardata\work\rme_extraction\20250820-yct\yct_range.gpkg")
+    create_igos_project(project_dir, project_name, args.spatialite_path, gpkg_path, log_path)
     log.info('Process complete.')
 
 if __name__ == '__main__':
