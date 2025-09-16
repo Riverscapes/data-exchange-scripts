@@ -20,7 +20,10 @@
           key
           value
         }
-        projectType { id } # Don't ask for any more than the ID or it will cause an extra dynamo record fetch
+        bounds {
+          id
+        }
+        projectType { id }
         createdOn
         updatedOn
         # The extra record fetch here is unfortunate but the user/org name is just too useful
