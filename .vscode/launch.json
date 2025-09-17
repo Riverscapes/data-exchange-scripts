@@ -32,7 +32,14 @@
     }
   ],
   "configurations": [
-  
+    {
+      "name": "Python Debugger: Current File with Arguments",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": "${command:pickArgs}"
+    },
     {
       "name": "🚀 Python: Run/Debug Current File (with .env)",
       "type": "debugpy",
@@ -171,7 +178,8 @@
       "args": [
         "production",
       ]
-    },{
+    },
+    {
       "name": "💀💀💀 Archive Projects CSV - DANGER 💀💀💀",
       "type": "debugpy",
       "request": "launch",
@@ -240,7 +248,8 @@
         "/opt/homebrew/lib/mod_spatialite.8.dylib",
         "riverscapes-athena",
         "{env:DATA_ROOT}/rme-athena",
-        "--tags", "2025CONUS", //"little_spokane", // "2024CONUS"
+        "--tags",
+        "2025CONUS", //"little_spokane", // "2024CONUS"
         // "--collection", "0f0a4494-424b-4ed7-8597-766e99018895",
         // "--huc_filter", "1601010101",
         "--delete",
@@ -263,9 +272,11 @@
         "riverscapes-athena",
         "{env:DATA_ROOT}/rme-athena",
         "11",
-        "--tags", "2025CONUS", //"little_spokane", // "2024CONUS"
+        "--tags",
+        "2025CONUS", //"little_spokane", // "2024CONUS"
         // "--collection", "0f0a4494-424b-4ed7-8597-766e99018895",
-        "--huc_filter", "1601010101",
+        "--huc_filter",
+        "1601010101",
         "--delete",
       ]
     },
@@ -283,7 +294,8 @@
       "args": [
         "production",
         "riverscapes-athena",
-        "--tags", "2025CONUS", //"little_spokane", // "2024CONUS"
+        "--tags",
+        "2025CONUS", //"little_spokane", // "2024CONUS"
         // "--full_scrape"
       ]
     },
@@ -301,7 +313,8 @@
       "args": [
         "s3://riverscapes-athena/output/",
         "c:/nardata/temp/dexstatusmaps",
-        "--s3_bucket", "s3://releases.northarrowresearch.com/images/2025_conus_model_run_status_maps/",
+        "--s3_bucket",
+        "s3://releases.northarrowresearch.com/images/2025_conus_model_run_status_maps/",
         "--output_gpkgs"
       ]
     },
@@ -322,19 +335,19 @@
       ]
     },
     {
-            "name": "Python: athena_to_rme",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/geo/athena_to_rme.py",
-            "console": "integratedTerminal",
-            "args": [
-                "s3://riverscapes-athena",
-                "adhoc/yct.csv",
-                "yct.gpkg",
-                "rme_table_column_defs.csv"
-            ],
-            "justMyCode": true
-        }
+      "name": "Python: athena_to_rme",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/geo/athena_to_rme.py",
+      "console": "integratedTerminal",
+      "args": [
+        "s3://riverscapes-athena",
+        "adhoc/yct.csv",
+        "yct.gpkg",
+        "rme_table_column_defs.csv"
+      ],
+      "justMyCode": true
+    }
     // {
     //   "name": "Scrape HUC statistics - BATCH",
     //   "type": "debugpy",

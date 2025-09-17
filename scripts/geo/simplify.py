@@ -21,17 +21,30 @@
 import shapely
 import geopandas as gpd
 
-print(gpd.__version__)
-print(shapely.__version__)
+print ("'simplify_coverage' requires shapely>=2.1 and GEOS>=3.12.")
+print(f"Shapely: {shapely.__version__}")
+print(f"Geopandas: {gpd.__version__}")
 
 # Read the GeoPackage
-gdf = gpd.read_file("/Users/philipbailey/GISData/riverscapes/rme/Metric_Engine-Metric_Engine_for_Comb_Wash-San_Juan_River/inputs/inputs.gpkg", layer='vbet_dgos')
+in_file = r"C:\nardata\work\huc_wbd_nhd_align\final\lsg_processed_hu10.gpkg"
+in_layer = 'wbdhu10_conus_rs'
+gdf = gpd.read_file(in_file, layer=in_layer)
+print(f'Read {in_layer} from {in_file}.')
 
 # Reproject to EPSG:5070
 gdf = gdf.to_crs(epsg=5070)
 
 # Simplify all geometries using simplify_coverage on the GeoSeries
-gdf["geometry"] = gdf.geometry.simplify_coverage(tolerance=11)
+gdf["geometry"] = gdf.geometry.simplify_coverage(tolerance=8000)
+
+# Select only the desired columns (geometry is always included if present)
+gdf_out = gdf[["TNMID", "HUC10", "geometry"]]
+# change (back?) to 4326 for Athena
+gdf_out.to_crs(epsg=4326)
 
 # Save the result
-gdf.to_file("/Users/philipbailey/GISData/temp/simple_vbet_dgos_11.gpkg", driver="GPKG")
+out_file=r"C:\nardata\work\huc_wbd_nhd_align\final\simplified_hu10.gpkg"
+out_layer = 'wbdhu10_conus_rs_simplified_8km'
+gdf_out.to_file(out_file, layer=out_layer, driver="GPKG")
+print(f"wrote {out_layer} to {out_file}.")
+

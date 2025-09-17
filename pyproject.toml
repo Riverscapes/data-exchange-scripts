@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Client scripts for the Riverscapes Data Exchange API"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -33,7 +33,7 @@ dependencies = [
 [project.optional-dependencies]
 geo = [
   "gdal>=3.2.2",
-  "shapely>=2.0.7",
+  "shapely>=2.1.1",
 ]
 
 [tool.setuptools]
