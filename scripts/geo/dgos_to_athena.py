@@ -55,6 +55,10 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
             log.warning(f'Project {project.id} does not have a HUC. Skipping.')
             continue
 
+        if not project.huc.startswith('16'):
+            # log.info(f'Skipping project {project.id} as it is in the 16-digit HUC range.')
+            continue
+
         # check whether the project is already in Athena with the same or newer date
         # project_created_date_ts = int(project.created_date.timestamp()) * 1000
         # if project.huc in existing_rme and existing_rme[project.huc] <= project_created_date_ts:
