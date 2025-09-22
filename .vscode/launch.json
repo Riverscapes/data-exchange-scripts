@@ -252,7 +252,7 @@
         "2025CONUS", //"little_spokane", // "2024CONUS"
         // "--collection", "0f0a4494-424b-4ed7-8597-766e99018895",
         // "--huc_filter", "1601010101",
-        "--delete",
+        // "--delete",
       ]
     },
     {

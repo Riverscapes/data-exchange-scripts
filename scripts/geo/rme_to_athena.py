@@ -34,7 +34,7 @@ MINOR = 1000
 
 def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: RiverscapesSearchParams, download_dir: str, s3_bucket: str, delete_downloads: bool) -> None:
     """
-    Loop over all the projects, download the RME and RCAT output GeoPackages, and scrape the statistics
+    Loop over all the projects, download the RME output GeoPackage, and scrape the geometries and metrics.
     """
 
     log = Logger('Merge RME Scrapes')
