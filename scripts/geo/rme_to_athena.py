@@ -44,7 +44,6 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
     results = athena_query(s3_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme')
     existing_rme = {row['Data'][0]['VarCharValue']: int(row['Data'][1]['VarCharValue']) for row in results[1:]}
 
-    # Create a timedelta object with a difference of 1 day
     count = 0
     for project, _stats, _searchtotal, prg in rs_api.search(search_params, progress_bar=True, page_size=100):
         project: RiverscapesProject
@@ -57,7 +56,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
         # check whether the project is already in Athena with the same or newer date
         project_created_date_ts = int(project.created_date.timestamp()) * 1000
         if project.huc in existing_rme and existing_rme[project.huc] <= project_created_date_ts:
-            log.info(f'Skipping project {project.id} as it is already in Athena with the same or newer date.')
+            log.info(f'Skipping project {project.id} as it is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={int(project.created_date.timestamp()) * 1000}.')
             continue
 
         if project.model_version is None:
