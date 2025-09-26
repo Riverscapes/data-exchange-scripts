@@ -173,6 +173,12 @@ def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd
         warnings.filterwarnings("ignore", message="pandas only supports SQLAlchemy connectable")
         df = pd.read_sql_query(sql, conn)
 
+    # because there are nulls, the combination of sqlites dynamic typing and pandas' type inference mis-assigns data types
+    # actually the problem is that it is sometimes a double, sometimes INT64. Needs to be consistent
+    # TODO: this should look up the types from our data dictionary but i am hardcoding for now
+    for field in ['fcode', 'seg_distance', 'stream_order', 'headwater', 'confluences', 'diffluences', 'tributaries']:
+        df[field] = df[field].astype('Int64')  # Note the capital 'I' for pandas nullable integer
+
     # Remove all columns named 'dgoid' (case-insensitive, even if duplicated)
     df = df.loc[:, [col for col in df.columns if col.lower() != 'dgoid']]
     # convert wkb geometry to shapely objects
@@ -212,7 +218,9 @@ def upload_to_s3(
 
 
 def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: RiverscapesSearchParams,
-               download_dir: str, s3_bucket: str, delete_downloads_when_done: bool) -> None:
+               download_dir: str, s3_bucket: str, delete_downloads_when_done: bool,
+               force_update: bool
+               ) -> None:
     """
     Orchestrate the scraping, processing, and uploading of RME projects.
     """
@@ -239,9 +247,11 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
         # check whether the project is already in Athena with the same or newer date
         project_created_date_ts = int(project.created_date.timestamp()) * 1000  # pyright: ignore[reportOptionalMemberAccess] Projects always have a created_date
         if project.huc in rme_in_athena and rme_in_athena[project.huc] <= project_created_date_ts:
-            log.info(f'NORMALLY WOULD BE Skipping project {project.id} as it is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
-            # TODO: uncomment after first run
-            # continue
+            if force_update:
+                log.info(f'Force update project {project.id} as it is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
+            else:
+                log.info(f'Skipping project {project.id} as it is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
+                continue
 
         if project.model_version is None:
             log.warning(f'Project {project.id} does not have a model version. Skipping.')
@@ -261,10 +271,13 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
             data_gdf['rme_version_int'] = model_version_int
 
             log.debug(f"Dataframe prepared with shape {data_gdf.shape}")
+            # until we have a more robust schema check this is something
+            if len(data_gdf.columns) != 133:
+                log.warning(f"Expected 133 columns, got {len(data_gdf.columns)}")
             rme_pq_filepath = os.path.join(huc_dir, f'rme_{project.huc}.parquet')
             data_gdf.to_parquet(rme_pq_filepath)
             # don't use os.path.join because this is aws os, not system os
-            s3_key = f'rme/raw-pq/{os.path.basename(rme_pq_filepath)}'
+            s3_key = f'rme/raw-rme-pq/{os.path.basename(rme_pq_filepath)}'
             upload_to_s3(rme_pq_filepath, s3_bucket, s3_key)
 
             if delete_downloads_when_done:
@@ -287,6 +300,7 @@ def main():
     parser.add_argument('--collection', help='Collection GUID', type=str)
     parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
     parser.add_argument('--huc_filter', help='HUC filter SQL prefix ("17%")', type=str, default='')
+    parser.add_argument('--force_update', help='Generate and upload new parquet even if data exists', action='store_true', default=False)
     args = dotenv.parse_args_env(parser)
 
     # Set up some reasonable folders to store things
@@ -314,7 +328,7 @@ def main():
         search_params.meta = {'HUC':  args.huc_filter}
 
     with RiverscapesAPI(stage=args.stage) as api:
-        scrape_rme(api, args.spatialite_path, search_params, download_folder, args.s3_bucket, args.delete)
+        scrape_rme(api, args.spatialite_path, search_params, download_folder, args.s3_bucket, args.delete, args.force_update)
 
     log.info('Process complete')
 
