@@ -12,8 +12,8 @@ Philip Bailey
 import os
 import argparse
 import inquirer
+from rsxml import ProgressBar, dotenv
 from pydex import RiverscapesAPI
-from rsxml import ProgressBar
 
 
 def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str) -> None:
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('stage', help='Production or staging Data Exchange', type=str, default='production')
     parser.add_argument('csv_folder', help='Folder containing CSV files with project IDs', type=str)
-    args = parser.parse_args()
+    args = dotenv.parse_args_env(parser)
 
     print(f'Archiving projects from {args.stage} environment')
     with RiverscapesAPI(stage=args.stage) as api:
