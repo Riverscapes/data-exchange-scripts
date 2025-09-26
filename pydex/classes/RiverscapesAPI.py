@@ -336,7 +336,7 @@ class RiverscapesAPI:
         with open(os.path.join(os.path.dirname(__file__), '..',  'graphql', 'mutations', f'{mutation_name}.graphql'), 'r', encoding='utf-8') as queryFile:
             return queryFile.read()
 
-    def search(self, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: List[str] = None, max_results: int = None, search_query_name: str = None) -> Generator[Tuple[RiverscapesProject, Dict, int], None, None]:
+    def search(self, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: List[str] = None, max_results: int = None, search_query_name: str = None) -> Generator[Tuple[RiverscapesProject, Dict, int, ProgressBar], None, None]:
         """ A simple function to make a yielded search on the riverscapes API
 
         This search has two modes: If the total number of records is less than 10,000 then it will do a single paginated query.
