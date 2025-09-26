@@ -177,6 +177,7 @@
       },
       "args": [
         "production",
+        "{env:CSV_FOLDER}",
       ]
     },
     {
@@ -192,7 +193,7 @@
       },
       "args": [
         "production",
-        "/Users/philipbailey/GISData/riverscapes/archive_projects_csv",
+        "{env:CSV_FOLDER}",
       ]
     },
     // {
@@ -312,7 +313,7 @@
       },
       "args": [
         "s3://riverscapes-athena/output/",
-        "c:/nardata/temp/dexstatusmaps",
+         "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps",
         "--s3_bucket",
         "s3://releases.northarrowresearch.com/images/2025_conus_model_run_status_maps/",
         "--output_gpkgs"
