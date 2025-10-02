@@ -1,10 +1,26 @@
+"""
+Upload multiple new projects from subfolders within a specified parent folder.
+Each subfolder is expected to contain a project.rs.xml file and any associated data files.
+
+Edit the launch.json file to set the path of the parent folder, as well as specify the owner and visibility for the new projects.
+After you initiate the script you will be prompted to confirm before proceeding with the upload.
+
+********** WARNING **********
+This script can create a real mess if you use it unwisely. Pause and think before you run it.
+You are advise to try it against the STAGING server first to make sure it does what you want.
+*****************************
+
+Philip Bailey (based on Matt's project_upload.py script)
+2 Oct 2025
+"""
 import os
+import time
+import json
 import argparse
+import inquirer
 from rsxml import Logger
 import requests
 from pydex import RiverscapesAPI, __version__
-
-PROJECT_ID = '81d118ac-4f2d-42b8-bfc9-3149aebed2c5'  # This is a real project on the STAGING server
 
 
 def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: str, visibility: str, tags: list):
@@ -27,6 +43,11 @@ def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: 
                 project_files.append(os.path.join(root, filename))
 
     log.info(f'Found {len(project_files)} project.rs.xml files in {parent_folder}')
+
+    proceed = inquirer.prompt([inquirer.Confirm('continue', message=f"About to upload {len(project_files)} projects found in subfolders of {parent_folder}. Continue?", default=False)])
+    if not proceed['continue']:
+        log.info('Upload cancelled by user.')
+        return
 
     # Iterate over each subfolder in the parent folder
     success_count = 0
@@ -87,7 +108,7 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
         # The server will just assume they're new and treat these files as updates.
         # NOTE: THIS IS NOT APPROPRIATE IF YOU WANT TO AVOID OVERWRITING FILES THAT HAVEN'T CHANGED
         'etags': ['XXXXXXXXXXXXXXXXXXXXXXXXXXXX'] * len(all_project_files),  # We don't have etags since we just downloaded the files
-        'sizes': all_project_files,
+        'sizes': [os.path.getsize(os.path.join(project_folder, f)) for f in all_project_files],
         # NOTE: VERY IMPORTANT: If you're updating an existing project you must set noDelete to True
         'noDelete': True,
         # Owner must be explicitly set to the same owner as the existing project.
@@ -106,8 +127,9 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
     # Step 2: Now we need to request the urls for the upload so we can start working on them
     # ================================================================================================================
     upload_urls_qry = riverscapes_api.load_query('requestUploadProjectFilesUrl')
+    combined_files = project_upload['data']['requestUploadProject']['create'] + project_upload['data']['requestUploadProject']['update']
     upload_urls = riverscapes_api.run_query(upload_urls_qry, {
-        'files': project_upload['data']['requestUploadProject']['update'],
+        'files': combined_files,
         'token': token
     })
 
@@ -134,7 +156,26 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
         'token': token
     })
 
-    log.info('Project upload finalized.')
+    if True is True:
+        # Step 5: Poll the upload status until it's done. This is optional so if you're immediately moving on to a different
+        # project you can skip this step. Only useful if you need to know when the project is actually available online.
+        # ================================================================================================================
+        done = False
+        while not done:
+            status_qry = riverscapes_api.load_query('checkUpload')
+            status = riverscapes_api.run_query(status_qry, {'token': token})
+            upload_status = status['data']['checkUpload']
+            if upload_status['status'] in ['SUCCESS']:
+                done = True
+                log.info("Upload process complete")
+            elif upload_status['status'] in ['FAILED']:
+                log.info(f"Upload failed: {json.dumps(upload_status, indent=2)}")
+                done = True
+            else:
+                log.info(f"...Upload status: {upload_status['status']}: Waiting 5 seconds to check status again...")
+                time.sleep(5)
+
+    log.info(f"Upload finalized. Project URL: https://{'staging.' if riverscapes_api.stage == 'STAGING' else ''}data.riverscapes.net/p/{project_upload['data']['requestUploadProject']['newId']}")
 
 
 def main():
