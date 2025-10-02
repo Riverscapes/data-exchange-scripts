@@ -177,11 +177,7 @@
       },
       "args": [
         "production",
-<<<<<<< HEAD
         "{env:CSV_FOLDER}",
-=======
-        "/Users/philipbailey/GISData/riverscapes/archive_projects_csv",
->>>>>>> 28af050 (delete projects from csv)
       ]
     },
     {
