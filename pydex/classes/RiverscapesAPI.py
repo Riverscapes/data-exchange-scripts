@@ -569,11 +569,13 @@ class RiverscapesAPI:
                     self.refresh_token()
                     self.log.debug("   done. Re-trying query...")
                     return self.run_query(query, variables)
+                else:
+                    raise RiverscapesAPIException(f"Query failed to run by returning errors: {resp_json['errors']}. {query} {json.dumps(variables)}")
 
             else:
                 # self.last_pass = True
                 # self.retry = 0
-                return request.json()
+                return resp_json
         else:
             raise RiverscapesAPIException(f"Query failed to run by returning code of {request.status_code}. {query} {json.dumps(variables)}")
 
