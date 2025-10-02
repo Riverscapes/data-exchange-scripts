@@ -182,12 +182,11 @@ def main():
     """Upload multiple new projects from subfolders of a specified parent folder."""
 
     parser = argparse.ArgumentParser(description="Upload or update a Riverscapes project.")
-    parser.add_argument('stage', help="Specify the server stage to use (default: staging)")
-    parser.add_argument('parent_folder', help='The parent folder inside which are subfolders representing projects to upload')
-    parser.add_argument('owner', help='The owner (user or organization) to assign the new projects to')
-    parser.add_argument('visibility', help='The visibility level of the new projects (public or private)')
-    parser.add_argument('--tags', help='A comma-separated list of tags to assign to the new projects', default='')
-    parser.add_argument('--verbose', action='store_true', help='Enable verbose logging', default=False)
+    parser.add_argument('stage', type=str, help="Specify the server stage to use (default: staging)")
+    parser.add_argument('parent_folder', type=str, help='The parent folder inside which are subfolders representing projects to upload')
+    parser.add_argument('owner', type=str, help='The owner (user or organization) to assign the new projects to')
+    parser.add_argument('visibility', type=str, help='The visibility level of the new projects (public or private)')
+    parser.add_argument('--tags', type=str, help='A comma-separated list of tags to assign to the new projects', default='')
     args = parser.parse_args()
 
     if args.parent_folder is None or not os.path.exists(args.parent_folder):
@@ -195,15 +194,13 @@ def main():
         return
 
     log = Logger('Project Upload')
-    # log.setup(log_path=os.path.join(args.parent_folder, 'rsdynamics.log'), verbose=args.verbose)
     log.title('Riverscapes Project Upload')
-
     log.info(f'parent folder: {args.parent_folder}')
     log.info(f'Stage: {args.stage}')
 
     tags = None
     if args.tags is not None and args.tags != '':
-        args.tags = [tag.strip() for tag in args.tags.split(',')]
+        tags = [tag.strip() for tag in args.tags.split(',')]
 
     with RiverscapesAPI(stage=args.stage) as api:
         upload_projects(api, args.parent_folder, args.owner, args.visibility, tags)

@@ -196,7 +196,6 @@
         "{env:CSV_FOLDER}",
       ]
     },
-,
     {
       "name": "Upload multiple new projects",
       "type": "debugpy",
