@@ -196,6 +196,29 @@
         "{env:CSV_FOLDER}",
       ]
     },
+,
+    {
+      "name": "Upload multiple new projects",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/utility/new_project_upload.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "staging",
+        "/Users/philipbailey/GISData/riverscapes/test",
+        "b6b1dfc9-973e-4919-b828-9c0e93fac07f",
+        "PRIVATE",
+        "--tags", "mytag,mytag2"
+      ]
+    },
+
+
+
     // {
     //   "name": "Scrape RME",
     //   "type": "debugpy",

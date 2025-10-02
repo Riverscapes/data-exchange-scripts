@@ -101,7 +101,7 @@ def upload_project_files(riverscapes_api: RiverscapesAPI):
     # Step 4: Now that all files are uploaded we need to finalize the upload
     # ================================================================================================================
     finalize_upload_qry = riverscapes_api.load_mutation('finalizeProjectUpload')
-    finalize_upload = riverscapes_api.run_query(finalize_upload_qry, {
+    __finalize_upload = riverscapes_api.run_query(finalize_upload_qry, {
         'token': token
     })
 
