@@ -303,7 +303,7 @@ class Raster:
             'proj': ds.GetProjection(),
             'value_count': 0,
             'hist_type': 'categorical',
-            'bins': category_counts
+            'bins': []
         }
 
         nodata = band.GetNoDataValue()
@@ -333,6 +333,10 @@ class Raster:
 
         self.log.info(f"Completed binning in {end_time - start_time:.2f} seconds")
         self.log.debug(f"Category Counts: \n\n{json.dumps(category_counts, indent=2)}\n")
+
+        # Final shape needs to be : [{category: '1', count: 100}, ...]
+        retval['bins'] = [{'category': k, 'cell_count': v} for k, v in category_counts.items()]
+
         return retval
 
     def bin_raster(self, bin_size: int = 100, window_size: int = 256) -> Dict[int, int]:
@@ -423,7 +427,7 @@ class Raster:
 
         bin_dict = {min_bin_elev + i * bin_size: int(count) for i, count in enumerate(total_hist)}
         self.log.debug(f"Bins: \n\n{json.dumps(bin_dict, indent=2)}\n")
-        retval['bins'] = bin_dict
+        retval['bins'] = [{'bin': k, 'cell_count': v} for k, v in bin_dict.items()]
         return retval
 
 
