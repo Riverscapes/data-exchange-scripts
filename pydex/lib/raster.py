@@ -1,7 +1,13 @@
 from __future__ import annotations
+import math
+from typing import Dict
 from os import path
-from pydex.imports import import_geo
+import json
+from time import time
 from rsxml import Logger
+
+from pydex.imports import import_geo
+
 
 gdal, ogr, osr, shapely, np = import_geo()
 
@@ -272,6 +278,153 @@ class Raster:
         self.cols = self.array.shape[1]
         self.min = np.nanmin(self.array)
         self.max = np.nanmax(self.array)
+
+    def bin_raster_categorical(self, window_size: int = 256) -> Dict[str, int]:
+        """ Bin raster values into categories based on unique values in the raster.
+
+        Args:
+            window_size (int, optional): The size of the window to use for binning. Defaults to 256.
+
+        Returns:
+            Dict[str, int]: A dictionary mapping category names to their counts.
+        """
+        self.log.info(f"Binning categorical raster {self.filename} with window size {window_size}")
+
+        ds = gdal.Open(self.filename)
+        band = ds.GetRasterBand(1)
+        cols, rows = ds.RasterXSize, ds.RasterYSize
+
+        category_counts: Dict[str, int] = {}
+        retval = {
+            'min': float(self.min),
+            'max': float(self.max),
+            'nodata': float(self.nodata) if self.nodata is not None else None,
+            'geotransform': ds.GetGeoTransform(),
+            'proj': ds.GetProjection(),
+            'value_count': 0,
+            'hist_type': 'categorical',
+            'bins': category_counts
+        }
+
+        nodata = band.GetNoDataValue()
+
+        self.log.info("Binning raster values...")
+        start_time = time()
+        for yoff in range(0, rows, window_size):
+            for xoff in range(0, cols, window_size):
+                xsize = min(window_size, cols - xoff)
+                ysize = min(window_size, rows - yoff)
+                arr = band.ReadAsArray(xoff, yoff, xsize, ysize).astype(np.float32)
+                if nodata is not None:
+                    arr = arr[arr != nodata]
+                if arr.size == 0:
+                    continue
+                unique, counts = np.unique(arr, return_counts=True)
+                gt = ds.GetGeoTransform()
+                x0 = gt[0] + xoff * gt[1]
+                y0 = gt[3] + yoff * gt[5]
+                window_counts = dict(zip((str(int(u)) for u in unique), map(int, counts)))
+                print(f"Window ({xoff},{yoff}) @ ({x0:.1f},{y0:.1f}): counts={window_counts}")
+                retval['value_count'] += arr.size
+                for category, count in window_counts.items():
+                    # Category should be the string representation of an integer
+                    category_counts[category] = category_counts.get(category, 0) + count
+        end_time = time()
+
+        self.log.info(f"Completed binning in {end_time - start_time:.2f} seconds")
+        self.log.debug(f"Category Counts: \n\n{json.dumps(category_counts, indent=2)}\n")
+        return retval
+
+    def bin_raster(self, bin_size: int = 100, window_size: int = 256) -> Dict[int, int]:
+        """
+        Bin raster values into elevation bins of size `bin_size`.
+        The min and max elevation are determined from the raster itself.
+        """
+
+        self.log.info(f"Binning raster {self.filename} with bin size {bin_size} and window size {window_size}")
+
+        ds = gdal.Open(self.filename)
+        band = ds.GetRasterBand(1)
+        cols, rows = ds.RasterXSize, ds.RasterYSize
+
+        # Scan the raster to find min and max (ignoring nodata)
+        nodata = band.GetNoDataValue()
+        min_elev, max_elev = None, None
+
+        # This should be very fast since we're only reading small windows at a time
+        self.log.info("Scanning raster to determine min and max elevation...")
+        start_time = time()
+        for yoff in range(0, rows, window_size):
+            for xoff in range(0, cols, window_size):
+                xsize = min(window_size, cols - xoff)
+                ysize = min(window_size, rows - yoff)
+                arr = band.ReadAsArray(xoff, yoff, xsize, ysize).astype(np.float32)
+                if nodata is not None:
+                    arr = arr[arr != nodata]
+                if arr.size == 0:
+                    continue
+                arr_min = arr.min()
+                arr_max = arr.max()
+                if min_elev is None or arr_min < min_elev:
+                    min_elev = arr_min
+                if max_elev is None or arr_max > max_elev:
+                    max_elev = arr_max
+        end_time = time()
+        self.log.info(f"Determined min elevation: {min_elev}, max elevation: {max_elev} in {end_time - start_time:.2f} seconds")
+
+        if min_elev is None or max_elev is None:
+            print("No valid data found in raster.")
+            return
+
+        # Define bins based on discovered min/max
+        # Round the min down and max up to the nearest bin_size
+        min_bin_elev = math.floor(min_elev / bin_size) * bin_size
+        max_bin_elev = math.ceil(max_elev / bin_size) * bin_size
+        bins = np.arange(min_bin_elev, max_bin_elev + bin_size, bin_size)
+        self.log.info(f"Defined {len(bins)-1} bins from {min_bin_elev} to {max_bin_elev}")
+
+        retval = {
+            'min': float(min_elev),
+            'max': float(max_elev),
+            'geotransform': ds.GetGeoTransform(),
+            'proj': ds.GetProjection(),
+            'nodata': float(nodata) if nodata is not None else None,
+            'value_count': 0,
+            'hist_type': 'continuous',
+            'bin_size': bin_size,
+            'bins': {}
+        }
+
+        # Now do the actual binning
+        self.log.info("Binning raster values...")
+        start_time = time()
+        total_hist = np.zeros(len(bins) - 1, dtype=int)
+        for yoff in range(0, rows, window_size):
+            for xoff in range(0, cols, window_size):
+                xsize = min(window_size, cols - xoff)
+                ysize = min(window_size, rows - yoff)
+                arr = band.ReadAsArray(xoff, yoff, xsize, ysize).astype(np.float32)
+                if nodata is not None:
+                    arr = arr[arr != nodata]
+                if arr.size == 0:
+                    continue
+                hist, edges = np.histogram(arr, bins=bins)
+                gt = ds.GetGeoTransform()
+                x0 = gt[0] + xoff * gt[1]
+                y0 = gt[3] + yoff * gt[5]
+                print(f"Window ({xoff},{yoff}) @ ({x0:.1f},{y0:.1f}): counts={hist}")
+                # Here you would accumulate hist into a total histogram if desired
+                retval['value_count'] += arr.size
+                total_hist += hist
+        end_time = time()
+
+        # Convert bins to a dictionary for easier use later
+        self.log.info(f"Completed binning in {end_time - start_time:.2f} seconds")
+
+        bin_dict = {min_bin_elev + i * bin_size: int(count) for i, count in enumerate(total_hist)}
+        self.log.debug(f"Bins: \n\n{json.dumps(bin_dict, indent=2)}\n")
+        retval['bins'] = bin_dict
+        return retval
 
 
 def isclose(a, b, rel_tol=1e-09, abs_tol=0):
