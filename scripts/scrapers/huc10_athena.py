@@ -101,6 +101,10 @@ def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, d
             metrics['rs_context']['existing_veg_bins'] = veg_bins
             log.info(f'Writing HUC10 metrics to {huc10_json}')
 
+            # Write the JSON back to `huc10code.json`
+            with open(huc10_json, 'w', encoding='utf-8') as f:
+                json.dump(metrics, f, indent=2)
+
             count += 1
             prg.update(count)
 
