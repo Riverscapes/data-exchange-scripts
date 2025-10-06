@@ -370,6 +370,22 @@
         "rme_table_column_defs.csv"
       ],
       "justMyCode": true
+    },
+    {
+      "name": "Python: huc10_athena",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/scrapers/huc10_athena.py",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },      
+      "args": [
+        "${input:environment}",
+        "s3://riverscapes-athena",
+        "{env:DATA_ROOT}/huc10_athena",
+        "--tags", "2025CONUS"
+      ],
     }
     // {
     //   "name": "Scrape HUC statistics - BATCH",
