@@ -399,9 +399,11 @@
       },      
       "args": [
         "${input:environment}",
-        "s3://riverscapes-athena",
         "{env:DATA_ROOT}/huc10_athena",
-        "--tags", "2025CONUS"
+        "--tags", "2025CONUS",
+        // "--huc_filter", "07",
+        "--skip-overwrite",
+        "--delete"
       ],
     }
     // {

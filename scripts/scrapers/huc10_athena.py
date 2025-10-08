@@ -6,6 +6,7 @@ Philip Bailey
 
 THis is going to help us build the Hypsometric Curve report for the WSCA
 https://alden-report.s3.us-east-1.amazonaws.com/1005001203/wsca_report.html
+S3 path for JSON Files s3://riverscapes-athena/data_exchange/rs-context/
 
 Searches for RME projects in the Data Exchange, downloads the RME output GeoPackages,
 scrapes the DGO metrics from the GeoPackages, and uploads the results to an S3 bucket.
@@ -38,6 +39,8 @@ REGEXES = {
     "METRICS_REGEX": r'.*rscontext_metrics\.json$',
     "VEG_REGEX": r'.*\/existing_veg\.tif$'
 }
+S3_BUCKET = 'riverscapes-athena'
+S3_BASE_PATH = 'data_exchange/rs-context'
 
 # Number of decimal places to truncate floats
 FLOAT_DEC_PLACES = 4
@@ -46,7 +49,7 @@ MAJOR = 1000000
 MINOR = 1000
 
 
-def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, download_dir: str, s3_bucket: str, delete_downloads: bool) -> None:
+def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, download_dir: str, delete_downloads: bool, skip_overwrite: bool) -> None:
     """
     Loop over all the projects, download the RME output GeoPackage, and scrape the geometries and metrics.
     """
@@ -59,6 +62,9 @@ def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, d
         project: RiverscapesProject
         prg: ProgressBar
 
+        # Upload just metrics['rs_context'] flattened to one line to s3
+        s3_key = os.path.join(S3_BASE_PATH, f'{project.huc}.json')
+
         if project.huc is None or project.huc == '':
             log.warning(f'Project {project.id} does not have a HUC. Skipping.')
             continue
@@ -68,11 +74,36 @@ def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, d
             continue
 
         try:
+            if skip_overwrite is True:
+                try:
+                    # head is the cheapest way to check if a file exists on S3
+                    s3.head_object(Bucket=S3_BUCKET, Key=s3_key)
+                    log.info(f'File s3://{S3_BUCKET}/{s3_key} already exists. Skipping project {project.id}.')
+                    count += 1
+                    prg.update(count)
+                    continue
+                except s3.exceptions.ClientError as e:
+                    if e.response['Error']['Code'] == '404':
+                        pass
+                    else:
+                        raise e
+
             huc_dir = os.path.join(download_dir, project.huc)
             safe_makedirs(huc_dir)
 
             # Download all the files we might need then load the paths and make sure they exist
-            rs_api.download_files(project_id=project.id, download_dir=huc_dir, re_filter=list(REGEXES.values()))
+            retry = 0
+            complete = False
+            while retry < 3 and complete is False:
+                try:
+                    rs_api.download_files(project_id=project.id, download_dir=huc_dir, re_filter=list(REGEXES.values()))
+                    complete = True
+                    break
+                except Exception as e:
+                    log.error(f'Error downloading files for project {project.id}: {e}')
+                    traceback.print_exc(file=sys.stdout)
+                    retry += 1
+                continue
             dem_tif = os.path.join(huc_dir, 'topography', 'dem.tif')
             if not os.path.isfile(dem_tif):
                 raise FileNotFoundError(f'Could not find DEM file for project {project.id}')
@@ -88,7 +119,6 @@ def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, d
                 metrics = {}
 
             huc10_json = os.path.join(huc_dir, f'huc10_{project.huc}.json')
-            s3_key = os.path.join('huc10', 'metrics', os.path.basename(huc10_json))
 
             dem_raster = Raster(dem_tif)
             dem_bins = dem_raster.bin_raster(100)
@@ -101,9 +131,18 @@ def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, d
             metrics['rs_context']['existing_veg_bins'] = veg_bins
             log.info(f'Writing HUC10 metrics to {huc10_json}')
 
-            # Write the JSON back to `huc10code.json`
+            # Add the project ID to the metrics so we can trace this back to its source
+            metrics['rs_context']['project_id'] = project.id
+            metrics['rs_context']['model_version'] = str(project.model_version)
+
+            # Write the JSON back to `huc10code.json` (just for debugging purposes really)
             with open(huc10_json, 'w', encoding='utf-8') as f:
                 json.dump(metrics, f, indent=2)
+
+            # Now use boto3 to upload the file to S3
+            log.info(f'Uploading {huc10_json} to s3://{S3_BUCKET}/{s3_key}')
+
+            s3.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=json.dumps(metrics['rs_context']))
 
             count += 1
             prg.update(count)
@@ -146,11 +185,11 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('stage', help='Environment: staging or production', type=str)
-    parser.add_argument('s3_bucket', help='s3 bucket RME files will be placed', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('--tags', help='Data Exchange tags to search for projects', type=str)
     parser.add_argument('--collection', help='Collection GUID', type=str)
     parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
+    parser.add_argument('--skip-overwrite', help='Whether or not to skip overwriting existing S3 files',  action='store_true', default=False)
     parser.add_argument('--huc_filter', help='HUC filter SQL prefix ("17%")', type=str, default='')
     args = dotenv.parse_args_env(parser)
 
@@ -178,7 +217,7 @@ def main():
 
     try:
         with RiverscapesAPI(stage=args.stage) as api:
-            scrape_rme(api, search_params, download_folder, args.s3_bucket, args.delete)
+            scrape_rme(api, search_params, download_folder, args.delete, args.skip_overwrite)
     except Exception as e:
         log.error(e)
         traceback.print_exc(file=sys.stdout)
