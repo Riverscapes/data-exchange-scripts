@@ -274,10 +274,10 @@
         "{env:DATA_ROOT}/rme-athena",
         "--tags",
         "2025CONUS", //"little_spokane", // "2024CONUS"
-        "--huc_filter",
-        "100800",
+        // "--huc_filter",
+        // "1004",
         // "--delete",
-        "--force_update"
+        // "--force_update"
       ]
     },
     {

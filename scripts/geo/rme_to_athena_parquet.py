@@ -49,7 +49,7 @@ def get_athena_rme_projects(s3_bucket: str) -> dict[str, int]:
     FUTURE ENHANCEMENT: if we're only interested in updating a subset, no need to return everything in rme
     """
     # FUTURE ENHANCEMENT - unless watershed_id a global id across countries we need something better
-    existing_rme = athena_query_get_parsed(s3_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme')
+    existing_rme = athena_query_get_parsed(s3_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme_pq')
     # this should look like:
     # [{'rme_date_created_ts': '1752810123000', 'watershed_id': '1704020402'},
     #  {'rme_date_created_ts': '1756512492000', 'watershed_id': '1030010112'},
@@ -164,7 +164,6 @@ def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd
                     FCode
                 FROM dgos
                 GROUP BY level_path, seg_distance
-                HAVING GeometryType(dgo_geom) = 'POLYGON'
             ) dgos ON dgo_desc.dgoid = dgos.dgoid
             INNER JOIN igos ON dgos.level_path = igos.level_path AND dgos.seg_distance = igos.seg_distance
     '''
@@ -184,6 +183,14 @@ def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd
     # convert wkb geometry to shapely objects
     df['dgo_geom'] = df['dgo_geom'].apply(wkb.loads)  # pyright: ignore[reportCallIssue, reportArgumentType]
     gdf = gpd.GeoDataFrame(df, geometry='dgo_geom', crs='EPSG:4326')
+
+    bbox_df = gdf.geometry.bounds.rename(columns={'minx': 'xmin', 'miny': 'ymin', 'maxx': 'xmax', 'maxy': 'ymax'})
+    # Combine into a struct-like dict for each row
+    gdf['dgo_geom_bbox'] = bbox_df.apply(
+        lambda row: {'xmin': float(row.xmin), 'ymin': float(row.ymin), 'xmax': float(row.xmax), 'ymax': float(row.ymax)},
+        axis=1
+    )
+
     return gdf
 
 
@@ -248,9 +255,9 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
         project_created_date_ts = int(project.created_date.timestamp()) * 1000  # pyright: ignore[reportOptionalMemberAccess] Projects always have a created_date
         if project.huc in rme_in_athena and rme_in_athena[project.huc] <= project_created_date_ts:
             if force_update:
-                log.info(f'Force update project {project.id} as it is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
+                log.info(f'Force update project {project.id} as {project.huc} is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
             else:
-                log.info(f'Skipping project {project.id} as it is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
+                log.info(f'Skipping project {project.id} as {project.huc} is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
                 continue
 
         if project.model_version is None:
@@ -272,8 +279,8 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
 
             log.debug(f"Dataframe prepared with shape {data_gdf.shape}")
             # until we have a more robust schema check this is something
-            if len(data_gdf.columns) != 133:
-                log.warning(f"Expected 133 columns, got {len(data_gdf.columns)}")
+            if len(data_gdf.columns) != 134:
+                log.warning(f"Expected 134 columns, got {len(data_gdf.columns)}")
             rme_pq_filepath = os.path.join(huc_dir, f'rme_{project.huc}.parquet')
             data_gdf.to_parquet(rme_pq_filepath)
             # don't use os.path.join because this is aws os, not system os
