@@ -1,7 +1,7 @@
 """ Utility functions to get data from AWS Athena and return it in useful formats
 a version/copy of these functions can be found in multiple Riverscapes repositories
-* data-exchange-scripts
-* rs-reports-gen (this one)
+* data-exchange-scripts (this one)
+* rs-reports-gen 
 * athena 
 * cybercastor_scripts
 
