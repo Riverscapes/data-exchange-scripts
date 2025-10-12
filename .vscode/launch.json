@@ -275,9 +275,9 @@
         "--tags",
         "2025CONUS", //"little_spokane", // "2024CONUS"
         // "--huc_filter",
-        // "1004",
+        // "160",
         // "--delete",
-        // "--force_update"
+        //"--force_update"
       ]
     },
     {

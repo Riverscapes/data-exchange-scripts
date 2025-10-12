@@ -49,7 +49,7 @@ def get_athena_rme_projects(s3_bucket: str) -> dict[str, int]:
     FUTURE ENHANCEMENT: if we're only interested in updating a subset, no need to return everything in rme
     """
     # FUTURE ENHANCEMENT - unless watershed_id a global id across countries we need something better
-    existing_rme = athena_query_get_parsed(s3_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme_pq')
+    existing_rme = athena_query_get_parsed(s3_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme_pq2')
     # this should look like:
     # [{'rme_date_created_ts': '1752810123000', 'watershed_id': '1704020402'},
     #  {'rme_date_created_ts': '1756512492000', 'watershed_id': '1030010112'},
@@ -137,35 +137,22 @@ def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd
             dgos.centerline_length,
             dgos.segment_area,
             dgos.FCode as fcode,
-            ST_X(castautomagic(igos.geom)) longitude,
-            ST_Y(castautomagic(igos.geom)) latitude,
+            ST_X(ST_CENTROID(castautomagic(dgos.geom))) longitude,
+            ST_Y(ST_CENTROID(castautomagic(dgos.geom))) latitude,
             dgo_desc.*,
             dgo_geomorph.*,
             dgo_veg.*,
             dgo_hydro.*,
             dgo_impacts.*,
             dgo_beaver.*,
-            ST_AsBinary(dgo_geom) dgo_geom
+            ST_AsBinary(CastAutomagic(dgos.geom)) dgo_geom
         FROM dgo_desc
             INNER JOIN dgo_geomorph ON dgo_desc.dgoid = dgo_geomorph.dgoid
             INNER JOIN dgo_veg ON dgo_desc.dgoid = dgo_veg.dgoid
             INNER JOIN dgo_hydro ON dgo_desc.dgoid = dgo_hydro.dgoid
             INNER JOIN dgo_impacts ON dgo_desc.dgoid = dgo_impacts.dgoid
             INNER JOIN dgo_beaver ON dgo_desc.dgoid = dgo_beaver.dgoid
-            INNER JOIN
-            (
-                    SELECT
-                    dgoid,
-                    st_union(CastAutomagic(dgos.geom)) dgo_geom,
-                    level_path,
-                    seg_distance,
-                    centerline_length,
-                    segment_area,
-                    FCode
-                FROM dgos
-                GROUP BY level_path, seg_distance
-            ) dgos ON dgo_desc.dgoid = dgos.dgoid
-            INNER JOIN igos ON dgos.level_path = igos.level_path AND dgos.seg_distance = igos.seg_distance
+            INNER JOIN dgos ON dgo_desc.dgoid = dgos.dgoid
     '''
     # we need apsw / spatialite . this seems to work despite pandas not supporting it
     with warnings.catch_warnings():
@@ -284,7 +271,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
             rme_pq_filepath = os.path.join(huc_dir, f'rme_{project.huc}.parquet')
             data_gdf.to_parquet(rme_pq_filepath)
             # don't use os.path.join because this is aws os, not system os
-            s3_key = f'rme/raw-rme-pq/{os.path.basename(rme_pq_filepath)}'
+            s3_key = f'data_exchange/riverscape_metrics/{os.path.basename(rme_pq_filepath)}'
             upload_to_s3(rme_pq_filepath, s3_bucket, s3_key)
 
             if delete_downloads_when_done:
