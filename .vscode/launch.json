@@ -212,12 +212,29 @@
         "/Users/philipbailey/GISData/riverscapes/test",
         "b6b1dfc9-973e-4919-b828-9c0e93fac07f",
         "PRIVATE",
-        "--tags", "mytag,mytag2"
+        "--tags",
+        "mytag,mytag2"
       ]
     },
-
-
-
+    {
+      "name": "Download files for multiple projects",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/scrapers/download_project_files_by_csv.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production",
+        "{env:CSV_FOLDER}",
+        "{env:DATA_ROOT}/project_download",
+        // "--regex_list", "\\.tif$,\\.shp$",
+        // --force
+      ]
+    }
     // {
     //   "name": "Scrape RME",
     //   "type": "debugpy",
@@ -335,7 +352,7 @@
       },
       "args": [
         "s3://riverscapes-athena/output/",
-         "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps",
+        "/Users/philipbailey/GISData/riverscapes/warehouse_report/status_maps",
         "--s3_bucket",
         "s3://releases.northarrowresearch.com/images/2025_conus_model_run_status_maps/",
         "--output_gpkgs"
