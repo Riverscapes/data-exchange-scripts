@@ -1,32 +1,31 @@
 """
-1. Loop over CHaMP visits that are present in the SQLite workbench database.
-2. Search the data exchange for a project matching the CHaMP visit ID.
-3. Download the project.rs.xml file for each matching project.
-4. Write the aux metrics as individual JSON files in the project folder.
-5. Update the project.rs.xml file to reference the new JSON files.
-6. Upload the modified project.rs.xml and JSON files back to the data exchange.
+Goal: Enrich CHaMP topo projects on the data exchange with missing aux measurements.
+
+1. Retrieve visits from Google Postgres that have topo projects but are missing aux measurements.
+2. Download the project.rs.xml file for each matching project.
+3. Retrieve the aux measurements from .net Workbench DB and Write as individual JSON files in the project folder.
+4. Update the project.rs.xml file to reference all the new JSON files.
+5. Upload the modified project.rs.xml and JSON files back to the data exchange.
 
 Philip Bailey
 23 Oct 2025
 """
-
 import os
 import re
 import sqlite3
 import json
 import argparse
 from datetime import datetime
+import psycopg2
 from rsxml import ProgressBar, dotenv, Logger
 from rsxml.project_xml import Project, Dataset, Meta, MetaData
 from rsxml.util import safe_makedirs
 from new_project_upload import upload_project
 from pydex import RiverscapesAPI
-from pydex.classes.riverscapes_helpers import RiverscapesSearchParams
-import psycopg2
 
 
 def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, delete_files: bool) -> None:
-    """Process CHaMP visits from the workbench database and upload aux measurements to the data exchange"""
+    """Upload aux measurements from the workbench database to topo projects in the data exchange"""
 
     log = Logger('CHaMP_Aux_Measurements')
 
@@ -55,6 +54,7 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
             'project_guid': row[4]
         } for row in postgres_cursor.fetchall()
     }
+    log.info(f'Found {len(visits)} CHaMP visits with topo projects that require aux measurement upload.')
 
     sqlite_conn = sqlite3.connect(db_path)
     sqlite_curs = sqlite_conn.cursor()
@@ -70,27 +70,32 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
         log.info(f'Processing visit ID {visit_id} ({watershed_name} - {site_name} - {visit_year})')
 
         try:
+            # Create a dedicated visit directory inside the download dir, with an aux directory inside it.
             visit_dir = os.path.join(download_dir, f'visit_{visit_id}_{project_guid}')
             aux_dir = os.path.join(visit_dir, 'aux_measurements')
-            safe_makedirs(visit_dir)
             safe_makedirs(aux_dir)
+
+            # Download the project.rs.xml file into the visit dir
             api.download_files(project_guid, visit_dir, ['project\\.rs\\.xml'], force=True)
             project_xml_path = os.path.join(visit_dir, 'project.rs.xml')
+
             if not os.path.exists(project_xml_path):
-                log.error(f'project.rs.xml not found for project ID {project_guid}')
+                log.error(f'project.rs.xml not found for visit ID {visit_id} project ID {project_guid}')
                 continue
 
-            # retrieve all the aux measurements and save them to JSON files
+            # retrieve all the aux measurements from .net SQLite and save them as individual JSON files
             sqlite_curs.execute("""
-                select l.title, m.Value
-                from CHaMP_Measurements m
-                    inner join LookupListItems l on m.MeasurementTypeID = l.ItemID
-                where m.VisitID = ?""", (visit_id,))
+                SELECT l.title, m.Value
+                FROM CHaMP_Measurements m
+                    INNER JOIN LookupListItems l ON m.MeasurementTypeID = l.ItemID
+                WHERE m.VisitID = ?
+            """, (visit_id,))
 
             visit_aux_files = {}
             for row in sqlite_curs.fetchall():
                 measurement_name = row[0]
                 metric_value = json.loads(row[1])
+
                 clean_name = re.sub(r'[_\s()]+', '_', measurement_name).strip('_')
                 file_name = f'{clean_name.lower()}.json'
                 aux_file_path = os.path.join(aux_dir, file_name)
@@ -109,10 +114,9 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
 
             log.info(f'Prepared {len(visit_aux_files)} aux measurement files for visit ID {visit_id}')
 
-            # Load the project XML and update it to reference the new aux measurement files
+            # Load the project XML and update it to reference the new aux measurement JSON files
             project = Project.load_project(project_xml_path)
             datasets = project.realizations[0].datasets
-
             for aux_file, (measurement_name, clean_name) in visit_aux_files.items():
                 datasets.append(Dataset(
                     xml_id=f'CHAMP_Aux_{clean_name}'.upper(),
@@ -121,18 +125,16 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
                     ds_type='File',
                     meta_data=MetaData([Meta('measurementType', measurement_name)])
                 ))
-
-            # Write the project file
             project.write()
 
-            # Upload the project found in this folder
+            # Upload the project found in this folder. This will include the new aux measurement JSON files.
             upload_project(api, project_xml_path)
-
             log.info(f'Uploaded aux measurements for visit ID {visit_id}')
 
-            # Update the aux_uploaded flag in the Postgres database
+            # Track progress by updating the aux_uploaded flag in the Postgres database
             postgres_cursor.execute('UPDATE visits SET aux_uploaded = %s WHERE visit_id = %s', (datetime.now(), visit_id))
 
+            # Optionally delete the downloaded files to save space
             if delete_files is True:
                 try:
                     for root, _dirs, files in os.walk(visit_dir, topdown=False):
