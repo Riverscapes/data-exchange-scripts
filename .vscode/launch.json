@@ -234,7 +234,7 @@
         // "--regex_list", "\\.tif$,\\.shp$",
         // --force
       ]
-    }
+    },
     // {
     //   "name": "Scrape RME",
     //   "type": "debugpy",
@@ -420,7 +420,23 @@
         "--skip-overwrite",
         // "--delete"
       ],
-    }
+    },
+    {
+      "name": "ChaMP Aux Measurements",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/utility/champ_aux_measurements.py",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production",
+        "/Users/philipbailey/GISData/riverscapes/champ/workbench.db",
+        "/Users/philipbailey/GISData/riverscapes/champ/visit_aux_data",
+        "False"
+      ]
+    },
     // {
     //   "name": "Scrape HUC statistics - BATCH",
     //   "type": "debugpy",
