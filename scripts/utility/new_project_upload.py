@@ -67,7 +67,7 @@ def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: 
     log.info(f'Upload completed: {success_count} succeeded, {fail_count} failed')
 
 
-def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner: str, visibility: str, tags: list):
+def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner: str = None, visibility: str = None, tags: list = None):
     """ A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
     files we wish to change as well as the project.rs.xml file which describes the project and its files.
 
@@ -112,14 +112,24 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
         # NOTE: VERY IMPORTANT: If you're updating an existing project you must set noDelete to True
         'noDelete': True,
         # Owner must be explicitly set to the same owner as the existing project.
-        'owner': {
-            'id': owner,
-            'type': 'ORGANIZATION'
-        },
-        # Visibility and tags must also be explicitly set so we use the values from the existing project we just looked up
-        'visibility': visibility,
+        # 'owner': {
+        #     'id': owner,
+        #     'type': 'ORGANIZATION'
+        # },
+        # # Visibility and tags must also be explicitly set so we use the values from the existing project we just looked up
+        # 'visibility': visibility,
         'tags': tags
     }
+
+    if owner is not None:
+        upload_params['owner'] = {
+            'id': owner,
+            'type': 'ORGANIZATION'
+        }
+
+    if visibility is not None:
+        upload_params['visibility'] = visibility
+
     project_upload_qry = riverscapes_api.load_query('requestUploadProject')
     project_upload = riverscapes_api.run_query(project_upload_qry, upload_params)
     token = project_upload['data']['requestUploadProject']['token']
