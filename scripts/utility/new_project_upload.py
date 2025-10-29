@@ -22,6 +22,8 @@ from rsxml import Logger
 import requests
 from pydex import RiverscapesAPI, __version__
 
+FILES_TO_SKIP = ['.DS_Store', 'thumbs.db', 'desktop.ini']
+
 
 def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: str, visibility: str, tags: list):
     """ Upload all projects found in subfolders of the specified parent folder.
@@ -67,7 +69,7 @@ def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: 
     log.info(f'Upload completed: {success_count} succeeded, {fail_count} failed')
 
 
-def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner: str = None, visibility: str = None, tags: list = None):
+def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, project_id: str, owner: str, visibility: str, tags: list = None):
     """ A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
     files we wish to change as well as the project.rs.xml file which describes the project and its files.
 
@@ -90,6 +92,10 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
     all_project_files = []
     for root, _dirs, files in os.walk(project_folder):
         for filename in files:
+
+            if filename in FILES_TO_SKIP:
+                continue
+
             rel_dir = os.path.relpath(root, project_folder)
             rel_file = os.path.join(rel_dir, filename) if rel_dir != '.' else filename
             all_project_files.append(rel_file)
@@ -102,6 +108,7 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
     # ================================================================================================================
     # Get a copy of the existing project record so we can copy the owner and visibility
     upload_params = {
+        'projectId': project_id,
         # 'token': "xxxxxxxxxxxxxxxxxxxxx" isn't needed because this is a new project update operation
         'files': all_project_files,  # Relative paths for the files
         # For now I'm faking MD5 tags. This is a little sloppy but for now it works. If you put in fake MD5 tags
@@ -112,23 +119,14 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
         # NOTE: VERY IMPORTANT: If you're updating an existing project you must set noDelete to True
         'noDelete': True,
         # Owner must be explicitly set to the same owner as the existing project.
-        # 'owner': {
-        #     'id': owner,
-        #     'type': 'ORGANIZATION'
-        # },
-        # # Visibility and tags must also be explicitly set so we use the values from the existing project we just looked up
-        # 'visibility': visibility,
-        'tags': tags
-    }
-
-    if owner is not None:
-        upload_params['owner'] = {
+        'owner': {
             'id': owner,
             'type': 'ORGANIZATION'
-        }
-
-    if visibility is not None:
-        upload_params['visibility'] = visibility
+        },
+        # # Visibility and tags must also be explicitly set so we use the values from the existing project we just looked up
+        'visibility': visibility,
+        'tags': tags
+    }
 
     project_upload_qry = riverscapes_api.load_query('requestUploadProject')
     project_upload = riverscapes_api.run_query(project_upload_qry, upload_params)
