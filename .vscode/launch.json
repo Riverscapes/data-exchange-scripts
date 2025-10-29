@@ -422,7 +422,7 @@
       ],
     },
     {
-      "name": "ChaMP Aux Measurements",
+      "name": "Add ChaMP Aux Measurements to Topo",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/scripts/utility/champ_aux_measurements.py",
@@ -434,7 +434,8 @@
         "production",
         "/Users/philipbailey/GISData/riverscapes/champ/workbench.db",
         "/Users/philipbailey/GISData/riverscapes/champ/visit_aux_data",
-        "False"
+        "False",
+        "c7d8c487-c377-42b0-a5b6-4c16db18fb41"
       ]
     },
     // {

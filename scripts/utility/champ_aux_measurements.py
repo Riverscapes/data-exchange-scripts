@@ -3,9 +3,10 @@ Goal: Enrich CHaMP topo projects on the data exchange with missing aux measureme
 
 1. Retrieve visits from Google Postgres that have topo projects but are missing aux measurements.
 2. Download the project.rs.xml file for each matching project.
-3. Retrieve the aux measurements from .net Workbench DB and Write as individual JSON files in the project folder.
+3. Retrieve the aux measurements from .net Workbench DB and Write as individual JSON files in a project sub-folder.
 4. Update the project.rs.xml file to reference all the new JSON files.
-5. Upload the modified project.rs.xml and JSON files back to the data exchange.
+5. Upload the modified project.rs.xml together with the JSON files back to the data exchange.
+6. Update Google postgres to mark aux measurements as uploaded.
 
 Philip Bailey
 23 Oct 2025
@@ -15,6 +16,7 @@ import re
 import sqlite3
 import json
 import argparse
+import shutil
 from datetime import datetime
 import psycopg2
 from rsxml import ProgressBar, dotenv, Logger
@@ -24,7 +26,7 @@ from new_project_upload import upload_project
 from pydex import RiverscapesAPI
 
 
-def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, delete_files: bool) -> None:
+def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, delete_files: bool, project_owner: str) -> None:
     """Upload aux measurements from the workbench database to topo projects in the data exchange"""
 
     log = Logger('CHaMP_Aux_Measurements')
@@ -76,7 +78,7 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
             safe_makedirs(aux_dir)
 
             # Download the project.rs.xml file into the visit dir
-            api.download_files(project_guid, visit_dir, ['project\\.rs\\.xml'], force=True)
+            api.download_files(project_guid, visit_dir, ['project\\.rs\\.xml$'], force=True)
             project_xml_path = os.path.join(visit_dir, 'project.rs.xml')
 
             if not os.path.exists(project_xml_path):
@@ -128,22 +130,17 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
             project.write()
 
             # Upload the project found in this folder. This will include the new aux measurement JSON files.
-            upload_project(api, project_xml_path)
+            upload_project(api, project_xml_path, project_guid, project_owner, 'PUBLIC')
             log.info(f'Uploaded aux measurements for visit ID {visit_id}')
 
             # Track progress by updating the aux_uploaded flag in the Postgres database
             postgres_cursor.execute('UPDATE visits SET aux_uploaded = %s WHERE visit_id = %s', (datetime.now(), visit_id))
+            postgres_conn.commit()
 
             # Optionally delete the downloaded files to save space
             if delete_files is True:
                 try:
-                    for root, _dirs, files in os.walk(visit_dir, topdown=False):
-                        for name in files:
-                            os.remove(os.path.join(root, name))
-                        for name in _dirs:
-                            os.rmdir(os.path.join(root, name))
-                    os.rmdir(visit_dir)
-                    log.info(f'Deleted files for visit ID {visit_id}')
+                    shutil.rmtree(visit_dir)
                 except Exception as e:
                     log.error(f'Error deleting files for visit ID {visit_id}: {e}')
 
@@ -164,10 +161,11 @@ def main():
     parser.add_argument('db_path', help='Path to the workbench SQLite database', type=str)
     parser.add_argument('download_dir', help='Path to the download directory to temporarily store visit files', type=str)
     parser.add_argument('delete_files', help='Whether to delete downloaded files after upload', type=bool)
+    parser.add_argument('project_owner', help='RDx organization Owner GUID for CHaMP projects', type=str)
     args = dotenv.parse_args_env(parser)
 
     with RiverscapesAPI(stage=args.stage) as api:
-        process_champ_visits(api, args.db_path, args.download_dir, args.delete_files)
+        process_champ_visits(api, args.db_path, args.download_dir, args.delete_files, args.project_owner)
 
 
 if __name__ == "__main__":
