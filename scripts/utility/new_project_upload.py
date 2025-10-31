@@ -69,7 +69,7 @@ def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: 
     log.info(f'Upload completed: {success_count} succeeded, {fail_count} failed')
 
 
-def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, project_id: str, owner: str, visibility: str, tags: list = None):
+def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, project_id: str, owner: str, visibility: str, tags: list = None, no_wait: bool = False):
     """ A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
     files we wish to change as well as the project.rs.xml file which describes the project and its files.
 
@@ -134,7 +134,7 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
     project_upload_qry = riverscapes_api.load_query('requestUploadProject')
     project_upload = riverscapes_api.run_query(project_upload_qry, upload_params)
     token = project_upload['data']['requestUploadProject']['token']
-    log.info(f'Requested upload. Received token: {token}')
+    log.info(f'Requested upload. Received token starting with: {token[:8]}...')
     log.info(f' - Files to create: {len(project_upload["data"]["requestUploadProject"]["create"])}')
     log.info(f' - Files to update: {len(project_upload["data"]["requestUploadProject"]["update"])}')
     log.info(f' - Files to delete: {len(project_upload["data"]["requestUploadProject"]["delete"])}')
@@ -160,17 +160,22 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
         url = file_info["urls"][0]
         file_path = os.path.join(project_folder, rel_path)
         log.info(f" - Uploading ({counter} of {len(all_urls)}) {rel_path}...")
-        with open(file_path, "rb") as f:
-            try:
-                response = requests.put(url, data=f, timeout=120)
-                if response.status_code == 200:
-                    pass
+        max_retries = 5
+        backoff = 2  # seconds
+        timeout = 120
+        for attempt in range(1, max_retries + 1):
+            with open(file_path, "rb") as f:
+                try:
+                    response = requests.put(url, data=f, timeout=timeout)
+                except requests.RequestException as e:
+                    log.error(f"Network error (attempt {attempt}/{max_retries}) for {rel_path}: {e}")
                 else:
-                    log.error(f"Failed to upload {rel_path}: {response.status_code} {response.text}")
-                    raise Exception(f"Failed to upload {rel_path}: {response.status_code} {response.text}")
-            except Exception as e:
-                log.error(f"Failed to upload {rel_path}: {str(e)}")
-                raise e
+                    if response.status_code in (200, 201):
+                        break
+                    log.error(f"HTTP {response.status_code} (attempt {attempt}/{max_retries}) for {rel_path}: {response.text[:200]}")
+                if attempt == max_retries:
+                    raise Exception(f"Giving up on {rel_path} after {max_retries} attempts")
+                time.sleep(backoff)
 
     log.info('All files successfully uploaded.')
 
@@ -181,7 +186,7 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
         'token': token
     })
 
-    if True is True:
+    if bool(no_wait) is False:
         # Step 5: Poll the upload status until it's done. This is optional so if you're immediately moving on to a different
         # project you can skip this step. Only useful if you need to know when the project is actually available online.
         # ================================================================================================================
