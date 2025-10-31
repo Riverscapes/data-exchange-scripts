@@ -37,6 +37,9 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${file}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },      
       "console": "integratedTerminal",
       "args": "${command:pickArgs}"
     },

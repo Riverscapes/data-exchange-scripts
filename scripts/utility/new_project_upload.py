@@ -88,7 +88,10 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
     log.title('Upload Riverscapes Files')
 
     # Find all files recursively inside this project folder
-    project_folder = os.path.dirname(project_xml_path)
+    if (not os.path.isfile(project_xml_path) and not os.path.isdir(project_xml_path)):
+        log.error(f'Project XML path does not exist: {project_xml_path}. Must be either the project.rs.xml file or the project folder.')
+        return
+    project_folder = os.path.dirname(project_xml_path) if os.path.isfile(project_xml_path) else project_xml_path
     all_project_files = []
     for root, _dirs, files in os.walk(project_folder):
         for filename in files:
@@ -131,6 +134,10 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
     project_upload_qry = riverscapes_api.load_query('requestUploadProject')
     project_upload = riverscapes_api.run_query(project_upload_qry, upload_params)
     token = project_upload['data']['requestUploadProject']['token']
+    log.info(f'Requested upload. Received token: {token}')
+    log.info(f' - Files to create: {len(project_upload["data"]["requestUploadProject"]["create"])}')
+    log.info(f' - Files to update: {len(project_upload["data"]["requestUploadProject"]["update"])}')
+    log.info(f' - Files to delete: {len(project_upload["data"]["requestUploadProject"]["delete"])}')
 
     # Step 2: Now we need to request the urls for the upload so we can start working on them
     # ================================================================================================================
@@ -140,22 +147,32 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
         'files': combined_files,
         'token': token
     })
+    log.info(f"Received upload urls for {len(upload_urls['data']['requestUploadProjectFilesUrl'])} files")
 
     # Step 3: Now upload each file to the provided url
     # ================================================================================================================
     log.info(f'Received {len(upload_urls["data"]["requestUploadProjectFilesUrl"])} upload urls')
-    for file_info in upload_urls["data"]["requestUploadProjectFilesUrl"]:
+    counter = 0
+    all_urls = upload_urls["data"]["requestUploadProjectFilesUrl"]
+    for file_info in all_urls:
+        counter += 1
         rel_path = file_info["relPath"]
         url = file_info["urls"][0]
         file_path = os.path.join(project_folder, rel_path)
-        print(f"Uploading {file_path} to {url.split('?')[0]} ...")
-
+        log.info(f" - Uploading ({counter} of {len(all_urls)}) {rel_path}...")
         with open(file_path, "rb") as f:
-            response = requests.put(url, data=f, timeout=120)
-            if response.status_code == 200:
-                print(f"Successfully uploaded {rel_path}")
-            else:
-                print(f"Failed to upload {rel_path}: {response.status_code} {response.text}")
+            try:
+                response = requests.put(url, data=f, timeout=120)
+                if response.status_code == 200:
+                    pass
+                else:
+                    log.error(f"Failed to upload {rel_path}: {response.status_code} {response.text}")
+                    raise Exception(f"Failed to upload {rel_path}: {response.status_code} {response.text}")
+            except Exception as e:
+                log.error(f"Failed to upload {rel_path}: {str(e)}")
+                raise e
+
+    log.info('All files successfully uploaded.')
 
     # Step 4: Now that all files are uploaded we need to finalize the upload
     # ================================================================================================================
