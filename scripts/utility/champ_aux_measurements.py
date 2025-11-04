@@ -75,15 +75,6 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
             # Create a dedicated visit directory inside the download dir, with an aux directory inside it.
             visit_dir = os.path.join(download_dir, f'visit_{visit_id}_{project_guid}')
             aux_dir = os.path.join(visit_dir, 'aux_measurements')
-            safe_makedirs(aux_dir)
-
-            # Download the project.rs.xml file into the visit dir
-            api.download_files(project_guid, visit_dir, ['project\\.rs\\.xml$'], force=True)
-            project_xml_path = os.path.join(visit_dir, 'project.rs.xml')
-
-            if not os.path.exists(project_xml_path):
-                log.error(f'project.rs.xml not found for visit ID {visit_id} project ID {project_guid}')
-                continue
 
             # retrieve all the aux measurements from .net SQLite and save them as individual JSON files
             sqlite_curs.execute("""
@@ -101,6 +92,7 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
                 clean_name = re.sub(r'[_\s()]+', '_', measurement_name).strip('_')
                 file_name = f'{clean_name.lower()}.json'
                 aux_file_path = os.path.join(aux_dir, file_name)
+                safe_makedirs(aux_dir)
                 with open(aux_file_path, 'w', encoding='utf-8') as f:
                     json.dump({'value': metric_value}, f, indent=4)
 
@@ -114,11 +106,19 @@ def process_champ_visits(api: RiverscapesAPI, db_path: str, download_dir: str, d
                 log.info(f'No aux measurement files found for visit ID {visit_id}, skipping upload.')
                 continue
 
+            # Download the project.rs.xml file into the visit dir
+            api.download_files(project_guid, visit_dir, ['project\\.rs\\.xml$'], force=True)
+            project_xml_path = os.path.join(visit_dir, 'project.rs.xml')
+
+            if not os.path.exists(project_xml_path):
+                log.error(f'project.rs.xml not found for visit ID {visit_id} project ID {project_guid}')
+                continue
+
             log.info(f'Prepared {len(visit_aux_files)} aux measurement files for visit ID {visit_id}')
 
             # Load the project XML and update it to reference the new aux measurement JSON files
             project = Project.load_project(project_xml_path)
-            datasets = project.realizations[0].datasets
+            datasets = project.common_datasets
             for aux_file, (measurement_name, clean_name) in visit_aux_files.items():
                 datasets.append(Dataset(
                     xml_id=f'CHAMP_Aux_{clean_name}'.upper(),
