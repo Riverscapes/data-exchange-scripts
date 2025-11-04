@@ -10,6 +10,7 @@ from rsxml import ProgressBar, dotenv, Logger
 from psycopg2.extensions import cursor as Cursor
 from new_project_upload import upload_project
 from pydex import RiverscapesAPI
+from rsxml.project_xml import Project, Dataset, Meta, MetaData
 
 TABLES_TO_SKIP = [
     'channel_unit_metrics',
@@ -278,7 +279,7 @@ def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, 
                     with open(os.path.join(aux_file_path), 'w', encoding='utf-8') as json_file:
                         json.dump(record_data, json_file, default=json_serial, indent=4)
 
-                visit_aux_files[aux_file_path] = (measurement_name, os.path.basename(aux_file_path))
+                visit_aux_files[aux_file_path] = (measurement_name, os.path.splitext(os.path.basename(aux_file_path))[0])
 
             if len(visit_aux_files) == 0:
                 log.info(f'No aux measurement files found for visit ID {visit_id}, skipping upload.')
@@ -293,6 +294,19 @@ def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, 
                 continue
 
             log.info(f'Prepared {len(visit_aux_files)} aux measurement files for visit ID {visit_id}')
+
+            # Load the project XML and update it to reference the new aux measurement JSON files
+            project = Project.load_project(project_xml_path)
+            datasets = project.common_datasets
+            for aux_file, (measurement_name, clean_name) in visit_aux_files.items():
+                datasets.append(Dataset(
+                    xml_id=f'CHAMP_Aux_{clean_name}'.upper(),
+                    name=measurement_name,
+                    path=os.path.relpath(aux_file, visit_dir),
+                    ds_type='File',
+                    meta_data=MetaData([Meta('measurementType', measurement_name)])
+                ))
+            project.write()
 
             # Upload the project found in this folder. This will include the new aux measurement JSON files.
             upload_project(api, project_xml_path, project_guid, project_owner, 'PUBLIC')
