@@ -1,0 +1,112 @@
+name: Metadata Catalog
+
+on:
+  push:
+    branches: [ main, rmescrapeparquet ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write  # needed for OIDC role assumption
+
+concurrency:
+  group: metadata-catalog-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TABLE_NAME: layer_column_defs
+  S3_BASE_PATH: s3://riverscapes-athena/metadata/layer_column_defs
+  ATHENA_DATABASE: default            # <-- update to your Glue/Athena database name
+  ATHENA_RESULT_BUCKET: s3://riverscapes-athena-output/query-results/metadata  # <-- ensure this exists
+  AWS_REGION: us-west-2                        
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.METADATA_PUBLISH_ROLE_ARN }}  # set in repo secrets
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv (fast Python resolver)
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+
+      - name: Sync dependencies
+        run: |
+          uv sync --frozen || uv sync
+
+      - name: Generate partitioned Parquet metadata
+        run: |
+          python scripts/metadata/flatten_layer_catalog.py
+          echo "Generated metadata artifacts:";
+          find dist/metadata -maxdepth 3 -type f -print
+
+      - name: Upload metadata to S3 (sync)
+        run: |
+          aws s3 sync dist/metadata/ ${{ env.S3_BASE_PATH }}/ --delete
+
+      - name: Create table if not exists
+        id: create-table
+        run: |
+          CREATE_SQL="CREATE EXTERNAL TABLE IF NOT EXISTS ${TABLE_NAME} (\n  layer_id string,\n  layer_name string,\n  layer_type string,\n  layer_description string,\n  name string,\n  friendly_name string,\n  data_unit string,\n  dtype string,\n  description string,\n  is_key boolean,\n  is_nullable boolean,\n  commit_sha string\n)\nPARTITIONED BY (\n  authority_name string,\n  authority_version string\n)\nSTORED AS PARQUET\nLOCATION '${S3_BASE_PATH}/';";
+          aws athena start-query-execution \
+            --query-string "$CREATE_SQL" \
+            --query-execution-context Database=${ATHENA_DATABASE} \
+            --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET}
+
+      - name: Repair / add partitions
+        run: |
+          aws athena start-query-execution \
+            --query-string "MSCK REPAIR TABLE ${TABLE_NAME}" \
+            --query-execution-context Database=${ATHENA_DATABASE} \
+            --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET}
+
+      - name: Verify partition count
+        run: |
+          QID=$(aws athena start-query-execution \
+            --query-string "SHOW PARTITIONS ${TABLE_NAME}" \
+            --query-execution-context Database=${ATHENA_DATABASE} \
+            --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET} \
+            --query-execution-context Database=${ATHENA_DATABASE} | jq -r '.QueryExecutionId')
+          echo "QueryExecutionId=$QID";
+          # Poll for completion
+          for i in $(seq 1 30); do
+            STATUS=$(aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.State');
+            if [ "$STATUS" = "SUCCEEDED" ]; then break; fi; sleep 4; done
+          aws s3 cp ${ATHENA_RESULT_BUCKET}/$QID.csv partitions.csv || true
+          echo "Partitions:"; cat partitions.csv || true
+
+      - name: Sample query (count rows)
+        run: |
+          QID=$(aws athena start-query-execution \
+            --query-string "SELECT count(*) FROM ${TABLE_NAME}" \
+            --query-execution-context Database=${ATHENA_DATABASE} \
+            --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET} | jq -r '.QueryExecutionId')
+          for i in $(seq 1 30); do
+            STATUS=$(aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.State');
+            if [ "$STATUS" = "SUCCEEDED" ]; then break; fi; sleep 4; done
+          aws s3 cp ${ATHENA_RESULT_BUCKET}/$QID.csv rowcount.csv || true
+          echo "Row count:"; cat rowcount.csv || true
+
+      - name: Post-run summary
+        run: |
+          echo "Metadata catalog workflow completed.";
+          echo "Table: ${TABLE_NAME}";
+          echo "S3 Base Path: ${S3_BASE_PATH}";
+          echo "Database: ${ATHENA_DATABASE}";
+
+    # Optional: simple failure notification step could be added here.

@@ -79,7 +79,9 @@ brew install gdal
 2. In VSCode, load the `RiverscapesAPI.code-workspace` workspace.
 3. Ensure the appropriate Python version is selected (e.g., `3.12.9 ('.venv')`).
 
-**NOTE: THE CODESPACE WILL NOT WORK WITH SCRIPTS THAT REQUIRE GDAL FOR NOW (think the project merging etc.)**
+### Codespace GDAL Limitation
+
+> NOTE: The codespace environment does not currently support scripts requiring GDAL (e.g. project merging). Run those locally.
 
 ## Best Practices
 
@@ -117,3 +119,157 @@ Contributions are welcome! Please follow these steps:
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+## Metadata Catalog Pipeline
+
+The repository includes an automated pipeline for publishing tool/layer column definitions to Amazon Athena as an external table.
+
+### Source Metadata Files
+
+- Each tool publishes a `layer_catalog.json` and one or more layer definition JSON files referenced by `def_path`.
+- These live beside the tool's code (e.g. under `scripts/<tool_name>/`).
+
+### Flattening Script
+
+`scripts/metadata/flatten_layer_catalog.py` scans the repo for every `layer_catalog.json` and produces partitioned Parquet output:
+
+```text
+dist/metadata/
+  authority_name=<authority>/authority_version=<version>/layer_metadata.parquet
+  index.json
+```
+
+Default behavior:
+
+- Output format: Parquet (use `--format csv` for CSV).
+- Partition columns (`authority_name`, `authority_version`) are NOT inside the Parquet files unless `--include-partition-cols` is passed.
+- A `commit_sha` (current HEAD) is written into every row and stored again in `index.json` with a run timestamp.
+
+Run locally:
+
+```bash
+python scripts/metadata/flatten_layer_catalog.py
+```
+
+Optional flags:
+
+```bash
+python scripts/metadata/flatten_layer_catalog.py --format csv             # CSV instead of Parquet
+python scripts/metadata/flatten_layer_catalog.py --include-partition-cols # Embed partition columns in each file
+```
+
+### Athena External Table
+
+We publish to: `s3://riverscapes-athena/metadata/layer_column_defs/`
+
+Recommended external table DDL (Parquet, partition columns excluded from file content):
+
+```sql
+CREATE EXTERNAL TABLE IF NOT EXISTS layer_column_defs (
+  layer_id          string,
+  layer_name        string,
+  layer_type        string,
+  layer_description string,
+  name              string,
+  friendly_name     string,
+  data_unit         string,
+  dtype             string,
+  description       string,
+  is_key            boolean,
+  is_nullable       boolean,
+  commit_sha        string
+)
+PARTITIONED BY (
+  authority_name    string,
+  authority_version string
+)
+STORED AS PARQUET
+LOCATION 's3://riverscapes-athena/metadata/layer_column_defs/';
+```
+
+Add new partitions (after upload):
+
+```sql
+MSCK REPAIR TABLE layer_column_defs;  -- auto-discover
+-- OR manual:
+ALTER TABLE layer_column_defs
+ADD IF NOT EXISTS PARTITION (authority_name='rme_to_athena', authority_version='1.0')
+LOCATION 's3://riverscapes-athena/metadata/layer_column_defs/authority_name=rme_to_athena/authority_version=1.0/';
+```
+
+### Example Queries
+
+List column definitions for a tool version:
+
+```sql
+SELECT name, friendly_name, dtype, description
+FROM layer_column_defs
+WHERE authority_name='rme_to_athena' AND authority_version='1.0'
+ORDER BY name;
+```
+
+Count columns by dtype across all authorities:
+
+```sql
+SELECT dtype, COUNT(*) AS n
+FROM layer_column_defs
+GROUP BY dtype
+ORDER BY n DESC;
+```
+
+Compare two versions of a tool:
+
+```sql
+SELECT a.name,
+       a.dtype AS dtype_v1,
+       b.dtype AS dtype_v2
+FROM layer_column_defs a
+JOIN layer_column_defs b
+  ON a.authority_name = b.authority_name
+ AND a.name = b.name
+WHERE a.authority_name='rme_to_athena'
+  AND a.authority_version='1.0'
+  AND b.authority_version='1.1';
+```
+
+### GitHub Actions Workflow
+
+Workflow file: `.github/workflows/metadata-catalog.yml`
+
+Steps performed:
+
+1. Checkout code.
+2. Assume AWS IAM role via OIDC (secret `METADATA_PUBLISH_ROLE_ARN`).
+3. Install dependencies (Python 3.12 + `uv sync`).
+4. Run flatten script -> partitioned Parquet.
+5. Sync `dist/metadata` to S3 bucket prefix.
+6. Create external table if missing.
+7. Run `MSCK REPAIR TABLE` to load partitions.
+8. Perform sample queries (partition listing / row count).
+
+
+### IAM Role (Least Privilege Summary)
+
+The role must allow:
+
+- S3 List/Get/Put/Delete under `metadata/layer_column_defs/` and query result prefix.
+- Athena: StartQueryExecution, GetQueryExecution, GetQueryResults.
+- Glue: Get/Create/Update table & partitions for the database/table.
+
+### Future Enhancements
+
+- Validate layer schemas (dtype whitelist, required fields).
+- Explicit partition adds instead of MSCK for faster updates.
+- Historical snapshots (extra partition like `snapshot_date`).
+- Option to emit both Parquet + CSV for human diffing.
+
+## Troubleshooting Metadata
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Empty Athena table | Partitions not loaded | Run `MSCK REPAIR TABLE` or add partitions manually |
+| Wrong data types | Created table before column rename | Drop & recreate external table with new DDL |
+| Missing new version | Workflow didn’t run or lacked perms | Check Actions logs & IAM role policies |
+| Zero rows for authority | Upload sync failed | Inspect S3 prefix & re-run workflow |
+
+<!-- End of Metadata Section -->

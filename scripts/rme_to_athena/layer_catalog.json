@@ -1,0 +1,14 @@
+{
+    "$schema": "https://s3.us-west-2.amazonaws.com/releases.northarrowresearch.com/reports/2025beta/metadata_schemas/layer_catalog.schema.json",
+    "authority_name": "rme_to_athena",
+    "authority_version": "1.0",
+    "layers": {
+        "riverscape_metrics": {
+            "data_product_version": "1.0",
+            "def_path": "./riverscapes_metrics_layerdef.json",
+            "description": "DGO metrics from RME project geopackages",
+            "layer_type": "table",
+            "source_url": "https://tools.riverscapes.net/rme/"
+        }
+    }
+}
