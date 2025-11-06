@@ -1,8 +1,6 @@
 {
   "$schema": "https://s3.us-west-2.amazonaws.com/releases.northarrowresearch.com/reports/2025beta/metadata_schemas/layer.schema.json",
   "layer_name": "raw_rme",
-  "layer_type": "table",
-  "layer_description": "Auto-converted on 2025-11-04 from legacy CSV; 131 columns.",
   "columns": [
     {
       "name": "brat_capacity",

@@ -21,6 +21,7 @@ dependencies = [
   "matplotlib>=3.9.4",
   "pyarrow>=21.0.0",
   "pyathena>=2.9.4",
+  "jsonschema>=4.17.3",
   "python-dateutil==2.9.0.post0",
   "requests==2.32.3",
   "rsxml==2.0.6",

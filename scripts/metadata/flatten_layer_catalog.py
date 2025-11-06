@@ -31,14 +31,10 @@ import json
 import subprocess
 import datetime as _dt
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
 
-try:
-    import pyarrow as pa  # type: ignore
-    import pyarrow.parquet as pq  # type: ignore
-    _HAVE_PARQUET = True
-except Exception:  # pragma: no cover - optional dependency
-    _HAVE_PARQUET = False
+from jsonschema import Draft202012Validator
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 CATALOG_FILENAME = "layer_catalog.json"
 OUTPUT_COLUMNS = [  # logical full schema (including potential partition columns)
@@ -60,7 +56,7 @@ OUTPUT_COLUMNS = [  # logical full schema (including potential partition columns
 ]
 
 
-def git_commit_sha() -> Optional[str]:
+def git_commit_sha() -> str | None:
     """Return current git commit SHA or None if not available."""
     try:
         sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
@@ -69,31 +65,49 @@ def git_commit_sha() -> Optional[str]:
         return None
 
 
-def find_catalogs(root: Path) -> List[Path]:
+def find_catalogs(root: Path) -> list[Path]:
     """Find all catalogs in the repository."""
     return [p for p in root.rglob(CATALOG_FILENAME)]
 
 
-def load_json(path: Path) -> Dict[str, Any]:
+def load_json(path: Path) -> dict:
     """Load JSON from disk."""
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def safe_get(d: Dict[str, Any], key: str, default: str = "") -> str:
+def safe_get(d: dict, key: str, default: str = "") -> str:
     v = d.get(key, default)
     if v is None:
         return default
     return str(v)
 
 
-def flatten_catalog(catalog_path: Path, commit_sha: Optional[str]) -> List[Dict[str, Any]]:
-    """Flatten a single catalog into row dicts."""
+def _load_validator(root: Path, schema_rel: str) -> Draft202012Validator | None:
+    """Load a JSON Schema validator or return None if the schema file is absent."""
+    schema_path = (root / schema_rel).resolve()
+    if not schema_path.exists():
+        return None
+    with schema_path.open("r", encoding="utf-8") as f:
+        schema_data = json.load(f)
+    return Draft202012Validator(schema_data)
+
+
+def flatten_catalog(catalog_path: Path, commit_sha: str | None, catalog_validator: Draft202012Validator | None, layer_validator: Draft202012Validator | None, errors: list[dict]) -> list[dict]:
+    """Flatten a single catalog into row dicts, validating schemas if validators provided."""
     catalog = load_json(catalog_path)
+    if catalog_validator:
+        for e in catalog_validator.iter_errors(catalog):
+            errors.append({
+                "file": str(catalog_path),
+                "type": "catalog",
+                "message": e.message,
+                "path": list(e.path)
+            })
     authority_name = catalog.get("authority_name", "")
     authority_version = catalog.get("authority_version", "")
     layers = catalog.get("layers", {})
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict] = []
 
     for layer_id, layer_info in layers.items():
         def_path_raw = layer_info.get("def_path")
@@ -105,12 +119,28 @@ def flatten_catalog(catalog_path: Path, commit_sha: Optional[str]) -> List[Dict[
             continue
         try:
             layer_def = load_json(def_path)
-        except Exception:
+        except Exception as ex:
+            errors.append({
+                "file": str(def_path),
+                "type": "layer",
+                "message": f"Failed to load: {ex}",
+                "path": []
+            })
             continue
 
+        if layer_validator:
+            for e in layer_validator.iter_errors(layer_def):
+                errors.append({
+                    "file": str(def_path),
+                    "type": "layer",
+                    "message": e.message,
+                    "path": list(e.path)
+                })
+
+        # layer_type and description are now sourced ONLY from catalog to avoid duplication.
         layer_name = layer_def.get("layer_name", layer_id)
-        layer_type = layer_def.get("layer_type", layer_info.get("layer_type", ""))
-        layer_description = layer_def.get("layer_description", layer_info.get("description", ""))
+        layer_type = layer_info.get("layer_type", "")
+        layer_description = layer_info.get("description", "")
         columns = layer_def.get("columns", [])
 
         for col in columns:
@@ -138,7 +168,7 @@ def flatten_catalog(catalog_path: Path, commit_sha: Optional[str]) -> List[Dict[
     return rows
 
 
-def write_csv(rows: List[Dict[str, Any]], output: Path, columns: List[str]) -> None:
+def write_csv(rows: list[dict], output: Path, columns: list[str]) -> None:
     """Write a list of row dicts to CSV with specified columns."""
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="", encoding="utf-8") as f:
@@ -148,10 +178,8 @@ def write_csv(rows: List[Dict[str, Any]], output: Path, columns: List[str]) -> N
             writer.writerow({k: r.get(k, "") for k in columns})
 
 
-def write_parquet(rows: List[Dict[str, Any]], output: Path, columns: List[str]) -> None:
-    """Write rows to Parquet using pyarrow (if available)."""
-    if not _HAVE_PARQUET:
-        raise RuntimeError("pyarrow not available; install pyarrow to use parquet output.")
+def write_parquet(rows: list[dict], output: Path, columns: list[str]) -> None:
+    """Write rows to Parquet using pyarrow."""
     output.parent.mkdir(parents=True, exist_ok=True)
     # Build Arrow schema dynamically
     field_types = {
@@ -185,8 +213,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def group_rows(rows: List[Dict[str, Any]]) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
-    groups: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+def group_rows(rows: list[dict]) -> dict[tuple[str, str], list[dict]]:
+    groups: dict[tuple[str, str], list[dict]] = {}
     for r in rows:
         key = (r.get("authority_name", ""), r.get("authority_version", ""))
         groups.setdefault(key, []).append(r)
@@ -202,9 +230,13 @@ def main() -> None:
     commit_sha = git_commit_sha()
 
     catalogs = find_catalogs(root)
-    all_rows: List[Dict[str, Any]] = []
+    # Load validators (tolerate absence)
+    catalog_validator = _load_validator(root, "metadata_schemas/layer_catalog.schema.json")
+    layer_validator = _load_validator(root, "metadata_schemas/layer.schema.json")
+    validation_errors: list[dict] = []
+    all_rows: list[dict] = []
     for c in catalogs:
-        all_rows.extend(flatten_catalog(c, commit_sha=commit_sha))
+        all_rows.extend(flatten_catalog(c, commit_sha=commit_sha, catalog_validator=catalog_validator, layer_validator=layer_validator, errors=validation_errors))
 
     # Partitioned mode only (single-file legacy removed)
     groups = group_rows(all_rows)
@@ -232,10 +264,11 @@ def main() -> None:
     index_path.parent.mkdir(parents=True, exist_ok=True)
     with index_path.open("w", encoding="utf-8") as f:
         json.dump({
-            "generated_at": _dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "generated_at": _dt.date.today().isoformat(),
             "commit_sha": commit_sha,
             "partitions": index_manifest,
-            "total_rows": len(all_rows)
+            "total_rows": len(all_rows),
+            "validation_errors": validation_errors,
         }, f, indent=2)
     print(f"Wrote {len(all_rows)} rows across {len(groups)} partitions to {base_output}")
 

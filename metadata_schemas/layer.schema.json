@@ -1,0 +1,104 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "http://xml.riverscapes.net/schemas/layer.schema.json",
+    "title": "Single Layer Definition",
+    "description": "Definition of a single data layer's structural columns. Descriptive metadata (type, description) now centralized in layer_catalog schema to avoid duplication.",
+    "type": "object",
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "layer_name": {
+            "type": "string",
+            "description": "Unique identifier for the layer."
+        },
+        "columns": {
+            "type": "array",
+            "description": "Ordered list of column definitions (for table/view) or bands (for raster).",
+            "minItems": 1,
+            "items": {
+                "$ref": "#/$defs/column"
+            }
+        }
+    },
+    "required": [
+        "layer_name"
+    ],
+    "$defs": {
+        "column": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Column identifier."
+                },
+                "dtype": {
+                    "type": "string",
+                    "description": "Data type (INTEGER, REAL, TEXT, etc.)."
+                },
+                "friendly_name": {
+                    "type": "string",
+                    "description": "Display-friendly name."
+                },
+                "theme": {
+                    "type": "string",
+                    "description": "Grouping/theme (e.g., Beaver, Hydrology)."
+                },
+                "data_unit": {
+                    "type": "string",
+                    "description": "Pint-compatible unit string (e.g., m, km^2, %)."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Meaning/derivation details."
+                },
+                "is_key": {
+                    "type": "boolean",
+                    "description": "Participates in a primary/unique key."
+                },
+                "is_nullable": {
+                    "type": "boolean",
+                    "description": "True if NULL values allowed."
+                },
+                "dflt_value": {
+                    "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                    ],
+                    "description": "Default value if missing."
+                },
+                "preferred_bin_definition": {
+                    "type": "string",
+                    "description": "Identifier of preferred bin definition (optional)."
+                }
+            },
+            "required": [
+                "name",
+                "dtype"
+            ],
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false,
+    "examples": [
+        {
+            "layer_name": "raw_rme",
+            "/* layer_type removed */": "table metadata now resides in layer_catalog entry",
+            "/* layer_description removed */": "description now resides in layer_catalog entry",
+            "columns": [
+                {
+                    "name": "brat_capacity",
+                    "dtype": "REAL",
+                    "friendly_name": "Existing Beaver Dam Capacity",
+                    "theme": "Beaver",
+                    "data_unit": "km^-1",
+                    "description": "Existing number of beaver dams per unit riverscape length supported",
+                    "is_key": false,
+                    "is_nullable": true
+                }
+            ]
+        }
+    ]
+}

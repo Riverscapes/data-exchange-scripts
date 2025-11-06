@@ -1,8 +1,6 @@
 {
   "$schema": "https://s3.us-west-2.amazonaws.com/releases.northarrowresearch.com/reports/2025beta/metadata_schemas/layer.schema.json",
   "layer_name": "rpt_rme",
-  "layer_type": "view",
-  "layer_description": "this is just the new columns in rpt_rme that aren't in raw_rme",
   "columns": [
     {
       "name": "fcode_desc",
