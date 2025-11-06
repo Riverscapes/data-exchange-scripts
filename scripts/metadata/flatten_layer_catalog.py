@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Flatten layer catalog + layer definitions into partitioned Parquet (default) files for Athena.
+"""Flatten unified layer_definitions metadata file into partitioned Parquet (default) files for Athena.
 
 Output pattern:
     dist/metadata/authority_name=<name>/authority_version=<version>/layer_metadata.parquet
@@ -18,8 +18,8 @@ Usage examples:
     python scripts/metadata/flatten_layer_catalog.py --format csv --include-partition-cols
 
 Notes:
-    - Scans repository recursively for 'layer_catalog.json'.
-    - Resolves each layer's definition via its 'def_path'.
+    - Scans repository recursively for 'layer_definitions.json'.
+    - Single file contains catalog + layer structural definitions (no def_path indirection).
     - Robust to missing optional fields.
     - Designed for Python >= 3.12 (compatible >=3.10).
     - Parquet writing uses pyarrow.
@@ -32,12 +32,12 @@ import subprocess
 import datetime as _dt
 from pathlib import Path
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft7Validator
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-CATALOG_FILENAME = "layer_catalog.json"
-OUTPUT_COLUMNS = [  # logical full schema (including potential partition columns)
+CATALOG_FILENAME = "layer_definitions.json"
+OUTPUT_COLUMNS = [  # logical full schema (including partition columns)
     "authority_name",
     "authority_version",
     "layer_id",
@@ -47,11 +47,14 @@ OUTPUT_COLUMNS = [  # logical full schema (including potential partition columns
     # column-defining fields with prefixes removed
     "name",
     "friendly_name",
+    "theme",
     "data_unit",
     "dtype",
     "description",
     "is_key",
-    "is_nullable",
+    "is_required",
+    "default_value",
+    # populated by flatten script
     "commit_sha",
 ]
 
@@ -83,71 +86,51 @@ def safe_get(d: dict, key: str, default: str = "") -> str:
     return str(v)
 
 
-def _load_validator(root: Path, schema_rel: str) -> Draft202012Validator | None:
+def _load_validator(root: Path, schema_rel: str) -> Draft7Validator | None:
     """Load a JSON Schema validator or return None if the schema file is absent."""
     schema_path = (root / schema_rel).resolve()
     if not schema_path.exists():
         return None
     with schema_path.open("r", encoding="utf-8") as f:
         schema_data = json.load(f)
-    return Draft202012Validator(schema_data)
+    return Draft7Validator(schema_data)
 
 
-def flatten_catalog(catalog_path: Path, commit_sha: str | None, catalog_validator: Draft202012Validator | None, layer_validator: Draft202012Validator | None, errors: list[dict]) -> list[dict]:
-    """Flatten a single catalog into row dicts, validating schemas if validators provided."""
-    catalog = load_json(catalog_path)
-    if catalog_validator:
-        for e in catalog_validator.iter_errors(catalog):
+def flatten_definitions(defs_path: Path, commit_sha: str | None, validator: Draft7Validator | None, errors: list[dict]) -> list[dict]:
+    """Flatten a unified layer_definitions.json file into row dicts."""
+    data = load_json(defs_path)
+    if validator:
+        for e in validator.iter_errors(data):
             errors.append({
-                "file": str(catalog_path),
-                "type": "catalog",
+                "file": str(defs_path),
+                "type": "definitions",
                 "message": e.message,
                 "path": list(e.path)
             })
-    authority_name = catalog.get("authority_name", "")
-    authority_version = catalog.get("authority_version", "")
-    layers = catalog.get("layers", {})
+    authority_name = data.get("authority_name", "")
+    authority_version = data.get("authority_version", "")
+    layers = data.get("layers", [])
     rows: list[dict] = []
-
-    for layer_id, layer_info in layers.items():
-        def_path_raw = layer_info.get("def_path")
-        if not def_path_raw:
-            continue  # skip malformed layer entry
-        def_path = (catalog_path.parent / def_path_raw).resolve()
-        if not def_path.exists():
-            # If definition file missing, skip silently (could log)
+    for layer in layers:
+        layer_id = layer.get("layer_id") or layer.get("layer_name") or ""
+        if not layer_id:
             continue
-        try:
-            layer_def = load_json(def_path)
-        except Exception as ex:
-            errors.append({
-                "file": str(def_path),
-                "type": "layer",
-                "message": f"Failed to load: {ex}",
-                "path": []
-            })
-            continue
-
-        if layer_validator:
-            for e in layer_validator.iter_errors(layer_def):
-                errors.append({
-                    "file": str(def_path),
-                    "type": "layer",
-                    "message": e.message,
-                    "path": list(e.path)
-                })
-
-        # layer_type and description are now sourced ONLY from catalog to avoid duplication.
-        layer_name = layer_def.get("layer_name", layer_id)
-        layer_type = layer_info.get("layer_type", "")
-        layer_description = layer_info.get("description", "")
-        columns = layer_def.get("columns", [])
-
+        layer_name = layer.get("layer_name", layer_id)
+        layer_type = layer.get("layer_type", "")
+        layer_description = layer.get("description", "")
+        columns = layer.get("columns", [])
         for col in columns:
-            # Some truncated JSON may omit fields entirely; ensure robustness.
             cname = col.get("name", "")
             if not cname:
                 continue
+            default_val = col.get("default_value")
+            # Normalize default_value to simple JSON-compatible scalar or None; store as string for heterogeneity
+            if isinstance(default_val, (dict, list)):
+                default_val_out = json.dumps(default_val, separators=(",", ":"))
+            elif default_val is None:
+                default_val_out = None
+            else:
+                default_val_out = str(default_val)
             rows.append({
                 "authority_name": authority_name,
                 "authority_version": authority_version,
@@ -157,14 +140,15 @@ def flatten_catalog(catalog_path: Path, commit_sha: str | None, catalog_validato
                 "layer_description": layer_description,
                 "name": cname,
                 "friendly_name": col.get("friendly_name", ""),
+                "theme": col.get("theme", ""),
                 "data_unit": col.get("data_unit", ""),
                 "dtype": col.get("dtype", ""),
                 "description": col.get("description", ""),
                 "is_key": col.get("is_key", False),
-                "is_nullable": col.get("is_nullable", True),
+                "is_required": (col.get("is_required") if "is_required" in col else (not col.get("is_nullable", True))),
+                "default_value": default_val_out,
                 "commit_sha": commit_sha or "",
             })
-
     return rows
 
 
@@ -193,7 +177,8 @@ def write_parquet(rows: list[dict], output: Path, columns: list[str]) -> None:
         "dtype": pa.string(),
         "description": pa.string(),
         "is_key": pa.bool_(),
-        "is_nullable": pa.bool_(),
+        "is_required": pa.bool_(),
+        "default_value": pa.string(),
         "commit_sha": pa.string(),
         "authority_name": pa.string(),
         "authority_version": pa.string(),
@@ -230,13 +215,28 @@ def main() -> None:
     commit_sha = git_commit_sha()
 
     catalogs = find_catalogs(root)
-    # Load validators (tolerate absence)
-    catalog_validator = _load_validator(root, "metadata_schemas/layer_catalog.schema.json")
-    layer_validator = _load_validator(root, "metadata_schemas/layer.schema.json")
+    # Unified validator
+    catalog_validator = _load_validator(root, "metadata_schemas/layer_definitions.schema.json")
     validation_errors: list[dict] = []
     all_rows: list[dict] = []
     for c in catalogs:
-        all_rows.extend(flatten_catalog(c, commit_sha=commit_sha, catalog_validator=catalog_validator, layer_validator=layer_validator, errors=validation_errors))
+        all_rows.extend(flatten_definitions(c, commit_sha=commit_sha, validator=catalog_validator, errors=validation_errors))
+
+    # Loud failure on any validation errors BEFORE writing partition outputs.
+    if validation_errors:
+        base_output.mkdir(parents=True, exist_ok=True)
+        index_path = base_output / "index.json"
+        with index_path.open("w", encoding="utf-8") as f:
+            json.dump({
+                "generated_at": _dt.date.today().isoformat(),
+                "commit_sha": commit_sha,
+                "partitions": [],
+                "total_rows": len(all_rows),
+                "validation_errors": validation_errors,
+                "status": "validation_failed"
+            }, f, indent=2)
+        print(f"Validation failed with {len(validation_errors)} error(s). See {index_path}")
+        raise SystemExit(1)
 
     # Partitioned mode only (single-file legacy removed)
     groups = group_rows(all_rows)
@@ -268,7 +268,8 @@ def main() -> None:
             "commit_sha": commit_sha,
             "partitions": index_manifest,
             "total_rows": len(all_rows),
-            "validation_errors": validation_errors,
+            "validation_errors": [],
+            "status": "ok",
         }, f, indent=2)
     print(f"Wrote {len(all_rows)} rows across {len(groups)} partitions to {base_output}")
 

@@ -19,7 +19,7 @@ This project uses [uv](https://github.com/astral-sh/uv) to manage Python virtual
 
 We have started using [Spatialite](https://www.gaia-gis.it) for some operations. This is a binary that sites on top of SQLite and provides several powerful geospatial operations as `ST_` functions, similar to PostGIS on top of Postgres.
 
-Spatialite is distributed as an extension to SQLite, but unfortunately the core SQLite3 Python package is not compiled to allow extensions to be loaded (presumably for security reasons). Therefore we use a package called [APSW](https://pypi.org/project/apsw/) that does. APSW can be installed with UV and then you have to load the extension with the following code, where `spatialite_path` is the path to the Spatialite binary. MacOS users can install Spatialite using homebrew and then search for the file `mod_spatialite.8.dylib`. Windows users can downloaded Spatialite binaries [here](https://www.gaia-gis.it/gaia-sins/windows-bin-amd64/). Our Python that uses Spatialite should all allow you to specify this path in the `launch.json` file. 
+Spatialite is distributed as an extension to SQLite, but unfortunately the core SQLite3 Python package is not compiled to allow extensions to be loaded (presumably for security reasons). Therefore we use a package called [APSW (Another Python SQLite Wrapper)](https://pypi.org/project/apsw/) that does. APSW can be installed with UV and then you have to load the extension with the following code, where `spatialite_path` is the path to the Spatialite binary. MacOS users can install Spatialite using homebrew and then search for the file `mod_spatialite.8.dylib`. Windows users can download Spatialite binaries from the Gaia GIS site. Our Python that uses Spatialite should all allow you to specify this path in the `launch.json` file.
 
 ```python
 conn = apsw.Connection(rme_gpkg)
@@ -55,7 +55,7 @@ This will create a `.venv` folder in the root of the repository with the correct
 
 The best way to run a script is going to be using the "Run and Debug" feature in VSCode. This will ensure that the correct virtual environment is activated and that the script runs in the correct context.
 
-Click that button and select the dropdown item that best fits. If you're just trying to run a file without a launch item you can use `🚀 Python: Run/Debug Current File (with .env)`. This will run the script and set you up with a server environment context (production or staging). 
+Click that button and select the dropdown item that best fits. If you're just trying to run a file without a launch item you can use `🚀 Python: Run/Debug Current File (with .env)`. This will run the script and set you up with a server environment context (production or staging).
 
 Running scripts this way will also allow you to drop breakpoints in your code and debug it.
 
@@ -86,7 +86,6 @@ brew install gdal
 ## Best Practices
 
 - **Dependency Management**: Use `uv sync` to ensure your environment is always up-to-date with the dependencies specified in `pyproject.toml`.
-
 
 ## Port Conflicts
 
@@ -126,12 +125,12 @@ The repository includes an automated pipeline for publishing tool/layer column d
 
 ### Source Metadata Files
 
-- Each tool publishes a `layer_catalog.json` and one or more layer definition JSON files referenced by `def_path`.
+- Each tool now publishes a single unified `layer_definitions.json` containing both descriptive metadata and column definitions (no separate per-layer files or `def_path` indirection).
 - These live beside the tool's code (e.g. under `scripts/<tool_name>/`).
 
 ### Flattening Script
 
-`scripts/metadata/flatten_layer_catalog.py` scans the repo for every `layer_catalog.json` and produces partitioned Parquet output:
+`scripts/metadata/flatten_layer_catalog.py` scans the repo for every `layer_definitions.json` and produces partitioned Parquet output:
 
 ```text
 dist/metadata/
@@ -144,6 +143,7 @@ Default behavior:
 - Output format: Parquet (use `--format csv` for CSV).
 - Partition columns (`authority_name`, `authority_version`) are NOT inside the Parquet files unless `--include-partition-cols` is passed.
 - A `commit_sha` (current HEAD) is written into every row and stored again in `index.json` with a run timestamp.
+- Schema validation is enforced; any validation error causes a loud failure (non-zero exit code). An `index.json` with `status: validation_failed` and the collected `validation_errors` is still written for diagnostics, but no partition files are produced.
 
 Run locally:
 
@@ -166,22 +166,25 @@ Recommended external table DDL (Parquet, partition columns excluded from file co
 
 ```sql
 CREATE EXTERNAL TABLE IF NOT EXISTS layer_column_defs (
-  layer_id          string,
-  layer_name        string,
-  layer_type        string,
-  layer_description string,
-  name              string,
-  friendly_name     string,
-  data_unit         string,
-  dtype             string,
-  description       string,
-  is_key            boolean,
-  is_nullable       boolean,
-  commit_sha        string
+  layer_id          string COMMENT 'Stable identifier of the layer or table, for example used for project.rs.xml id',
+  layer_name        string COMMENT 'Human-readable layer or table name (may match layer_id)',
+  layer_type        string COMMENT 'Layer category (table, view, raster, vector)',
+  layer_description string COMMENT 'Human-readable summary of the layer',
+  name              string COMMENT 'Column (or raster band) identifier',
+  friendly_name     string COMMENT 'Display-friendly name for the column',
+  theme             string COMMENT 'Grouping theme -- useful for very wide tables (e.g., Beaver, Hydrology)',
+  data_unit         string COMMENT 'Pint-compatible unit string (e.g., m, km^2, %)',
+  dtype             string COMMENT 'Data type (INTEGER, REAL, TEXT, etc.)',
+  description       string COMMENT 'Detailed description of the column',
+  is_key            boolean COMMENT 'Participates in a primary/unique key',
+  is_required       boolean COMMENT 'True if field cannot be empty. Corresponds to SQL NOT NULL',
+  default_value     string COMMENT 'Default value for new records',
+  commit_sha        string COMMENT 'git commit at time of harvest from authority json'
 )
+COMMENT 'Unified Riverscapes layer column definitions (structural + descriptive metadata)'
 PARTITIONED BY (
-  authority_name    string,
-  authority_version string
+  authority_name    string COMMENT 'Issuing package/tool authority name',
+  authority_version string COMMENT 'Schema version (semver)'
 )
 STORED AS PARQUET
 LOCATION 's3://riverscapes-athena/metadata/layer_column_defs/';
