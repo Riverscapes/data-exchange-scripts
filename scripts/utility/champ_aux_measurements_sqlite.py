@@ -3,6 +3,7 @@ import os
 import json
 import psycopg2
 import psycopg2.extras
+import sqlite3
 import shutil
 import datetime
 from rsxml.util import safe_makedirs
@@ -12,62 +13,17 @@ from new_project_upload import upload_project
 from pydex import RiverscapesAPI
 from rsxml.project_xml import Project, Dataset, Meta, MetaData
 
+# from scripts.utility.champ_aux_measurements_postgres import COLUMNS_TO_SKIP
+
 TABLES_TO_SKIP = [
-    'channel_unit_metrics',
-    'channel_unit_tiers',
-    'crew',
-    'metric_plots',
-    'visits',
-    'sites',
-    'statues',
-
-    'projects',
-    'programs',
-    'project_types',
-    'statuses',
-    'visit_metrics',
-    'watersheds',
-    'vw_visits',
-    'vw_projects',
-    'metric_definitions',
-
-    'livestock',
-    'electropasstransectfish',
-    'slopeandbearing',
-    'slopeandbearingsetup'
+    'sqlite_master',
+    'Visits',
+    'Livestock',
+    'ElectroPassTransectFish',
+    'SlopeAndBearing',
+    'SlopeAndBearingSetup'
 ]
 
-COLUMNS_TO_SKIP = [
-    'programsiteid',
-    'sitename',
-    'watershedid',
-    'watershedname',
-    'sampledate',
-    'hitchname',
-    'crewname',
-    'visityear',
-    'iterationid',
-    'categoryname',
-    'panelname',
-    'visitdate',
-    'protocolid',
-    'programid',
-    'aem',
-    'bug validation',
-    'champ 10% revisit',
-    'champ core',
-    'champ-pibo comparison',
-    'effectiveness',
-    'has fish data',
-    'imw',
-    'remove',
-    'velocity validation',
-    'primary visit',
-    'qc visit',
-    'error',
-    'no',
-    'yes',
-]
 
 MEASUREMENT_NAMES = [
     'Air Temp Logger Output',
@@ -84,7 +40,7 @@ MEASUREMENT_NAMES = [
     'Channel Unit Supplement',
     'Control Point',
     'Crew',
-    'Cross section',
+    'Cross Section',
     'Daily Solar Access Meas',
     'Daily Solar Access Trans',
     'Discharge',
@@ -95,15 +51,15 @@ MEASUREMENT_NAMES = [
     'Fish Cover',
     'Jam Has Channel Unit',
     'Large Woody Debris',
-    'Large Woody Piece',
-    'Mid Channel Bottom of Site',
+    'Large Wood Piece',
+    'Mid Channel Bottom Of Site',
     'Monthly SolarPathfinder Result Measurement',
     'Monument',
     'Pebble',
     'Pebble Cross Section',
     'Pool Tail Fines',
     'Riparian Structure',
-    'Sample Biomasses',
+    'Sample Biomass',
     'Side Channel',
     'Site Marker',
     'Snorkel Fish',
@@ -127,55 +83,47 @@ MEASUREMENT_NAMES = [
     'Supplementary Photo',
     'Targeted Riffle Sample',
     'Targeted Riffle Sample Replicate',
-    'Taxon By Size Class Counts',
+    'Taxon By Size Class Count',
     'Topo Tool Log Entries',
     'Topo Tool Messages',
     'Topographic Info Corrected',
     'Topographic Info Original',
     'Transect',
-    'Transect Photos',
-    'Undercut Banks',
+    'Transect Photo',
+    'Undercut Bank',
     'Visit Information',
     'Water Chemistry',
     'Woody Debris Jam'
 ]
 
 
-def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, download_dir: str, delete_files: bool, project_owner: str, visit_id: int = None, watershed: str = None, year: int = None) -> None:
+def process_champ_visits(api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_curs: psycopg2.extensions.cursor, download_dir: str, delete_files: bool, project_owner: str, visit_id: int = None, watershed: str = None, year: int = None) -> None:
 
     log = Logger('CHaMP_Aux_Measurements')
 
-    # Get a list of all the tables in the public schema
-    curs.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
-    tables = curs.fetchall()
-
-    # Remove tables that we want to skip
+    # Get a list of all the tables in the SQLite database and remove the ones we want to skip
+    sqlite_curs.execute("SELECT name as table_name FROM sqlite_master WHERE type='table';")
+    tables = sqlite_curs.fetchall()
     table_names = {table['table_name']: {'multirow': None, 'columns': []} for table in tables if table['table_name'] not in TABLES_TO_SKIP}
     log.info(f'Found {len(table_names)} measurement tables to process.')
 
     for table_name in table_names.keys():
         # Get the columns for each table
-        curs.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = %s", (table_name,))
-        columns = curs.fetchall()
-        table_names[table_name]['columns'] = [column['column_name'] for column in columns if column['column_name'] not in COLUMNS_TO_SKIP]
+        sqlite_curs.execute(f"PRAGMA table_info({table_name})")
+        table_names[table_name]['columns'] = [column['name'] for column in sqlite_curs.fetchall()]
 
         try:
             # Get the maximum number of rows per visit across all tables
-            curs.execute(f"""
-                select max(tally)
-                from (SELECT visitid, count(*) tally
-                FROM {table_name}
-                group by visitid)""")
-            max_rows = curs.fetchone()
+            sqlite_curs.execute(f'SELECT max(tally) FROM (SELECT count(*) tally FROM {table_name} GROUP BY visitid)')
+            max_rows = sqlite_curs.fetchone()
             table_names[table_name]['multirow'] = max_rows[0] and max_rows[0] > 1
         except Exception as e:
             log.error(f'Error determining max rows for table {table_name}: {e}')
             table_names[table_name]['multirow'] = False
 
-    # Get all the visits that still require aux
-    # Retrieve CHaMP visit IDs that have topo projects, but are missing aux measurements
-    # The optional visit ID will filter to just that visit for debugging
-    curs.execute('''
+    # Get all the visits that have a topo project but still require aux measurements
+    # The optional parameters will filter to just specific visits/watersheds/years for debugging
+    pg_curs.execute('''
         SELECT v.visit_id, s.name, w.name, v.visit_year, p.guid
         FROM visits v
             inner join sites s on v.site_id = s.site_id
@@ -197,7 +145,7 @@ def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, 
             'watershed_name': row[2],
             'visit_year': row[3],
             'project_guid': row[4]
-        } for row in curs.fetchall()
+        } for row in pg_curs.fetchall()
     }
     log.info(f'Found {len(visits)} CHaMP visits with topo projects that require aux measurement upload.')
 
@@ -217,6 +165,15 @@ def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, 
             visit_dir = os.path.join(download_dir, f'visit_{visit_id}_{project_guid}')
             aux_dir = os.path.join(visit_dir, 'aux_measurements')
 
+            # Download the project.rs.xml file into the visit dir
+            api.download_files(project_guid, visit_dir, ['project\\.rs\\.xml$'], force=True)
+            api.download_files(project_guid, visit_dir, ['aux_measurements.*\\.json$'], force=True)
+            project_xml_path = os.path.join(visit_dir, 'project.rs.xml')
+
+            if not os.path.exists(project_xml_path):
+                log.error(f'project.rs.xml not found for visit ID {visit_id} project ID {project_guid}')
+                continue
+
             visit_aux_files = {}
             for table in tables:
                 # This postgres table name will be lower case and have no spaces
@@ -224,43 +181,35 @@ def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, 
                 if table_name in TABLES_TO_SKIP:
                     continue
 
-                curs.execute(f'SELECT COUNT(*) FROM {table_name} WHERE visitid = %s', (visit_id,))
-                row_count = curs.fetchone()[0]
+                sqlite_curs.execute(f'SELECT COUNT(*) FROM {table_name} WHERE visitid = ?', (visit_id,))
+                row_count = sqlite_curs.fetchone()[0]
                 if row_count == 0:
                     continue
 
                 clean_table_name = table_name
-                if table_name == 'driftinverterbratesample':
-                    clean_table_name = 'driftinvertebratesample'
-                elif table_name == 'undercutbank':
-                    clean_table_name = 'undercutbanks'
-                elif table_name == 'samplebiomass':
-                    clean_table_name = 'samplebiomasses'
-                elif table_name == 'taxonbysizeclasscount':
-                    clean_table_name = 'taxonbysizeclasscounts'
-                elif table_name == 'transectphoto':
-                    clean_table_name = 'transectphotos'
-                elif table_name == 'largewoodpiece':
-                    clean_table_name = 'largewoodypiece'
+
+                # Access tables misspelled "Invertebrate"
+                if 'Inverterbrate' in clean_table_name:
+                    clean_table_name = clean_table_name.replace('Inverterbrate', 'Invertebrate')
 
                 final_file_name = None
                 # These measurment names have spaces and capitalization
                 for measurement_name in MEASUREMENT_NAMES:
-                    measurement_name_no_spaces = measurement_name.replace(' ', '').replace('_', '').lower()
-                    if clean_table_name.lower() == measurement_name_no_spaces.lower():
+                    measurement_name_no_spaces = measurement_name.replace(' ', '').replace('_', '')
+                    if clean_table_name == measurement_name_no_spaces:
                         # The final table name will have underscores instead of spaces, and be lower case
-                        final_file_name = measurement_name.replace(' ', '_').lower()
+                        final_file_name = measurement_name.replace(' ', '_')
                         break
 
                 if final_file_name is None:
                     raise Exception(f"Table name {clean_table_name} not found in measurement names.")
 
                 record_data = []
-                curs.execute(f'SELECT * FROM {table_name} WHERE visitid = %s', (visit_id,))
-                for row in curs.fetchall():
+                sqlite_curs.execute(f'SELECT * FROM {table_name} WHERE visitid = ?', (visit_id,))
+                for row in sqlite_curs.fetchall():
                     row_data = dict(row)
-                    for col in COLUMNS_TO_SKIP:
-                        row_data.pop(col, None)
+                    # for col in COLUMNS_TO_SKIP:
+                    #     row_data.pop(col, None)
 
                     clean_data = {"note": "",
                                   "MeasurementType": measurement_name,
@@ -298,34 +247,26 @@ def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, 
                 tags.remove('CHaMP')
 
             if 'CHaMP_Watershed_South Fork Salmon' in tags:
-                tags.remove('CHaMP_Watershed_South Fork Salmon')
+                tags.remove('CHAMP_Watershed_South Fork Salmon')
 
-            watershed_tag = f'CHaMP_Watershed_{watershed_name.replace(" ", "_").replace("(", "").replace(")", "")}'
+            watershed_tag = f'CHAMP_Watershed_{watershed_name.replace(" ", "_").replace("(", "").replace(")", "")}'
             if watershed_tag not in tags:
                 tags.append(watershed_tag)
 
-            site_tag = f'CHaMP_Site_{site_name.replace(" ", "_")}'
+            site_tag = f'CHAMP_Site_{site_name.replace(" ", "_")}'
             if site_tag not in tags:
                 tags.append(site_tag)
 
-            if f'CHaMP_Year_{visit_year}' not in tags:
-                tags.append(f'CHaMP_Year_{visit_year}')
+            if f'CHAMP_Year_{visit_year}' not in tags:
+                tags.append(f'CHAMP_Year_{visit_year}')
 
-            visit_tag1 = f'CHaMP_Visit_{visit_id}'
+            visit_tag1 = f'CHAMP_Visit_{visit_id}'
             if visit_tag1 not in tags:
                 tags.append(visit_tag1)
 
-            visit_tag2 = f'CHaMP_Visit_{str(visit_id).zfill(4)}'
+            visit_tag2 = f'CHAMP_Visit_{str(visit_id).zfill(4)}'
             if visit_tag2 != visit_tag1 and visit_tag2 not in tags:
                 tags.append(visit_tag2)
-
-            # Download the project.rs.xml file into the visit dir
-            api.download_files(project_guid, visit_dir, ['project\\.rs\\.xml$'], force=True)
-            project_xml_path = os.path.join(visit_dir, 'project.rs.xml')
-
-            if not os.path.exists(project_xml_path):
-                log.error(f'project.rs.xml not found for visit ID {visit_id} project ID {project_guid}')
-                continue
 
             log.info(f'Prepared {len(visit_aux_files)} aux measurement files for visit ID {visit_id}')
 
@@ -333,22 +274,33 @@ def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, 
             project = Project.load_project(project_xml_path)
             datasets = project.common_datasets
             for aux_file, (measurement_name, clean_name) in visit_aux_files.items():
-                datasets.append(Dataset(
-                    xml_id=f'CHAMP_Aux_{clean_name}'.upper(),
-                    name=measurement_name,
-                    path=os.path.relpath(aux_file, visit_dir),
-                    ds_type='File',
-                    meta_data=MetaData([Meta('measurementType', measurement_name)])
-                ))
+                xml_id = f'CHAMP_Aux_{clean_name}'.upper()
+
+                ds_exists = False
+                for ds in datasets:
+                    if ds.xml_id == xml_id:
+                        log.info(f'Dataset with XML ID {xml_id} already exists in project, skipping addition.')
+                        ds.path = os.path.relpath(aux_file, visit_dir)
+                        ds_exists = True
+                        break
+
+                if ds_exists is False:
+                    datasets.append(Dataset(
+                        xml_id=xml_id,
+                        name=measurement_name,
+                        path=os.path.relpath(aux_file, visit_dir),
+                        ds_type='File',
+                        meta_data=MetaData([Meta('measurementType', measurement_name)])
+                    ))
             project.write()
 
             # Upload the project found in this folder. This will include the new aux measurement JSON files.
-            upload_project(api, project_xml_path, project_guid, project_owner, 'PUBLIC', tags)
+            upload_project(api, project_xml_path, project_guid, project_owner, 'PUBLIC', tags, no_wait=True)
             log.info(f'Uploaded aux measurements for visit ID {visit_id}')
 
             # Track progress by updating the aux_uploaded flag in the Postgres database
-            curs.execute('UPDATE visits SET aux_uploaded = %s WHERE visit_id = %s', (datetime.datetime.now(), visit_id))
-            curs.connection.commit()
+            pg_curs.execute('UPDATE visits SET aux_uploaded = %s WHERE visit_id = %s', (datetime.datetime.now(), visit_id))
+            pg_curs.connection.commit()
 
             # Optionally delete the downloaded files to save space
             if delete_files is True:
@@ -360,7 +312,7 @@ def process_champ_visits(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, 
                 processed += 1
                 progbar.update(processed)
         except Exception as e:
-            print(f'Error processing visit ID {visit_id}: {e}')
+            log.error(f'Error processing visit ID {visit_id}: {e}')
             errors += 1
 
     progbar.finish()
@@ -381,6 +333,7 @@ def main():
     parser = argparse.ArgumentParser(description="Export all measurements from the database to JSON files.")
     parser.add_argument('stage', type=str, help='RiverscapesAPI stage to connect to (e.g., DEV, TEST, PROD).')
     parser.add_argument('db_service', type=str, help='Name of postgres service in .pg_service.conf to connect to the database.')
+    parser.add_argument('sqlite_db', type=str, help='Path to the all measurements SQLite database file.')
     parser.add_argument('download_dir', help='Path to the download directory to temporarily store visit files', type=str)
     parser.add_argument('delete_files', help='Whether to delete downloaded files after upload', type=bool)
     parser.add_argument('project_owner', help='RDx organization Owner GUID for CHaMP projects', type=str)
@@ -406,11 +359,15 @@ def main():
     if args.year:
         log.info(f'Filtering to year {args.year}')
 
-    conn = psycopg2.connect(service=args.db_service)
-    curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    pg_conn = psycopg2.connect(service=args.db_service)
+    pg_curs = pg_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    with RiverscapesAPI(stage=args.stage) as api:
-        process_champ_visits(api, curs, args.download_dir, args.delete_files, args.project_owner, visit_id=args.visit_id, watershed=args.watershed, year=args.year)
+    with sqlite3.connect(args.sqlite_db) as sqlite_conn:
+        # include a row factory to return dicts
+        sqlite_conn.row_factory = sqlite3.Row
+        sqlite_curs = sqlite_conn.cursor()
+        with RiverscapesAPI(stage=args.stage) as api:
+            process_champ_visits(api, sqlite_curs, pg_curs, args.download_dir, args.delete_files, args.project_owner, visit_id=args.visit_id, watershed=args.watershed, year=args.year)
 
 
 if __name__ == "__main__":
