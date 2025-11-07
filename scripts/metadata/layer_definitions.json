@@ -1,0 +1,195 @@
+{
+    "$schema": "https://s3.us-west-2.amazonaws.com/releases.northarrowresearch.com/reports/2025beta/metadata_schemas/layer_definitions.schema.json",
+    "authority_name": "dgo_exporter",
+    "tool_schema_version": "1.0.2",
+    "layers": [
+        {
+            "layer_id": "rs_context_huc10",
+            "layer_name": "rs_context_huc10",
+            "description": "",
+            "layer_type": "table",
+            "columns": [
+                {
+                    "name": "huc",
+                    "dtype": "TEXT",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "hucname",
+                    "dtype": "TEXT",
+                    "friendly_name": "HUC Name",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "hucstates",
+                    "dtype": "TEXT",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "hucareasqkm",
+                    "dtype": "REAL",
+                    "friendly_name": "HUC Area",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "hucareaacres",
+                    "dtype": "REAL",
+                    "friendly_name": "HUC Area",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.min",
+                    "dtype": "REAL",
+                    "friendly_name": "Lowest Elevation",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.max",
+                    "dtype": "REAL",
+                    "friendly_name": "Highest Elevation",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.geotransform",
+                    "dtype": "ARRAY",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.proj",
+                    "dtype": "TEXT",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.nodata",
+                    "dtype": "REAL",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.value_count",
+                    "dtype": "INTEGER",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.hist_type",
+                    "dtype": "TEXT",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.bin_size",
+                    "dtype": "INTEGER",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.bins.bin",
+                    "dtype": "INTEGER",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "dem_bins.bins.cell_count",
+                    "dtype": "INTEGER",
+                    "friendly_name": "",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                }
+            ]
+        }
+    ]
+}

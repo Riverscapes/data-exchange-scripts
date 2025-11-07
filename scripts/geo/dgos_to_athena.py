@@ -1,6 +1,6 @@
 """
 Searches for RME projects in the Data Exchange, downloads the RME output GeoPackages,
-scrapes the DGO metrics from the GeoPackages, and uploads the results to an S3 bucket.
+creates simplified geometries of dgos, group by huc12 level, and uploads the results to an S3 bucket.
 
 Philip Bailey
 June 2025

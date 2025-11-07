@@ -2,6 +2,7 @@ import os
 from typing import Dict, List, Generator, Tuple
 import webbrowser
 import re
+import time
 import concurrent.futures
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -638,21 +639,35 @@ class RiverscapesAPI:
                 self.log.info(f'        File etag mismatch. Re-downloading: {local_path}')
             elif not file_is_there:
                 self.log.info(f'        Downloading: {local_path}')
-            r = requests.get(api_file_obj['downloadUrl'], allow_redirects=True, stream=True, timeout=30)
-            total_length = r.headers.get('content-length')
 
-            dl = 0
-            with open(local_path, 'wb') as f:
-                if total_length is None:  # no content length header
-                    f.write(r.content)
-                else:
-                    progbar = ProgressBar(int(total_length), 50, local_path, byte_format=True)
-                    for data in r.iter_content(chunk_size=4096):
-                        dl += len(data)
-                        f.write(data)
-                        progbar.update(dl)
-                    progbar.erase()
-            return True
+            max_retries = 3  # could parameterize
+            for attempt in range(max_retries):
+                try:
+                    # errors occurred here once, so we try to catch it:
+                    # Exception has occurred: ConnectionError
+                    # ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))
+                    r = requests.get(api_file_obj['downloadUrl'], allow_redirects=True, stream=True, timeout=30)
+                    total_length = r.headers.get('content-length')
+
+                    dl = 0
+                    with open(local_path, 'wb') as f:
+                        if total_length is None:  # no content length header
+                            f.write(r.content)
+                        else:
+                            progbar = ProgressBar(int(total_length), 50, local_path, byte_format=True)
+                            for data in r.iter_content(chunk_size=4096):
+                                dl += len(data)
+                                f.write(data)
+                                progbar.update(dl)
+                            progbar.erase()
+                    return True
+                except requests.ConnectionError as e:
+                    self.log.warning(f"Connection error on attempt {attempt+1}: {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                    else:
+                        raise
+
         else:
             self.log.debug(f'        File already exists (skipping): {local_path}')
             return False
