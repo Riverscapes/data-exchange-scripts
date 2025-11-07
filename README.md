@@ -19,7 +19,7 @@ This project uses [uv](https://github.com/astral-sh/uv) to manage Python virtual
 
 We have started using [Spatialite](https://www.gaia-gis.it) for some operations. This is a binary that sites on top of SQLite and provides several powerful geospatial operations as `ST_` functions, similar to PostGIS on top of Postgres.
 
-Spatialite is distributed as an extension to SQLite, but unfortunately the core SQLite3 Python package is not compiled to allow extensions to be loaded (presumably for security reasons). Therefore we use a package called [APSW](https://pypi.org/project/apsw/) that does. APSW can be installed with UV and then you have to load the extension with the following code, where `spatialite_path` is the path to the Spatialite binary. MacOS users can install Spatialite using homebrew and then search for the file `mod_spatialite.8.dylib`. Windows users can downloaded Spatialite binaries [here](https://www.gaia-gis.it/gaia-sins/windows-bin-amd64/). Our Python that uses Spatialite should all allow you to specify this path in the `launch.json` file. 
+Spatialite is distributed as an extension to SQLite, but unfortunately the core SQLite3 Python package is not compiled to allow extensions to be loaded (presumably for security reasons). Therefore we use a package called [APSW (Another Python SQLite Wrapper)](https://pypi.org/project/apsw/) that does. APSW can be installed with UV and then you have to load the extension with the following code, where `spatialite_path` is the path to the Spatialite binary. MacOS users can install Spatialite using homebrew and then search for the file `mod_spatialite.8.dylib`. Windows users can download Spatialite binaries from the Gaia GIS site. Our Python that uses Spatialite should all allow you to specify this path in the `launch.json` file.
 
 ```python
 conn = apsw.Connection(rme_gpkg)
@@ -27,8 +27,6 @@ conn.enable_load_extension(True)
 conn.load_extension(spatialite_path)
 curs = conn.cursor()
 ```
-
-
 
 ### Setting Up the Project
 
@@ -55,7 +53,7 @@ This will create a `.venv` folder in the root of the repository with the correct
 
 The best way to run a script is going to be using the "Run and Debug" feature in VSCode. This will ensure that the correct virtual environment is activated and that the script runs in the correct context.
 
-Click that button and select the dropdown item that best fits. If you're just trying to run a file without a launch item you can use `🚀 Python: Run/Debug Current File (with .env)`. This will run the script and set you up with a server environment context (production or staging). 
+Click that button and select the dropdown item that best fits. If you're just trying to run a file without a launch item you can use `🚀 Python: Run/Debug Current File (with .env)`. This will run the script and set you up with a server environment context (production or staging).
 
 Running scripts this way will also allow you to drop breakpoints in your code and debug it.
 
@@ -79,12 +77,13 @@ brew install gdal
 2. In VSCode, load the `RiverscapesAPI.code-workspace` workspace.
 3. Ensure the appropriate Python version is selected (e.g., `3.12.9 ('.venv')`).
 
-**NOTE: THE CODESPACE WILL NOT WORK WITH SCRIPTS THAT REQUIRE GDAL FOR NOW (think the project merging etc.)**
+### Codespace GDAL Limitation
+
+> NOTE: The codespace environment does not currently support scripts requiring GDAL (e.g. project merging). Run those locally.
 
 ## Best Practices
 
 - **Dependency Management**: Use `uv sync` to ensure your environment is always up-to-date with the dependencies specified in `pyproject.toml`.
-
 
 ## Port Conflicts
 
@@ -105,7 +104,6 @@ For legacy projects that use `pip` you can install it directly from the reposito
 pip install git+https://github.com/Riverscapes/data-exchange-scripts.git
 ```
 
-
 ## Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -117,3 +115,110 @@ Contributions are welcome! Please follow these steps:
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+## Metadata Catalog Pipeline
+
+The repository includes an automated pipeline for publishing tool/layer column definitions to Amazon Athena as an external table.
+
+### Source Metadata Files
+
+- Each tool now publishes a single unified `layer_definitions.json` containing both descriptive metadata and column definitions (no separate per-layer files or `def_path` indirection).
+- These live beside the tool's code (e.g. under `scripts/<tool_name>/`).
+
+### Export / Flatten Script
+
+`scripts/metadata/export_layer_definitions_for_s3.py` scans the repo for every `layer_definitions.json` and produces partitioned Parquet (default) output. Partition hierarchy (three levels):
+
+1. `authority` – repository root name (e.g. `data-exchange-scripts`). Derived automatically from the git repo folder name.
+2. `authority_name` – the tool / package authority publishing the layer definitions (from JSON).
+3. `tool_schema_version` – semantic version of the tool's layer definition schema (from JSON).
+
+Output pattern:
+
+```text
+dist/metadata/
+  authority=<repo>/authority_name=<authority>/tool_schema_version=<version>/layer_metadata.parquet
+  index.json
+```
+
+Default behavior:
+
+- Output format: Parquet (use `--format csv` for CSV).
+- Partition columns (`authority`, `authority_name`, `tool_schema_version`) are NOT inside the Parquet/CSV files unless `--include-partition-cols` is passed.
+- A `commit_sha` (current HEAD) is written into every row and stored again in `index.json` with a run timestamp.
+- Schema validation is enforced; any validation error causes a loud failure (non-zero exit code). An `index.json` with `status: validation_failed` and the collected `validation_errors` is still written for diagnostics, but no partition files are produced.
+
+Run locally:
+
+```bash
+python scripts/metadata/export_layer_definitions_for_s3.py
+```
+
+Optional flags:
+
+```bash
+python scripts/metadata/export_layer_definitions_for_s3.py --format csv             # CSV instead of Parquet
+python scripts/metadata/export_layer_definitions_for_s3.py --include-partition-cols # Embed partition columns in each file
+```
+
+### Athena External Table
+
+We publish to: `s3://riverscapes-athena/metadata/layer_definitions/`
+
+This gets turned into the athena table default.layer_definitions.
+
+Add new partitions (after upload):
+
+```sql
+-- auto-discover
+MSCK REPAIR TABLE layer_definitions;  
+-- OR manual:
+ALTER TABLE layer_definitions
+ADD IF NOT EXISTS PARTITION (
+  authority='data-exchange-scripts',
+  authority_name='rme_to_athena',
+  tool_schema_version='1.0.0'
+)
+LOCATION 's3://riverscapes-athena/metadata/layer_definitions/authority=data-exchange-scripts/authority_name=rme_to_athena/tool_schema_version=1.0.0/';
+```
+
+### GitHub Actions Workflow
+
+Workflow file: `.github/workflows/metadata-catalog.yml`
+
+Steps performed:
+
+1. Checkout code.
+2. Assume AWS IAM role via OIDC (secret `METADATA_PUBLISH_ROLE_ARN`).
+3. Install dependencies (Python 3.12 + `uv sync`).
+4. Run flatten script -> partitioned Parquet.
+5. Sync `dist/metadata` to S3 bucket prefix.
+6. Run `MSCK REPAIR TABLE` to load partitions.
+7. Perform sample queries (partition listing / row count).
+
+### IAM Role (Least Privilege Summary)
+
+The role must allow:
+
+- S3 List/Get/Put/Delete under `metadata/layer_definitions/` and query result prefix.
+- Athena: StartQueryExecution, GetQueryExecution, GetQueryResults.
+- Glue: Get/Create/Update table & partitions for the database/table.
+
+### Future Enhancements
+
+- Validate layer schemas (dtype whitelist, required fields & semantic checks).
+- Explicit partition adds instead of MSCK for faster updates.
+- Historical snapshots (extra partition like `snapshot_date`).
+- Glue Catalog integration (automated table & partition registration without MSCK).
+- Data quality profile summary (row counts, distinct key coverage) in `index.json`.
+
+## Troubleshooting Metadata
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Empty Athena table | Partitions not loaded | Run `MSCK REPAIR TABLE` or add partitions manually |
+| Wrong data types | Created table before column rename | Drop & recreate external table with new DDL |
+| Missing new version | Workflow didn’t run or lacked perms | Check Actions logs & IAM role policies |
+| Zero rows for authority | Upload sync failed | Inspect S3 prefix & re-run workflow |
+
+<!-- End of Metadata Section -->

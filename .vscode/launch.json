@@ -285,14 +285,39 @@
       },
       "args": [
         "production",
-        "/opt/homebrew/lib/mod_spatialite.8.dylib",
+        "{env:SPATIALITE_LIB}",
         "riverscapes-athena",
         "{env:DATA_ROOT}/rme-athena",
         "--tags",
         "2025CONUS", //"little_spokane", // "2024CONUS"
         // "--collection", "0f0a4494-424b-4ed7-8597-766e99018895",
-        // "--huc_filter", "1601010101",
+        "--huc_filter",
+        "1008000203",
         // "--delete",
+      ]
+    },
+    {
+      "name": "🆕Scrape RME to Athena-Parquet",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/geo/rme_to_athena_parquet.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production",
+        "{env:SPATIALITE_LIB}",
+        "riverscapes-athena",
+        "{env:DATA_ROOT}/rme-athena",
+        "--tags",
+        "2025CONUS", //"little_spokane", // "2024CONUS"
+        // "--huc_filter",
+        // "160",
+        // "--delete",
+        //"--force_update"
       ]
     },
     {

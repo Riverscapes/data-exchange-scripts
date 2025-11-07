@@ -1,4 +1,5 @@
 """
+THIS WAS COPIED TO rs-report-gen repository where it was enhanced. PROBABLY GET RID OF IT HERE. 
 Reads a CSV file from S3 and generates a GeoPackage (SQLite) file with tables
 such as dgos, dgos_veg, dgo_hydro, etc., based on a column-to-table-and-type mapping
 from rme_table_column_defs.csv. All tables will include a sequentially generated dgoid column.
@@ -20,6 +21,7 @@ import boto3
 import apsw
 import uuid
 from rsxml import dotenv, Logger, ProgressBar
+
 
 def parse_table_defs(defs_csv_path):
     """
@@ -50,6 +52,7 @@ def parse_table_defs(defs_csv_path):
                 table_col_order[table].insert(0, 'dgoid')
     return table_schema_map, table_col_order, fk_tables
 
+
 def download_csv_from_s3(s3_bucket: str, s3_key: str, local_path: str) -> None:
     """
     Download a CSV file from S3 to a local path.
@@ -59,6 +62,7 @@ def download_csv_from_s3(s3_bucket: str, s3_key: str, local_path: str) -> None:
     log.info(f"Downloading {s3_key} from bucket {s3_bucket} to {local_path}")
     s3.download_file(s3_bucket, s3_key, local_path)
     log.info("Download complete.")
+
 
 def create_geopackage(gpkg_path: str, table_schema_map: dict, table_col_order: dict, fk_tables: set) -> apsw.Connection:
     """
@@ -90,6 +94,7 @@ def create_geopackage(gpkg_path: str, table_schema_map: dict, table_col_order: d
         log.info(f"Created table {table} with columns: {list(columns.keys())}")
     return conn
 
+
 def wkt_from_csv(csv_geom: str) -> str:
     """
     Convert geometry string from CSV (with | instead of ,) back to WKT.
@@ -97,6 +102,7 @@ def wkt_from_csv(csv_geom: str) -> str:
     if not csv_geom:
         return None
     return csv_geom.replace('|', ',')
+
 
 def populate_tables_from_csv(csv_path: str, conn: apsw.Connection, table_schema_map: dict, table_col_order: dict) -> None:
     """
@@ -143,6 +149,7 @@ def populate_tables_from_csv(csv_path: str, conn: apsw.Connection, table_schema_
         conn.execute('COMMIT')
     log.info("Table population complete.")
 
+
 def main():
     """
     Main entry point: parses arguments, downloads CSV, parses table defs, creates GeoPackage, and populates tables.
@@ -163,6 +170,7 @@ def main():
     conn = create_geopackage(args.output_gpkg, table_schema_map, table_col_order, fk_tables)
     populate_tables_from_csv(temp_csv, conn, table_schema_map, table_col_order)
     log.info('Process complete.')
+
 
 if __name__ == '__main__':
     main()

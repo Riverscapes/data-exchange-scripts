@@ -53,7 +53,7 @@ import argparse
 import boto3
 from rsxml import dotenv
 from pydex import RiverscapesAPI, RiverscapesSearchParams
-from pydex.lib.athena import athena_query
+from pydex.lib.athena import athena_execute, athena_query_get_parsed
 
 
 def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, search_params: RiverscapesSearchParams) -> int:
@@ -177,15 +177,14 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
         curs.execute("UPDATE temp_projects SET processed = 1 WHERE project_type_id = ? AND create_stamp = ?", [project_type_id, unique_stamp])
 
 
-def get_max_existing_athena_date(s3_bucket: str) -> datetime:
+def get_max_existing_athena_date(s3_bucket: str) -> datetime | None:
     """
     Get the maximum existing date in the Athena table from S3.
     This is used to determine if we need to delete the existing Athena table.
     """
-
-    rows = athena_query(s3_bucket, 'SELECT MAX(created_on) FROM vw_projects')
-    data = rows[1]['Data'][0].get('VarCharValue')
-    if data:
+    rows = athena_query_get_parsed(s3_bucket, 'SELECT MAX(created_on) AS max_created_on FROM vw_projects')
+    if rows and rows[0].get('max_created_on'):
+        data = rows[0]['max_created_on']
         try:
             date_timestamp = int(data)
             return datetime.fromtimestamp(date_timestamp / 1000, tz=timezone.utc)
@@ -256,7 +255,7 @@ def main():
 
             # Need to refresh partitions after uploading new data to S3
             print('Refreshing Athena partitions...')
-            athena_query(args.s3_bucket, 'MSCK REPAIR TABLE rs_projects')
+            athena_execute(args.s3_bucket, 'MSCK REPAIR TABLE rs_projects')
 
         print('Process complete')
 
