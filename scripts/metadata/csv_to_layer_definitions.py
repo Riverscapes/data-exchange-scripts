@@ -9,7 +9,7 @@ Columns (header names case-sensitive):
     column_name, dtype, friendly_name, data_unit, col_description,
     is_key, is_required, theme, preferred_bin_definition, default_value
 
-Authority metadata (authority_name, authority_version) will be provided via CLI flags instead of sheet columns to avoid accidental edits.
+Authority metadata (authority_name, tool_schema_version) will be provided via CLI flags instead of sheet columns to avoid accidental edits.
 
 Cutover process recommendation:
   1. Team maintains spreadsheet until ready.
@@ -26,7 +26,7 @@ Usage:
   python scripts/metadata/csv_to_layer_definitions.py \
       --csv definitions.csv \
       --authority-name rme_to_athena \
-      --authority-version 1.0.0 \
+      --tool-schema-version 1.0.0 \
       --out metadata_schemas/layer_definitions.json
 
 """
@@ -37,17 +37,20 @@ import json
 import sys
 from pathlib import Path
 from jsonschema import Draft7Validator
+from urllib.request import urlopen
+
+SCHEMA_URL = "https://s3.us-west-2.amazonaws.com/releases.northarrowresearch.com/reports/2025beta/metadata_schemas/layer_definitions.schema.json"
 
 REQUIRED_ROW_FIELDS = ["layer_id", "column_name", "dtype"]
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Convert spreadsheet CSV to layer_definitions.json")
+    p = argparse.ArgumentParser(description="Convert spreadsheet CSV to layer_definitions.json (validated against remote schema)")
     p.add_argument("--csv", required=True, help="Input CSV export from spreadsheet")
     p.add_argument("--authority-name", required=True, help="Authority name (package/tool identifier)")
-    p.add_argument("--authority-version", required=True, help="Authority version (semver or tag)")
+    p.add_argument("--tool-schema-version", required=False, help="Tool schema version (semver)")
+    p.add_argument("--authority-version", required=False, help="(Deprecated) legacy flag; use --tool-schema-version")
     p.add_argument("--out", default="metadata_schemas/layer_definitions.json", help="Output JSON path")
-    p.add_argument("--schema", default="metadata_schemas/layer_definitions.schema.json", help="Schema file path for validation")
     return p.parse_args()
 
 
@@ -68,7 +71,7 @@ def coerce_bool(val: str | None, default: bool) -> bool:
     return default
 
 
-def build_definition(authority_name: str, authority_version: str, rows: list[dict]) -> tuple[dict, list[dict]]:
+def build_definition(authority_name: str, tool_schema_version: str, rows: list[dict]) -> tuple[dict, list[dict]]:
     """Build unified definitions.
 
     First occurrence of layer-level metadata (layer_name, layer_type, layer_description) wins.
@@ -83,9 +86,14 @@ def build_definition(authority_name: str, authority_version: str, rows: list[dic
         if missing:
             raise ValueError(f"Row missing required fields {missing}: {r}")
         lid = r["layer_id"].strip()
-        new_layer_name = (r.get("layer_name") or lid).strip()
-        new_desc = (r.get("layer_description") or "").strip()
-        new_type = (r.get("layer_type") or "").strip()
+        # Capture raw values before applying fallbacks so we only treat genuinely provided non-empty values as potential conflicts.
+        raw_layer_name = (r.get("layer_name") or "").strip()
+        raw_desc = (r.get("layer_description") or "").strip()
+        raw_type = (r.get("layer_type") or "").strip()
+        # Fallbacks (blank layer_name falls back to layer_id; other fields remain blank if missing)
+        new_layer_name = raw_layer_name or lid
+        new_desc = raw_desc
+        new_type = raw_type
         if lid not in layers:
             layers[lid] = {
                 "layer_id": lid,
@@ -96,13 +104,13 @@ def build_definition(authority_name: str, authority_version: str, rows: list[dic
             }
         else:
             existing = layers[lid]
-            # Detect conflicts only when new value is non-empty and differs
-            if new_layer_name and new_layer_name != existing["layer_name"]:
-                conflicts.append({"layer_id": lid, "field": "layer_name", "kept": existing["layer_name"], "ignored": new_layer_name})
-            if new_desc and new_desc != existing["description"]:
-                conflicts.append({"layer_id": lid, "field": "description", "kept": existing["description"], "ignored": new_desc})
-            if new_type and new_type != existing["layer_type"]:
-                conflicts.append({"layer_id": lid, "field": "layer_type", "kept": existing["layer_type"], "ignored": new_type})
+            # Only record a conflict if the raw (explicit) value is non-empty and differs; ignore fallback-derived values.
+            if raw_layer_name and raw_layer_name != existing["layer_name"]:
+                conflicts.append({"layer_id": lid, "field": "layer_name", "kept": existing["layer_name"], "ignored": raw_layer_name})
+            if raw_desc and raw_desc != existing["description"]:
+                conflicts.append({"layer_id": lid, "field": "description", "kept": existing["description"], "ignored": raw_desc})
+            if raw_type and raw_type != existing["layer_type"]:
+                conflicts.append({"layer_id": lid, "field": "layer_type", "kept": existing["layer_type"], "ignored": raw_type})
         layers[lid]["columns"].append({
             "name": r["column_name"].strip(),
             "dtype": r["dtype"].strip(),
@@ -116,14 +124,20 @@ def build_definition(authority_name: str, authority_version: str, rows: list[dic
             "default_value": (r.get("default_value") or None),
         })
     return ({
+        "$schema": SCHEMA_URL,
         "authority_name": authority_name,
-        "authority_version": authority_version,
+        "tool_schema_version": tool_schema_version,
         "layers": list(layers.values())
     }, conflicts)
 
 
-def validate(defs: dict, schema_path: Path) -> None:
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+def validate(defs: dict) -> None:
+    try:
+        with urlopen(SCHEMA_URL) as resp:
+            schema = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"Failed to fetch remote schema {SCHEMA_URL}: {e}", file=sys.stderr)
+        sys.exit(3)
     Draft7Validator(schema).validate(defs)
 
 
@@ -134,9 +148,13 @@ def main() -> None:
         print(f"CSV not found: {csv_path}", file=sys.stderr)
         sys.exit(2)
     rows = load_rows(csv_path)
-    defs, conflicts = build_definition(args.authority_name, args.authority_version, rows)
+    tool_schema_version = args.tool_schema_version
+    if not tool_schema_version:
+        print("Missing required --tool-schema-version", file=sys.stderr)
+        sys.exit(2)
+    defs, conflicts = build_definition(args.authority_name, tool_schema_version, rows)
     try:
-        validate(defs, Path(args.schema))
+        validate(defs)
     except Exception as e:
         print(f"Validation failed: {e}", file=sys.stderr)
         # Pretty-print partial for debugging if small

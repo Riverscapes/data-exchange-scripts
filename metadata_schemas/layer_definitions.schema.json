@@ -11,9 +11,9 @@
             "type": "string",
             "description": "Issuing Python package name"
         },
-        "authority_version": {
+        "tool_schema_version": {
             "type": "string",
-            "description": "Schema version (semver). Increment major for deleted tables or columns, minor for added tables or columns, patch for non-breaking changes"
+            "description": "Tool schema version (semver) increment major for deleted tables or columns, minor for added tables or columns, patch for non-breaking changes"
         },
         "layers": {
             "type": "array",
@@ -72,7 +72,7 @@
     },
     "required": [
         "authority_name",
-        "authority_version",
+        "tool_schema_version",
         "layers"
     ],
     "additionalProperties": false,
@@ -136,7 +136,7 @@
     "examples": [
         {
             "authority_name": "rme_to_athena",
-            "authority_version": "1.0.0",
+            "tool_schema_version": "1.0.0",
             "layers": [
                 {
                     "layer_id": "raw_rme",
@@ -152,6 +152,7 @@
                             "data_unit": "km^-1",
                             "description": "Existing number of beaver dams per unit riverscape length supported",
                             "is_key": false,
+                            "is_required": true
                         }
                     ]
                 }

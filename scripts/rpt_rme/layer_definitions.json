@@ -1,0 +1,39 @@
+{
+    "$schema": "https://s3.us-west-2.amazonaws.com/releases.northarrowresearch.com/reports/2025beta/metadata_schemas/layer_definitions.schema.json",
+    "authority_name": "rpt_rme",
+    "tool_schema_version": "1.0.2",
+    "layers": [
+        {
+            "layer_id": "rpt_rme",
+            "layer_name": "rpt_rme_pq",
+            "description": "report view",
+            "layer_type": "view",
+            "columns": [
+                {
+                    "name": "fcode_desc",
+                    "dtype": "TEXT",
+                    "friendly_name": "Flow Type",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                },
+                {
+                    "name": "ownership_desc",
+                    "dtype": "TEXT",
+                    "friendly_name": "Ownership",
+                    "data_unit": "",
+                    "description": "",
+                    "is_key": false,
+                    "is_required": false,
+                    "theme": "",
+                    "preferred_bin_definition": "",
+                    "default_value": null
+                }
+            ]
+        }
+    ]
+}

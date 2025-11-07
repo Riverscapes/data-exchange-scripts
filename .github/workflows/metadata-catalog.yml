@@ -59,15 +59,6 @@ jobs:
         run: |
           aws s3 sync dist/metadata/ ${{ env.S3_BASE_PATH }}/ --delete
 
-      - name: Create table if not exists
-        id: create-table
-        run: |
-          CREATE_SQL="CREATE EXTERNAL TABLE IF NOT EXISTS ${TABLE_NAME} (\n  layer_id string,\n  layer_name string,\n  layer_type string,\n  layer_description string,\n  name string,\n  friendly_name string,\n  data_unit string,\n  dtype string,\n  description string,\n  is_key boolean,\n  is_nullable boolean,\n  commit_sha string\n)\nPARTITIONED BY (\n  authority_name string,\n  authority_version string\n)\nSTORED AS PARQUET\nLOCATION '${S3_BASE_PATH}/';";
-          aws athena start-query-execution \
-            --query-string "$CREATE_SQL" \
-            --query-execution-context Database=${ATHENA_DATABASE} \
-            --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET}
-
       - name: Repair / add partitions
         run: |
           aws athena start-query-execution \

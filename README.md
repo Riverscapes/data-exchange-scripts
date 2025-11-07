@@ -28,8 +28,6 @@ conn.load_extension(spatialite_path)
 curs = conn.cursor()
 ```
 
-
-
 ### Setting Up the Project
 
 To set up the project, follow these steps:
@@ -106,7 +104,6 @@ For legacy projects that use `pip` you can install it directly from the reposito
 pip install git+https://github.com/Riverscapes/data-exchange-scripts.git
 ```
 
-
 ## Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -130,74 +127,86 @@ The repository includes an automated pipeline for publishing tool/layer column d
 
 ### Flattening Script
 
-`scripts/metadata/flatten_layer_catalog.py` scans the repo for every `layer_definitions.json` and produces partitioned Parquet output:
+`scripts/metadata/export_layer_definitions_for_s3.py` scans the repo for every `layer_definitions.json` and produces partitioned Parquet (default) output. Partition hierarchy (three levels):
+
+1. `authority` – repository root name (e.g. `data-exchange-scripts`). Derived automatically from the git repo folder name.
+2. `authority_name` – the tool / package authority publishing the layer definitions (from JSON).
+3. `tool_schema_version` – semantic version of the tool's layer definition schema (from JSON).
+
+Output pattern:
 
 ```text
 dist/metadata/
-  authority_name=<authority>/authority_version=<version>/layer_metadata.parquet
+  authority=<repo>/authority_name=<authority>/tool_schema_version=<version>/layer_metadata.parquet
   index.json
 ```
 
 Default behavior:
 
 - Output format: Parquet (use `--format csv` for CSV).
-- Partition columns (`authority_name`, `authority_version`) are NOT inside the Parquet files unless `--include-partition-cols` is passed.
+- Partition columns (`authority`, `authority_name`, `tool_schema_version`) are NOT inside the Parquet/CSV files unless `--include-partition-cols` is passed.
 - A `commit_sha` (current HEAD) is written into every row and stored again in `index.json` with a run timestamp.
 - Schema validation is enforced; any validation error causes a loud failure (non-zero exit code). An `index.json` with `status: validation_failed` and the collected `validation_errors` is still written for diagnostics, but no partition files are produced.
 
 Run locally:
 
 ```bash
-python scripts/metadata/flatten_layer_catalog.py
+python scripts/metadata/export_layer_definitions_for_s3.py
 ```
 
 Optional flags:
 
 ```bash
-python scripts/metadata/flatten_layer_catalog.py --format csv             # CSV instead of Parquet
-python scripts/metadata/flatten_layer_catalog.py --include-partition-cols # Embed partition columns in each file
+python scripts/metadata/export_layer_definitions_for_s3.py --format csv             # CSV instead of Parquet
+python scripts/metadata/export_layer_definitions_for_s3.py --include-partition-cols # Embed partition columns in each file
 ```
 
 ### Athena External Table
 
-We publish to: `s3://riverscapes-athena/metadata/layer_column_defs/`
+We publish to: `s3://riverscapes-athena/metadata/layer_definitions/`
 
 Recommended external table DDL (Parquet, partition columns excluded from file content):
 
 ```sql
-CREATE EXTERNAL TABLE IF NOT EXISTS layer_column_defs (
-  layer_id          string COMMENT 'Stable identifier of the layer or table, for example used for project.rs.xml id',
-  layer_name        string COMMENT 'Human-readable layer or table name (may match layer_id)',
-  layer_type        string COMMENT 'Layer category (table, view, raster, vector)',
-  layer_description string COMMENT 'Human-readable summary of the layer',
-  name              string COMMENT 'Column (or raster band) identifier',
-  friendly_name     string COMMENT 'Display-friendly name for the column',
-  theme             string COMMENT 'Grouping theme -- useful for very wide tables (e.g., Beaver, Hydrology)',
-  data_unit         string COMMENT 'Pint-compatible unit string (e.g., m, km^2, %)',
-  dtype             string COMMENT 'Data type (INTEGER, REAL, TEXT, etc.)',
-  description       string COMMENT 'Detailed description of the column',
+CREATE EXTERNAL TABLE IF NOT EXISTS layer_definitions (
+  layer_id          string  COMMENT 'Stable identifier of the layer or table, for example used for project.rs.xml id',
+  layer_name        string  COMMENT 'Human-readable layer or table name (may match layer_id)',
+  layer_type        string  COMMENT 'Layer category (table, view, raster, vector)',
+  layer_description string  COMMENT 'Human-readable summary of the layer',
+  name              string  COMMENT 'Column (or raster band) identifier',
+  friendly_name     string  COMMENT 'Display-friendly name for the column',
+  theme             string  COMMENT 'Grouping theme -- useful for very wide tables (e.g., Beaver, Hydrology)',
+  data_unit         string  COMMENT 'Pint-compatible unit string (e.g., m, km^2, %)',
+  dtype             string  COMMENT 'Data type (INTEGER, REAL, TEXT, etc.)',
+  description       string  COMMENT 'Detailed description of the column',
   is_key            boolean COMMENT 'Participates in a primary/unique key',
   is_required       boolean COMMENT 'True if field cannot be empty. Corresponds to SQL NOT NULL',
-  default_value     string COMMENT 'Default value for new records',
-  commit_sha        string COMMENT 'git commit at time of harvest from authority json'
+  default_value     string  COMMENT 'Default value for new records',
+  commit_sha        string  COMMENT 'git commit at time of harvest from authority json'
 )
 COMMENT 'Unified Riverscapes layer column definitions (structural + descriptive metadata)'
 PARTITIONED BY (
-  authority_name    string COMMENT 'Issuing package/tool authority name',
-  authority_version string COMMENT 'Schema version (semver)'
+  authority          string COMMENT 'Repository root name (publishing authority)',
+  authority_name     string COMMENT 'Issuing package/tool authority name',
+  tool_schema_version string COMMENT 'Tool schema version (semver)'
 )
 STORED AS PARQUET
-LOCATION 's3://riverscapes-athena/metadata/layer_column_defs/';
+LOCATION 's3://riverscapes-athena/metadata/layer_definitions/';
 ```
 
 Add new partitions (after upload):
 
 ```sql
-MSCK REPAIR TABLE layer_column_defs;  -- auto-discover
+-- auto-discover
+MSCK REPAIR TABLE layer_definitions;  
 -- OR manual:
-ALTER TABLE layer_column_defs
-ADD IF NOT EXISTS PARTITION (authority_name='rme_to_athena', authority_version='1.0')
-LOCATION 's3://riverscapes-athena/metadata/layer_column_defs/authority_name=rme_to_athena/authority_version=1.0/';
+ALTER TABLE layer_definitions
+ADD IF NOT EXISTS PARTITION (
+  authority='data-exchange-scripts',
+  authority_name='rme_to_athena',
+  tool_schema_version='1.0.0'
+)
+LOCATION 's3://riverscapes-athena/metadata/layer_definitions/authority=data-exchange-scripts/authority_name=rme_to_athena/tool_schema_version=1.0.0/';
 ```
 
 ### Example Queries
@@ -206,8 +215,10 @@ List column definitions for a tool version:
 
 ```sql
 SELECT name, friendly_name, dtype, description
-FROM layer_column_defs
-WHERE authority_name='rme_to_athena' AND authority_version='1.0'
+FROM layer_definitions
+WHERE authority='data-exchange-scripts'
+  AND authority_name='rme_to_athena'
+  AND tool_schema_version='1.0.1'
 ORDER BY name;
 ```
 
@@ -215,7 +226,7 @@ Count columns by dtype across all authorities:
 
 ```sql
 SELECT dtype, COUNT(*) AS n
-FROM layer_column_defs
+FROM layer_definitions
 GROUP BY dtype
 ORDER BY n DESC;
 ```
@@ -226,13 +237,15 @@ Compare two versions of a tool:
 SELECT a.name,
        a.dtype AS dtype_v1,
        b.dtype AS dtype_v2
-FROM layer_column_defs a
-JOIN layer_column_defs b
-  ON a.authority_name = b.authority_name
+FROM layer_definitions a
+JOIN layer_definitions b
+  ON a.authority = b.authority
+ AND a.authority_name = b.authority_name
  AND a.name = b.name
-WHERE a.authority_name='rme_to_athena'
-  AND a.authority_version='1.0'
-  AND b.authority_version='1.1';
+WHERE a.authority='data-exchange-scripts'
+  AND a.authority_name='rme_to_athena'
+  AND a.tool_schema_version='1.0.0'
+  AND b.tool_schema_version='1.1.0';
 ```
 
 ### GitHub Actions Workflow
@@ -250,21 +263,23 @@ Steps performed:
 7. Run `MSCK REPAIR TABLE` to load partitions.
 8. Perform sample queries (partition listing / row count).
 
-
 ### IAM Role (Least Privilege Summary)
 
 The role must allow:
 
-- S3 List/Get/Put/Delete under `metadata/layer_column_defs/` and query result prefix.
+- S3 List/Get/Put/Delete under `metadata/layer_definitions/` and query result prefix.
 - Athena: StartQueryExecution, GetQueryExecution, GetQueryResults.
 - Glue: Get/Create/Update table & partitions for the database/table.
 
 ### Future Enhancements
 
-- Validate layer schemas (dtype whitelist, required fields).
+- Validate layer schemas (dtype whitelist, required fields & semantic checks).
 - Explicit partition adds instead of MSCK for faster updates.
 - Historical snapshots (extra partition like `snapshot_date`).
 - Option to emit both Parquet + CSV for human diffing.
+- Glue Catalog integration (automated table & partition registration without MSCK).
+- Data quality profile summary (row counts, distinct key coverage) in `index.json`.
+- Optional secondary partition on major version (derived), if performance requires.
 
 ## Troubleshooting Metadata
 
