@@ -2,7 +2,7 @@ name: Metadata Catalog
 
 on:
   push:
-    branches: [ main, rmescrapeparquet ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -16,9 +16,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  TABLE_NAME: layer_column_defs
-  S3_BASE_PATH: s3://riverscapes-athena/metadata/layer_column_defs
-  ATHENA_DATABASE: default            # <-- update to your Glue/Athena database name
+  TABLE_NAME: layer_definitions
+  S3_BASE_PATH: s3://riverscapes-athena/metadata/layer_definitions
+  ATHENA_DATABASE: default
   ATHENA_RESULT_BUCKET: s3://riverscapes-athena-output/query-results/metadata  # <-- ensure this exists
   AWS_REGION: us-west-2                        
 
@@ -57,7 +57,7 @@ jobs:
 
       - name: Upload metadata to S3 (sync)
         run: |
-          aws s3 sync dist/metadata/ ${{ env.S3_BASE_PATH }}/ --delete
+          aws s3 sync dist/metadata/ ${{ env.S3_BASE_PATH }}/ 
 
       - name: Repair / add partitions
         run: |
