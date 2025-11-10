@@ -27,6 +27,15 @@ from rsxml import dotenv, Logger
 from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
 from pydex.lib.athena import athena_query_get_parsed
 
+# Environment-configurable buckets. These represent stable infrastructure and
+# should not vary run-to-run, so we prefer environment variables over CLI args.
+DATA_BUCKET_ENV_VAR = "RME_DATA_BUCKET"
+OUTPUT_BUCKET_ENV_VAR = "RME_ATHENA_OUTPUT_BUCKET"
+DEFAULT_DATA_BUCKET = "riverscapes-athena"
+
+DATA_BUCKET = os.getenv(DATA_BUCKET_ENV_VAR, DEFAULT_DATA_BUCKET)
+ATHENA_OUTPUT_BUCKET = os.getenv(OUTPUT_BUCKET_ENV_VAR, DATA_BUCKET)  # fallback to data bucket if not set
+
 
 def semver_to_int(version: Version) -> int:
     """convert to integer for easier comparisons
@@ -42,14 +51,14 @@ def semver_to_int(version: Version) -> int:
     return version.major * MAJOR + version.minor * MINOR + version.patch
 
 
-def get_athena_rme_projects(s3_bucket: str) -> dict[str, int]:
+def get_athena_rme_projects(output_bucket: str) -> dict[str, int]:
     """
     Query Athena for existing RME projects  
     return: lookup dict consisting of watershedID (ie huc10,str) and timestamp (integer)
     FUTURE ENHANCEMENT: if we're only interested in updating a subset, no need to return everything in rme
     """
     # FUTURE ENHANCEMENT - unless watershed_id a global id across countries we need something better
-    existing_rme = athena_query_get_parsed(s3_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme_pq2')
+    existing_rme = athena_query_get_parsed(output_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme_pq2')
     # this should look like:
     # [{'rme_date_created_ts': '1752810123000', 'watershed_id': '1704020402'},
     #  {'rme_date_created_ts': '1756512492000', 'watershed_id': '1030010112'},
@@ -211,10 +220,16 @@ def upload_to_s3(
     log.debug(f'file uploaded to s3 {s3_bucket} {s3_key}')
 
 
-def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: RiverscapesSearchParams,
-               download_dir: str, s3_bucket: str, delete_downloads_when_done: bool,
-               force_update: bool
-               ) -> None:
+def scrape_rme(
+    rs_api: RiverscapesAPI,
+    spatialite_path: str,
+    search_params: RiverscapesSearchParams,
+    download_dir: str,
+    data_bucket: str,
+    athena_output_bucket: str,
+    delete_downloads_when_done: bool,
+    force_update: bool,
+) -> None:
     """
     Orchestrate the scraping, processing, and uploading of RME projects.
     """
@@ -229,7 +244,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
 
     log = Logger('Scrape RME')
 
-    rme_in_athena = get_athena_rme_projects(s3_bucket)
+    rme_in_athena = get_athena_rme_projects(athena_output_bucket)
     log.debug(f'{len(rme_in_athena)} existing rme projects found in athena')
     # loop through data exchange projects
     count = 0
@@ -272,7 +287,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
             data_gdf.to_parquet(rme_pq_filepath)
             # don't use os.path.join because this is aws os, not system os
             s3_key = f'data_exchange/riverscape_metrics/{os.path.basename(rme_pq_filepath)}'
-            upload_to_s3(rme_pq_filepath, s3_bucket, s3_key)
+            upload_to_s3(rme_pq_filepath, data_bucket, s3_key)
 
             if delete_downloads_when_done:
                 delete_folder(download_dir)
@@ -288,7 +303,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('spatialite_path', help='Path to the mod_spatialite library', type=str)
-    parser.add_argument('s3_bucket', help='s3 bucket RME files will be placed', type=str)
+    # Bucket configuration now via environment variables (RME_DATA_BUCKET, RME_ATHENA_OUTPUT_BUCKET)
+    # Remove old CLI bucket arguments to reduce noise and accidental misconfiguration.
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('--tags', help='Data Exchange tags to search for projects', type=str)
     parser.add_argument('--collection', help='Collection GUID', type=str)
@@ -321,8 +337,23 @@ def main():
     if args.huc_filter != '' and args.huc_filter != '.':
         search_params.meta = {'HUC':  args.huc_filter}
 
+    # Log bucket resolution
+    if ATHENA_OUTPUT_BUCKET == DATA_BUCKET:
+        log.warning(f"Using single bucket for data & Athena output: {DATA_BUCKET} (override with {OUTPUT_BUCKET_ENV_VAR})")
+    else:
+        log.info(f"Data bucket: {DATA_BUCKET} (env {DATA_BUCKET_ENV_VAR}); Athena output bucket: {ATHENA_OUTPUT_BUCKET} (env {OUTPUT_BUCKET_ENV_VAR})")
+
     with RiverscapesAPI(stage=args.stage) as api:
-        scrape_rme(api, args.spatialite_path, search_params, download_folder, args.s3_bucket, args.delete, args.force_update)
+        scrape_rme(
+            api,
+            args.spatialite_path,
+            search_params,
+            download_folder,
+            DATA_BUCKET,
+            ATHENA_OUTPUT_BUCKET,
+            args.delete,
+            args.force_update,
+        )
 
     log.info('Process complete')
 

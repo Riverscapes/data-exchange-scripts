@@ -300,7 +300,7 @@
       "name": "🆕Scrape RME to Athena-Parquet",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/scripts/geo/rme_to_athena_parquet.py",
+      "program": "${workspaceFolder}/pipelines/rme_to_athena/rme_to_athena_parquet.py",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "envFile": "${workspaceFolder}/.env",
@@ -308,16 +308,18 @@
         "PYTHONPATH": "${workspaceFolder}"
       },
       "args": [
+        // Stage (staging | production)
         "production",
+        // Spatialite library path from env
         "{env:SPATIALITE_LIB}",
-        "riverscapes-athena",
+        // Working folder (downloads + parquet output)
         "{env:DATA_ROOT}/rme-athena",
+        // Optional filters / flags
         "--tags",
-        "2025CONUS", //"little_spokane", // "2024CONUS"
-        // "--huc_filter",
-        // "160",
+        "2025CONUS",
+        // "--huc_filter", "160",
         // "--delete",
-        //"--force_update"
+        // "--force_update"
       ]
     },
     {
@@ -421,11 +423,12 @@
       "console": "integratedTerminal",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
-      },      
+      },
       "args": [
         "${input:environment}",
         "{env:DATA_ROOT}/huc10_athena",
-        "--tags", "2025CONUS",
+        "--tags",
+        "2025CONUS",
         // "--huc_filter", "07",
         "--skip-overwrite",
         "--delete"
