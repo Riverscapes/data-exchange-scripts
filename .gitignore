@@ -121,6 +121,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Keep a tracked example environment file
+!.env.example
+
 # Spyder project settings
 .spyderproject
 .spyproject
