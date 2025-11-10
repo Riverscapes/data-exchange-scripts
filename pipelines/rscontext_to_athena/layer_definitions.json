@@ -1,6 +1,6 @@
 {
     "$schema": "https://s3.us-west-2.amazonaws.com/releases.northarrowresearch.com/reports/2025beta/metadata_schemas/layer_definitions.schema.json",
-    "authority_name": "dgo_exporter",
+    "authority_name": "rscontext_to_athena",
     "tool_schema_version": "1.0.2",
     "layers": [
         {
