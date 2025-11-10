@@ -1,0 +1,22 @@
+name: Tooling Check (jq)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tooling-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure jq available
+        run: |
+          ls /usr/bin
+          command -v jq >/dev/null 2>&1 || {
+            echo "jq missing; installing...";
+            sudo apt-get update -y;
+            sudo apt-get install -y jq;
+          }
+          echo "jq version:"; jq --version
+          
