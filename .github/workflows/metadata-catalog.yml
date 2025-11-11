@@ -1,4 +1,4 @@
-name: Metadata Catalog
+name: Publish Metadata Catalog
 
 on:
   push:
@@ -17,7 +17,7 @@ concurrency:
 
 env:
   TABLE_NAME: layer_definitions
-  S3_BASE_PATH: s3://riverscapes-athena/metadata/layer_definitions
+  S3_BASE_PATH: s3://riverscapes-athena/riverscapes_metadata/layer_definitions
   ATHENA_DATABASE: default
   ATHENA_RESULT_BUCKET: s3://riverscapes-athena-output/query-results/metadata  # <-- ensure this exists
   AWS_REGION: us-west-2                        
@@ -53,7 +53,7 @@ jobs:
 
       - name: Generate partitioned Parquet metadata
         run: |
-          uv run python scripts/metadata/export_layer_definitions_for_s3.py
+          uv run export-layer-definitions-for-s3 --root .
           echo "Index manifest:"
           cat dist/index.json | jq .
           echo "Partition files:"

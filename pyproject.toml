@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Client scripts for the Riverscapes Data Exchange API"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -29,7 +29,8 @@ dependencies = [
   "setuptools==76.0.0",
   "six==1.17.0",
   "termcolor==2.5.0",
-  "urllib3==2.3.0",
+  "urllib3>=2.3",
+  "riverscapes-metadata @ git+https://github.com/Riverscapes/RiverscapesXML.git@8c9a1b93a609f207f392fb20d4620523f373ba0e#subdirectory=riverscapes_metadata"
 ]
 
 [project.optional-dependencies]
