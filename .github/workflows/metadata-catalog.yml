@@ -59,7 +59,6 @@ jobs:
           echo "Partition files:"
           jq -r '.partitions[].path' dist/index.json
           
-
       - name: Upload metadata to S3 (sync)
         run: |
           aws s3 sync dist/metadata/ ${{ env.S3_BASE_PATH }}/ 
