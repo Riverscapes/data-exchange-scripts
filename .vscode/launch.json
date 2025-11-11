@@ -402,24 +402,10 @@
       ]
     },
     {
-      "name": "Python: athena_to_rme",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/scripts/geo/athena_to_rme.py",
-      "console": "integratedTerminal",
-      "args": [
-        "s3://riverscapes-athena",
-        "adhoc/yct.csv",
-        "yct.gpkg",
-        "rme_table_column_defs.csv"
-      ],
-      "justMyCode": true
-    },
-    {
       "name": "Python: huc10_athena",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/scripts/scrapers/huc10_athena.py",
+      "program": "${workspaceFolder}/pipelines/rscontext_to_athena/huc10_athena.py",
       "console": "integratedTerminal",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
@@ -429,9 +415,10 @@
         "{env:DATA_ROOT}/huc10_athena",
         "--tags",
         "2025CONUS",
-        // "--huc_filter", "07",
+        "--huc_filter",
+        "07",
         "--skip-overwrite",
-        "--delete"
+        // "--delete"
       ],
     }
     // {
