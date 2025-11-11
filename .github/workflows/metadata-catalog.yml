@@ -80,12 +80,14 @@ jobs:
           echo "QueryExecutionId=$QID";
           # Poll for completion
           STATUS="PENDING"
+          RESULT_JSON=""
           for i in $(seq 1 30); do
-            STATUS=$(aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.State');
+            RESULT_JSON=$(aws athena get-query-execution --query-execution-id $QID)
+            STATUS=$(echo "$RESULT_JSON" | jq -r '.QueryExecution.Status.State');
             if [ "$STATUS" = "SUCCEEDED" ]; then break; fi
             if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
               echo "::error::Athena query $QID ended with status $STATUS" >&2
-              aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.StateChangeReason' >&2
+              echo "$RESULT_JSON" | jq -r '.QueryExecution.Status.StateChangeReason' >&2
               exit 1
             fi
             sleep 4
@@ -94,8 +96,23 @@ jobs:
             echo "::error::Athena query $QID did not succeed (status=$STATUS)" >&2
             exit 1
           fi
-          if ! aws s3 cp ${ATHENA_RESULT_BUCKET}/$QID.csv partitions.csv; then
-            echo "::error::Failed to download Athena results from ${ATHENA_RESULT_BUCKET}/$QID.csv" >&2
+          OUTPUT_URI=$(echo "$RESULT_JSON" | jq -r '.QueryExecution.ResultConfiguration.OutputLocation')
+          if [ -z "$OUTPUT_URI" ] || [ "$OUTPUT_URI" = "null" ]; then
+            echo "::error::Athena did not return an output location for query $QID" >&2
+            exit 1
+          fi
+          echo "OutputLocation=$OUTPUT_URI"
+          DOWNLOAD_OK="false"
+          for attempt in $(seq 1 5); do
+            if aws s3 cp "$OUTPUT_URI" partitions.csv; then
+              DOWNLOAD_OK="true"
+              break
+            fi
+            echo "Waiting for result file to appear... (attempt $attempt)"
+            sleep 2
+          done
+          if [ "$DOWNLOAD_OK" != "true" ]; then
+            echo "::error::Failed to download Athena results from $OUTPUT_URI" >&2
             exit 1
           fi
           echo "Partitions:"; cat partitions.csv
@@ -107,12 +124,14 @@ jobs:
             --query-execution-context Database=${ATHENA_DATABASE} \
             --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET} | jq -r '.QueryExecutionId')
           STATUS="PENDING"
+          RESULT_JSON=""
           for i in $(seq 1 30); do
-            STATUS=$(aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.State');
+            RESULT_JSON=$(aws athena get-query-execution --query-execution-id $QID)
+            STATUS=$(echo "$RESULT_JSON" | jq -r '.QueryExecution.Status.State');
             if [ "$STATUS" = "SUCCEEDED" ]; then break; fi
             if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
               echo "::error::Athena query $QID ended with status $STATUS" >&2
-              aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.StateChangeReason' >&2
+              echo "$RESULT_JSON" | jq -r '.QueryExecution.Status.StateChangeReason' >&2
               exit 1
             fi
             sleep 4
@@ -121,8 +140,23 @@ jobs:
             echo "::error::Athena query $QID did not succeed (status=$STATUS)" >&2
             exit 1
           fi
-          if ! aws s3 cp ${ATHENA_RESULT_BUCKET}/$QID.csv rowcount.csv; then
-            echo "::error::Failed to download Athena results from ${ATHENA_RESULT_BUCKET}/$QID.csv" >&2
+          OUTPUT_URI=$(echo "$RESULT_JSON" | jq -r '.QueryExecution.ResultConfiguration.OutputLocation')
+          if [ -z "$OUTPUT_URI" ] || [ "$OUTPUT_URI" = "null" ]; then
+            echo "::error::Athena did not return an output location for query $QID" >&2
+            exit 1
+          fi
+          echo "OutputLocation=$OUTPUT_URI"
+          DOWNLOAD_OK="false"
+          for attempt in $(seq 1 5); do
+            if aws s3 cp "$OUTPUT_URI" rowcount.csv; then
+              DOWNLOAD_OK="true"
+              break
+            fi
+            echo "Waiting for result file to appear... (attempt $attempt)"
+            sleep 2
+          done
+          if [ "$DOWNLOAD_OK" != "true" ]; then
+            echo "::error::Failed to download Athena results from $OUTPUT_URI" >&2
             exit 1
           fi
           echo "Row count:"; cat rowcount.csv
