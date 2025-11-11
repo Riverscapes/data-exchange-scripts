@@ -51,13 +51,9 @@ jobs:
         run: |
           uv sync --frozen || uv sync
 
-      - name: List installed packages
-        run: |
-          uv run python -c "import pyarrow, sys; print(pyarrow.__version__); print(sys.executable)"
-
       - name: Generate partitioned Parquet metadata
         run: |
-          python scripts/metadata/export_layer_definitions_for_s3.py
+          uv run python scripts/metadata/export_layer_definitions_for_s3.py
           echo "Index manifest:"
           cat dist/index.json | jq .
           echo "Partition files:"
