@@ -79,11 +79,26 @@ jobs:
             --query-execution-context Database=${ATHENA_DATABASE} | jq -r '.QueryExecutionId')
           echo "QueryExecutionId=$QID";
           # Poll for completion
+          STATUS="PENDING"
           for i in $(seq 1 30); do
             STATUS=$(aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.State');
-            if [ "$STATUS" = "SUCCEEDED" ]; then break; fi; sleep 4; done
-          aws s3 cp ${ATHENA_RESULT_BUCKET}/$QID.csv partitions.csv || true
-          echo "Partitions:"; cat partitions.csv || true
+            if [ "$STATUS" = "SUCCEEDED" ]; then break; fi
+            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "::error::Athena query $QID ended with status $STATUS" >&2
+              aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.StateChangeReason' >&2
+              exit 1
+            fi
+            sleep 4
+          done
+          if [ "$STATUS" != "SUCCEEDED" ]; then
+            echo "::error::Athena query $QID did not succeed (status=$STATUS)" >&2
+            exit 1
+          fi
+          if ! aws s3 cp ${ATHENA_RESULT_BUCKET}/$QID.csv partitions.csv; then
+            echo "::error::Failed to download Athena results from ${ATHENA_RESULT_BUCKET}/$QID.csv" >&2
+            exit 1
+          fi
+          echo "Partitions:"; cat partitions.csv
 
       - name: Sample query (count rows)
         run: |
@@ -91,11 +106,26 @@ jobs:
             --query-string "SELECT count(*) FROM ${TABLE_NAME}" \
             --query-execution-context Database=${ATHENA_DATABASE} \
             --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET} | jq -r '.QueryExecutionId')
+          STATUS="PENDING"
           for i in $(seq 1 30); do
             STATUS=$(aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.State');
-            if [ "$STATUS" = "SUCCEEDED" ]; then break; fi; sleep 4; done
-          aws s3 cp ${ATHENA_RESULT_BUCKET}/$QID.csv rowcount.csv || true
-          echo "Row count:"; cat rowcount.csv || true
+            if [ "$STATUS" = "SUCCEEDED" ]; then break; fi
+            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "::error::Athena query $QID ended with status $STATUS" >&2
+              aws athena get-query-execution --query-execution-id $QID | jq -r '.QueryExecution.Status.StateChangeReason' >&2
+              exit 1
+            fi
+            sleep 4
+          done
+          if [ "$STATUS" != "SUCCEEDED" ]; then
+            echo "::error::Athena query $QID did not succeed (status=$STATUS)" >&2
+            exit 1
+          fi
+          if ! aws s3 cp ${ATHENA_RESULT_BUCKET}/$QID.csv rowcount.csv; then
+            echo "::error::Failed to download Athena results from ${ATHENA_RESULT_BUCKET}/$QID.csv" >&2
+            exit 1
+          fi
+          echo "Row count:"; cat rowcount.csv
 
       - name: Post-run summary
         run: |
