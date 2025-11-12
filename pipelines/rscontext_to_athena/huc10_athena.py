@@ -6,13 +6,11 @@ Philip Bailey
 
 THis is going to help us build the Hypsometric Curve report for the WSCA
 https://alden-report.s3.us-east-1.amazonaws.com/1005001203/wsca_report.html
+
 S3 path for JSON Files s3://riverscapes-athena/data_exchange/rs-context/
 
-Searches for RME projects in the Data Exchange, downloads the RME output GeoPackages,
-scrapes the DGO metrics from the GeoPackages, and uploads the results to an S3 bucket.
-
-Philip Bailey
-June 2025
+Searches for projects in the Data Exchange, downloads specific files, uses geo to bin rasters, 
+ and uploads the results to an S3 bucket.
 """
 from __future__ import annotations
 import sys
@@ -23,6 +21,7 @@ import os
 import re
 import json
 import shutil
+from pathlib import PurePosixPath
 
 import boto3
 
@@ -49,7 +48,11 @@ MAJOR = 1000000
 MINOR = 1000
 
 
-def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, download_dir: str, delete_downloads: bool, skip_overwrite: bool) -> None:
+def join_s3_key(*parts: str) -> str:
+    """Build an S3 key with forward slashes regardless of OS."""
+    return str(PurePosixPath(*parts))
+
+def scrape_rsprojects(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, download_dir: str, delete_downloads: bool, skip_overwrite: bool) -> None:
     """
     Loop over all the projects, download the RME output GeoPackage, and scrape the geometries and metrics.
     """
@@ -63,7 +66,7 @@ def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, d
         prg: ProgressBar
 
         # Upload just metrics['rs_context'] flattened to one line to s3
-        s3_key = os.path.join(S3_BASE_PATH, f'{project.huc}.json')
+        s3_key = join_s3_key(S3_BASE_PATH, f'{project.huc}.json')
 
         if project.huc is None or project.huc == '':
             log.warning(f'Project {project.id} does not have a HUC. Skipping.')
@@ -217,7 +220,7 @@ def main():
 
     try:
         with RiverscapesAPI(stage=args.stage) as api:
-            scrape_rme(api, search_params, download_folder, args.delete, args.skip_overwrite)
+            scrape_rsprojects(api, search_params, download_folder, args.delete, args.skip_overwrite)
     except Exception as e:
         log.error(e)
         traceback.print_exc(file=sys.stdout)
