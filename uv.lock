@@ -890,7 +890,7 @@ requires-dist = [
     { name = "pyathena", specifier = ">=2.9.4" },
     { name = "python-dateutil", specifier = "==2.9.0.post0" },
     { name = "requests", specifier = "==2.32.3" },
-    { name = "riverscapes-metadata", git = "https://github.com/Riverscapes/RiverscapesXML.git?subdirectory=riverscapes_metadata&rev=8c9a1b93a609f207f392fb20d4620523f373ba0e" },
+    { name = "riverscapes-metadata", git = "https://github.com/Riverscapes/RiverscapesXML.git?subdirectory=riverscapes_metadata&rev=master" },
     { name = "rsxml", specifier = "==2.0.6" },
     { name = "semver", specifier = "==3.0.4" },
     { name = "setuptools", specifier = "==76.0.0" },
@@ -1053,7 +1053,7 @@ wheels = [
 [[package]]
 name = "riverscapes-metadata"
 version = "0.1.1"
-source = { git = "https://github.com/Riverscapes/RiverscapesXML.git?subdirectory=riverscapes_metadata&rev=8c9a1b93a609f207f392fb20d4620523f373ba0e#8c9a1b93a609f207f392fb20d4620523f373ba0e" }
+source = { git = "https://github.com/Riverscapes/RiverscapesXML.git?subdirectory=riverscapes_metadata&rev=master#e42bf837082398c9bf1e9569aedf8462ede1d6e6" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pyarrow" },
