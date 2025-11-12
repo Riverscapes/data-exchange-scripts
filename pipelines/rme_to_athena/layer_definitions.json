@@ -1,5 +1,5 @@
 {
-  "$schema": "https://xml.riverscapes.net/layer_definitions/schema/layer_definitions.schema.json",
+  "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
   "authority_name": "rme_to_athena",
   "tool_schema_version": "1.0.2",
   "layers": [
