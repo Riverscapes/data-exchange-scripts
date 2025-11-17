@@ -7,7 +7,7 @@
       "layer_id": "raw_rme",
       "layer_name": "raw_rme_pq",
       "description": "DGO metrics from RME project geopackages",
-      "layer_type": "table",
+      "layer_type": "DataTable",
       "columns": [
         {
           "name": "brat_capacity",

@@ -7,7 +7,7 @@
             "layer_id": "rpt_rme",
             "layer_name": "rpt_rme_pq",
             "description": "report view",
-            "layer_type": "view",
+            "layer_type": "DataTable",
             "columns": [
                 {
                     "name": "fcode_desc",

@@ -7,7 +7,7 @@
             "layer_id": "rs_context_huc10",
             "layer_name": "rs_context_huc10",
             "description": "",
-            "layer_type": "table",
+            "layer_type": "DataTable",
             "columns": [
                 {
                     "name": "huc",
