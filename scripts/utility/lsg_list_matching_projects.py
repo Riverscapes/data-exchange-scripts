@@ -1,6 +1,7 @@
 """
    Given a list, for example of watershed names, find matching projects in the data exchange
    return the list with new matching projects attribute (list of projects that match the criteria)
+   To do - make more general 
 """
 
 # import os
@@ -236,8 +237,9 @@ if __name__ == '__main__':
     log.debug("Starting...")
     starttime = time.time()
     
-    ws_ids = get_nz_ws_ids()
+    # ws_ids = get_nz_ws_ids()
     # ws_ids = ws_ids[:1] # FOR TESTING ONLY LIMIT TO TOP 1
+    ws_ids = [593472,593451]
 
     with RiverscapesAPI(stage='PRODUCTION') as riverscapes_api:
         matchingprojects = get_latest_matching_projects_for_list(riverscapes_api, ws_ids)
