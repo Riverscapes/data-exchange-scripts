@@ -37,6 +37,9 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${file}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },      
       "console": "integratedTerminal",
       "args": "${command:pickArgs}"
     },
@@ -234,7 +237,7 @@
         // "--regex_list", "\\.tif$,\\.shp$",
         // --force
       ]
-    }
+    },
     // {
     //   "name": "Scrape RME",
     //   "type": "debugpy",
@@ -402,6 +405,39 @@
       ]
     },
     {
+      "name": "Python: athena_to_rme",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/geo/athena_to_rme.py",
+      "console": "integratedTerminal",
+      "args": [
+        "s3://riverscapes-athena",
+        "adhoc/yct.csv",
+        "yct.gpkg",
+        "rme_table_column_defs.csv"
+      ],
+      "justMyCode": true
+    },
+    // This is the old version that pulled aux from .net SQLite workbench DB
+    // {
+    //   "name": "Add ChaMP Aux Measurements to Topo",
+    //   "type": "debugpy",
+    //   "request": "launch",
+    //   "program": "${workspaceFolder}/scripts/utility/champ_aux_measurements.py",
+    //   "console": "integratedTerminal",
+    //   "env": {
+    //     "PYTHONPATH": "${workspaceFolder}"
+    //   },
+    //   "args": [
+    //     "production",
+    //     "/Users/philipbailey/GISData/riverscapes/champ/workbench.db",
+    //     "/Users/philipbailey/GISData/riverscapes/champ/visit_aux_data",
+    //     "False",
+    //     "c7d8c487-c377-42b0-a5b6-4c16db18fb41"
+    //   ]
+    // },
+    // This is the new version that pulls aux from Google Postgres
+    {
       "name": "Python: huc10_athena",
       "type": "debugpy",
       "request": "launch",
@@ -420,7 +456,27 @@
         "--skip-overwrite",
         // "--delete"
       ],
-    }
+    },
+    {
+      "name": "Add ChaMP Aux Measurements to Topo - SQLite",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/utility/champ_aux_measurements_sqlite.py",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production",
+        "CHaMPGooglePostgres",
+        "/Users/philipbailey/GISData/riverscapes/champ/CHaMP_All_Measurements3.sqlite",
+        "/Users/philipbailey/GISData/riverscapes/champ/visit_aux_data",
+        "False",
+        "c7d8c487-c377-42b0-a5b6-4c16db18fb41",
+        // "--visit_id", "744"
+        "--watershed", "Yankee Fork",
+      ]
+    },
     // {
     //   "name": "Scrape HUC statistics - BATCH",
     //   "type": "debugpy",
