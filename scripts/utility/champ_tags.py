@@ -37,7 +37,7 @@ def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor) -> None:
     # Script assumes all topo projects should be owned by CHaMP organization.
     for x, _stats, _total, _prg in api.search(RiverscapesSearchParams({
         "projectTypeId": "topo",
-    })):
+    }), page_size=100):
 
         meta_watershed = x.project_meta.get("Watershed", None)
         meta_site = x.project_meta.get("Site", None)
@@ -58,17 +58,6 @@ def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor) -> None:
             log.error(f"  No Visit found in project metadata for project {x.id} - {x.name}. Skipping tag upload.")
             continue
 
-        if x.ownedBy['id'] != champ_org:
-            log.warning(f"Project {x.id} - {x.name} is not owned by CHaMP organization. Skipping tag upload.")
-            wrong_owner_count += 1
-            continue
-
-        log.debug(f"Processing project {x.id} - {x.name}")
-        log.debug(f"Watershed: {meta_watershed}")
-        log.debug(f"Site: {meta_site}")
-        log.debug(f"Year: {meta_year}")
-        log.debug(f"Visit: {meta_visit}")
-
         # Cleanup the metadata into the format required for tags.
         watershed_tag = f"CHAMP_Watershed_{meta_watershed.replace(' ', '_')}"
         site_tag = f"CHAMP_Site_{meta_site.replace(' ', '_')}"
@@ -85,7 +74,7 @@ def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor) -> None:
 
         # Add any existing tags that are not CHaMP tags.
         for tag in x.tags:
-            if not tag.startswith("CHAMP_"):
+            if not tag.startswith("CHAMP_") and not tag.startswith("CHaMP_"):
                 final_tags.append(tag)
 
         missing_tags = 0
@@ -109,32 +98,46 @@ def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor) -> None:
             visit_tag_count += 1
             # log.warning(f"  Added tag: {visit_tag}")
 
-        if missing_tags_count > 0 or x.ownedBy['id'] != champ_org:
-            log.info(f"Updating project {x.id} - {x.name} with new tags and/or ownership.")
+        if missing_tags > 0:
+            log.info(f"Updating project {x.id} - {x.name} with new tags.")
+            print_visit(meta_watershed, meta_site, meta_year, meta_visit, x)
 
-            update_project_mutation = api.load_mutation('updataProject')
+            update_project_mutation = api.load_mutation('updateProject')
             __update_project_result = api.run_query(update_project_mutation, {
+                'projectId': x.id,
+                'project': {
+                    'tags': final_tags
+                }
+            })
+            print(f"Updated project {x.id} - {x.name} with new tags.")
+
+        if x.ownedBy['id'] != champ_org:
+            log.warning(f"Project {x.id} - {x.name} is not owned by CHaMP organization. Skipping tag upload.")
+            print_visit(meta_watershed, meta_site, meta_year, meta_visit, x)
+            wrong_owner_count += 1
+
+            change_owner_mutation = api.load_mutation('changeProjectOwner')
+            __change_owner_result = api.run_query(change_owner_mutation, {
                 'projectId': x.id,
                 'owner': {
                     'id': champ_org,
                     'type': 'ORGANIZATION'
-                },
-                'tags': final_tags
+                }
             })
-            print(f"Updated project {x.id} - {x.name} with new tags and/or ownership.")
+            print(f"Updated project {x.id} - {x.name} with new ownership.")
 
         ############################################################################################################################################
         # Check if Postgres has a matching project row
         curs.execute("SELECT project_id, status_id, guid FROM projects WHERE visit_id = %s AND project_type_id = 1", (meta_visit,))
         project_row = curs.fetchone()
         if not project_row:
-            log.error(f"  No project found in CHaMP database for visit ID {meta_visit}. Skipping tag upload.")
+            log.error(f"No project found in CHaMP database for visit ID {meta_visit}. Skipping tag upload.")
             missing_postgres_row += 1
             continue
         else:
             # Ensure that the project row has GUID and that it matches that in Data Exchange
             if project_row['guid']:
-                log.debug(f"  CHaMP DB GUID: {project_row['guid']}")
+                # log.debug(f"  CHaMP DB GUID: {project_row['guid']}")
                 if project_row['guid'] != x.id:
                     log.error(f"  GUID mismatch for visit ID {meta_visit}. CHaMP DB GUID: {project_row['guid']}, Dex GUID: {x.id}. Skipping tag upload.")
                     continue
@@ -155,6 +158,15 @@ def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor) -> None:
     log.info(f"GUIDs added: {adding_guid_count}")
     log.info(f"Missing Postgres rows: {missing_postgres_row}")
     log.info(f"Projects with wrong owner: {wrong_owner_count}")
+
+
+def print_visit(watershed: str, site: str, year: int, visit: int, x) -> None:
+    log = Logger('CHaMP')
+    log.debug(f"Processing project {x.id} - {x.name}")
+    log.debug(f"Watershed: {watershed}")
+    log.debug(f"Site: {site}")
+    log.debug(f"Year: {year}")
+    log.debug(f"Visit: {visit}")
 
 
 def main():
