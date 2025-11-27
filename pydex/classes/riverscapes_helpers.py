@@ -59,6 +59,8 @@ class RiverscapesProject:
 
             self.visibility = proj_obj['visibility'] if 'visibility' in proj_obj else None
             self.archived = proj_obj['archived'] if 'archived' in proj_obj else None
+            self.ownedBy = proj_obj['ownedBy'] if 'ownedBy' in proj_obj else None
+
             # Turn the meta into a dictionary
             self.project_meta = {x['key']: x['value'] for x in proj_obj['meta']}
             # make a lowercase version of the meta and strip away spaces, dashes, and underscores
@@ -154,7 +156,7 @@ class RiverscapesSearchParams:
         self.editableOnly = input_obj.get('editableOnly', None)
         if 'excludeArchived' not in input_obj:
             self.log.info("Excluding archived projects by default.")
-        self.excludeArchived = input_obj.get('excludeArchived', True) # default to excluding if we don't specify 
+        self.excludeArchived = input_obj.get('excludeArchived', True)  # default to excluding if we don't specify
         self.createdOnFrom = None
         self.createdOnTo = None
         self.updatedOnFrom = None
