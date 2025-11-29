@@ -16,6 +16,7 @@ postgres_service = "CHaMPGooglePostgres"
 stage = "production"
 download_dir = "/tmp/champ_downloads"
 champ_org = "c7d8c487-c377-42b0-a5b6-4c16db18fb41"
+watershed_solutions_org = "9a619d52-6b3c-4e26-8854-eb7ff9b77c2a"
 
 
 def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor) -> None:
@@ -111,8 +112,9 @@ def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor) -> None:
             })
             print(f"Updated project {x.id} - {x.name} with new tags.")
 
-        if x.ownedBy['id'] != champ_org:
-            log.warning(f"Project {x.id} - {x.name} is not owned by CHaMP organization. Skipping tag upload.")
+        # Project should be owned by either CHaMP or Watershed Solutions organization.
+        if x.ownedBy['id'] != champ_org and x.ownedBy['id'] != watershed_solutions_org:
+            log.warning(f"Project {x.id} - {x.name} is not owned by CHaMP or Watershed Solutions organization. Skipping tag upload.")
             print_visit(meta_watershed, meta_site, meta_year, meta_visit, x)
             wrong_owner_count += 1
 
