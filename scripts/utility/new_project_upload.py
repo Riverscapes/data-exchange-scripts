@@ -22,6 +22,8 @@ from rsxml import Logger
 import requests
 from pydex import RiverscapesAPI, __version__
 
+FILES_TO_SKIP = ['.DS_Store', 'thumbs.db', 'desktop.ini']
+
 
 def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: str, visibility: str, tags: list):
     """ Upload all projects found in subfolders of the specified parent folder.
@@ -67,7 +69,7 @@ def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: 
     log.info(f'Upload completed: {success_count} succeeded, {fail_count} failed')
 
 
-def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner: str, visibility: str, tags: list):
+def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, project_id: str, owner: str, visibility: str, tags: list = None, no_wait: bool = False):
     """ A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
     files we wish to change as well as the project.rs.xml file which describes the project and its files.
 
@@ -86,10 +88,17 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
     log.title('Upload Riverscapes Files')
 
     # Find all files recursively inside this project folder
-    project_folder = os.path.dirname(project_xml_path)
+    if (not os.path.isfile(project_xml_path) and not os.path.isdir(project_xml_path)):
+        log.error(f'Project XML path does not exist: {project_xml_path}. Must be either the project.rs.xml file or the project folder.')
+        return
+    project_folder = os.path.dirname(project_xml_path) if os.path.isfile(project_xml_path) else project_xml_path
     all_project_files = []
     for root, _dirs, files in os.walk(project_folder):
         for filename in files:
+
+            if filename in FILES_TO_SKIP:
+                continue
+
             rel_dir = os.path.relpath(root, project_folder)
             rel_file = os.path.join(rel_dir, filename) if rel_dir != '.' else filename
             all_project_files.append(rel_file)
@@ -102,6 +111,7 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
     # ================================================================================================================
     # Get a copy of the existing project record so we can copy the owner and visibility
     upload_params = {
+        'projectId': project_id,
         # 'token': "xxxxxxxxxxxxxxxxxxxxx" isn't needed because this is a new project update operation
         'files': all_project_files,  # Relative paths for the files
         # For now I'm faking MD5 tags. This is a little sloppy but for now it works. If you put in fake MD5 tags
@@ -116,13 +126,18 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
             'id': owner,
             'type': 'ORGANIZATION'
         },
-        # Visibility and tags must also be explicitly set so we use the values from the existing project we just looked up
+        # # Visibility and tags must also be explicitly set so we use the values from the existing project we just looked up
         'visibility': visibility,
         'tags': tags
     }
+
     project_upload_qry = riverscapes_api.load_query('requestUploadProject')
     project_upload = riverscapes_api.run_query(project_upload_qry, upload_params)
     token = project_upload['data']['requestUploadProject']['token']
+    log.info(f'Requested upload. Received token starting with: {token[:8]}...')
+    log.info(f' - Files to create: {len(project_upload["data"]["requestUploadProject"]["create"])}')
+    log.info(f' - Files to update: {len(project_upload["data"]["requestUploadProject"]["update"])}')
+    log.info(f' - Files to delete: {len(project_upload["data"]["requestUploadProject"]["delete"])}')
 
     # Step 2: Now we need to request the urls for the upload so we can start working on them
     # ================================================================================================================
@@ -132,22 +147,37 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
         'files': combined_files,
         'token': token
     })
+    log.info(f"Received upload urls for {len(upload_urls['data']['requestUploadProjectFilesUrl'])} files")
 
     # Step 3: Now upload each file to the provided url
     # ================================================================================================================
     log.info(f'Received {len(upload_urls["data"]["requestUploadProjectFilesUrl"])} upload urls')
-    for file_info in upload_urls["data"]["requestUploadProjectFilesUrl"]:
+    counter = 0
+    all_urls = upload_urls["data"]["requestUploadProjectFilesUrl"]
+    for file_info in all_urls:
+        counter += 1
         rel_path = file_info["relPath"]
         url = file_info["urls"][0]
         file_path = os.path.join(project_folder, rel_path)
-        print(f"Uploading {file_path} to {url.split('?')[0]} ...")
+        log.info(f" - Uploading ({counter} of {len(all_urls)}) {rel_path}...")
+        max_retries = 5
+        backoff = 2  # seconds
+        timeout = 120
+        for attempt in range(1, max_retries + 1):
+            with open(file_path, "rb") as f:
+                try:
+                    response = requests.put(url, data=f, timeout=timeout)
+                except requests.RequestException as e:
+                    log.error(f"Network error (attempt {attempt}/{max_retries}) for {rel_path}: {e}")
+                else:
+                    if response.status_code in (200, 201):
+                        break
+                    log.error(f"HTTP {response.status_code} (attempt {attempt}/{max_retries}) for {rel_path}: {response.text[:200]}")
+                if attempt == max_retries:
+                    raise Exception(f"Giving up on {rel_path} after {max_retries} attempts")
+                time.sleep(backoff)
 
-        with open(file_path, "rb") as f:
-            response = requests.put(url, data=f, timeout=120)
-            if response.status_code == 200:
-                print(f"Successfully uploaded {rel_path}")
-            else:
-                print(f"Failed to upload {rel_path}: {response.status_code} {response.text}")
+    log.info('All files successfully uploaded.')
 
     # Step 4: Now that all files are uploaded we need to finalize the upload
     # ================================================================================================================
@@ -156,7 +186,7 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, owner
         'token': token
     })
 
-    if True is True:
+    if bool(no_wait) is False:
         # Step 5: Poll the upload status until it's done. This is optional so if you're immediately moving on to a different
         # project you can skip this step. Only useful if you need to know when the project is actually available online.
         # ================================================================================================================
