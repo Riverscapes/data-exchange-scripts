@@ -9,7 +9,7 @@ on:
 
 permissions:
   contents: read
-  # id-token: write  # needed for OIDC role assumption
+  id-token: write  # needed for OIDC role assumption
 
 concurrency:
   group: metadata-catalog-${{ github.ref }}
