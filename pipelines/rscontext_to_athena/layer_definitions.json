@@ -22,52 +22,129 @@
                     "default_value": null
                 },
                 {
-                    "name": "hucname",
+                    "name": "hucName",
                     "dtype": "TEXT",
-                    "friendly_name": "HUC Name",
+                    "friendly_name": "Watershed Name",
                     "data_unit": "",
                     "description": "",
                     "is_key": false,
                     "is_required": false,
                     "theme": "",
-                    "preferred_bin_definition": "",
                     "default_value": null
                 },
                 {
-                    "name": "hucstates",
+                    "name": "hucStates",
                     "dtype": "TEXT",
-                    "friendly_name": "",
+                    "friendly_name": "State(s)",
                     "data_unit": "",
+                    "description": "",
+                    "theme": ""
+                },
+                {
+                    "name": "hucAreaSqKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Watershed Area",
+                    "data_unit": "km^2",
                     "description": "",
                     "is_key": false,
                     "is_required": false,
                     "theme": "",
-                    "preferred_bin_definition": "",
                     "default_value": null
                 },
                 {
-                    "name": "hucareasqkm",
+                    "name": "hucAreaAcres",
                     "dtype": "REAL",
-                    "friendly_name": "HUC Area",
-                    "data_unit": "",
+                    "friendly_name": "Watershed Area (acres)",
+                    "data_unit": "acre",
                     "description": "",
                     "is_key": false,
                     "is_required": false,
                     "theme": "",
-                    "preferred_bin_definition": "",
                     "default_value": null
                 },
                 {
-                    "name": "hucareaacres",
+                    "name": "flowlineLengthPerennialKm",
                     "dtype": "REAL",
-                    "friendly_name": "HUC Area",
-                    "data_unit": "",
-                    "description": "",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
+                    "friendly_name": "Perrenial Stream Length",
+                    "data_unit": "km"
+                },
+                {
+                    "name": "flowlineLengthIntermittentKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Intermittent Stream Length",
+                    "data_unit": "km"
+                },
+                {
+                    "name": "flowlineLengthEphemeralKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Ephemeral Stream Length",
+                    "data_unit": "km"
+                },
+                {
+                    "name": "flowlineLengthCanalsKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Canal Length",
+                    "data_unit": "km"
+                },
+                {
+                    "name": "flowlineLengthAllKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Total Stream Length",
+                    "data_unit": "km"
+                },
+                {
+                    "name": "flowlineFeatureCount",
+                    "dtype": "INTEGER",
+                    "friendly_name": "Number of Stream Segments",
+                    "data_unit": "Unitless"
+                },
+                {
+                    "name": "waterbodyAreaSqKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Total Waterbody Area",
+                    "data_unit": "km^2"
+                },
+                {
+                    "name": "waterbodyFeatureCount",
+                    "dtype": "INTEGER",
+                    "friendly_name": "Total count of Waterbodies",
+                    "data_unit": "Unitless"
+                },
+                {
+                    "name": "waterbodyLakesPondsAreaSqKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Lake Area",
+                    "data_unit": "km^2"
+                },
+                {
+                    "name": "waterbodyReservoirAreaSqKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Reservoir Area",
+                    "data_unit": "km^2"
+                },
+                {
+                    "name": "waterbodyEstuariesAreaSqKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Estuaries Area",
+                    "data_unit": "km^2"
+                },
+                {
+                    "name": "waterbodyPlayaAreaSqKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Playa Area",
+                    "data_unit": "km^2"
+                },
+                {
+                    "name": "waterbodySwampMarshAreaSqKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Swamp/Marsh Area",
+                    "data_unit": "km^2"
+                },
+                {
+                    "name": "waterbodyIceSnowAreaSqKm",
+                    "dtype": "REAL",
+                    "friendly_name": "Ice/Snow Area",
+                    "data_unit": "km^2"
                 },
                 {
                     "name": "dem_bins.min",

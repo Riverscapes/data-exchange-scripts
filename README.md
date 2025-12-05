@@ -123,11 +123,14 @@ The repository includes an automated pipeline for publishing tool/layer column d
 ### Source Metadata Files
 
 - Each tool now publishes a single unified `layer_definitions.json` containing both descriptive metadata and column definitions (no separate per-layer files or `def_path` indirection).
-- These live beside the tool's code (e.g. under `scripts/<tool_name>/`).
+- These live beside the tool's code (e.g. under `pipelines/<tool_name>/`).
 
 ### Export / Flatten Script
 
-`scripts/metadata/export_layer_definitions_for_s3.py` scans the repo for every `layer_definitions.json` and produces partitioned Parquet (default) output. Partition hierarchy (three levels):
+`export_layer_definitions_for_s3.py` in the riverscapesXML repo scans the repo for every `layer_definitions.json` and produces partitioned Parquet (default) output.
+We've loaded it as a requirement in the toml:  `https://github.com/Riverscapes/RiverscapesXML.git@master#subdirectory=riverscapes_metadata`
+
+ Partition hierarchy (three levels):
 
 1. `authority` – repository root name (e.g. `data-exchange-scripts`). Derived automatically from the git repo folder name.
 2. `authority_name` – the tool / package authority publishing the layer definitions (from JSON).
