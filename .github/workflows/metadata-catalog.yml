@@ -2,7 +2,7 @@ name: Publish Metadata Catalog
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, readychanges ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -59,132 +59,8 @@ jobs:
           cat dist/index.json | jq .
           echo "Partition files:"
           jq -r '.partitions[].path' dist/index.json
-              # Continue-on-error allows subsequent steps to run even if this one fails.
-        # We need this so the artifact upload step can execute on failure.
-        continue-on-error: true
-
-      - name: Upload validation report artifact
-        # This step runs on both success and failure
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: validation-report
-          path: dist/index.json
-
-      - name: Check for validation failure
-        # This step explicitly fails the job if the generation step failed.
-        if: steps.generate-metadata.outcome == 'failure'
-        run: |
-          echo "Metadata generation failed. See the 'validation-report' artifact for details."
-          exit 1
           
-      - name: Upload metadata to S3 (sync)
+      - name: Upload and process metadata
         run: |
-          aws s3 sync dist/metadata/ ${{ env.S3_BASE_PATH }}/ 
+          uv run publish-metadata-to-s3 --root .
 
-      - name: Repair / add partitions
-        run: |
-          aws athena start-query-execution \
-            --query-string "MSCK REPAIR TABLE ${TABLE_NAME}" \
-            --query-execution-context Database=${ATHENA_DATABASE} \
-            --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET}
-
-      - name: Verify partition count
-        run: |
-          QID=$(aws athena start-query-execution \
-            --query-string "SHOW PARTITIONS ${TABLE_NAME}" \
-            --query-execution-context Database=${ATHENA_DATABASE} \
-            --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET} \
-            --query-execution-context Database=${ATHENA_DATABASE} | jq -r '.QueryExecutionId')
-          echo "QueryExecutionId=$QID";
-          # Poll for completion
-          STATUS="PENDING"
-          RESULT_JSON=""
-          for i in $(seq 1 30); do
-            RESULT_JSON=$(aws athena get-query-execution --query-execution-id $QID)
-            STATUS=$(echo "$RESULT_JSON" | jq -r '.QueryExecution.Status.State');
-            if [ "$STATUS" = "SUCCEEDED" ]; then break; fi
-            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
-              echo "::error::Athena query $QID ended with status $STATUS" >&2
-              echo "$RESULT_JSON" | jq -r '.QueryExecution.Status.StateChangeReason' >&2
-              exit 1
-            fi
-            sleep 4
-          done
-          if [ "$STATUS" != "SUCCEEDED" ]; then
-            echo "::error::Athena query $QID did not succeed (status=$STATUS)" >&2
-            exit 1
-          fi
-          OUTPUT_URI=$(echo "$RESULT_JSON" | jq -r '.QueryExecution.ResultConfiguration.OutputLocation')
-          if [ -z "$OUTPUT_URI" ] || [ "$OUTPUT_URI" = "null" ]; then
-            echo "::error::Athena did not return an output location for query $QID" >&2
-            exit 1
-          fi
-          echo "OutputLocation=$OUTPUT_URI"
-          DOWNLOAD_OK="false"
-          for attempt in $(seq 1 5); do
-            if aws s3 cp "$OUTPUT_URI" partitions.csv; then
-              DOWNLOAD_OK="true"
-              break
-            fi
-            echo "Waiting for result file to appear... (attempt $attempt)"
-            sleep 2
-          done
-          if [ "$DOWNLOAD_OK" != "true" ]; then
-            echo "::error::Failed to download Athena results from $OUTPUT_URI" >&2
-            exit 1
-          fi
-          echo "Partitions:"; cat partitions.csv
-
-      - name: Sample query (count rows)
-        run: |
-          QID=$(aws athena start-query-execution \
-            --query-string "SELECT count(*) FROM ${TABLE_NAME}" \
-            --query-execution-context Database=${ATHENA_DATABASE} \
-            --result-configuration OutputLocation=${ATHENA_RESULT_BUCKET} | jq -r '.QueryExecutionId')
-          STATUS="PENDING"
-          RESULT_JSON=""
-          for i in $(seq 1 30); do
-            RESULT_JSON=$(aws athena get-query-execution --query-execution-id $QID)
-            STATUS=$(echo "$RESULT_JSON" | jq -r '.QueryExecution.Status.State');
-            if [ "$STATUS" = "SUCCEEDED" ]; then break; fi
-            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
-              echo "::error::Athena query $QID ended with status $STATUS" >&2
-              echo "$RESULT_JSON" | jq -r '.QueryExecution.Status.StateChangeReason' >&2
-              exit 1
-            fi
-            sleep 4
-          done
-          if [ "$STATUS" != "SUCCEEDED" ]; then
-            echo "::error::Athena query $QID did not succeed (status=$STATUS)" >&2
-            exit 1
-          fi
-          OUTPUT_URI=$(echo "$RESULT_JSON" | jq -r '.QueryExecution.ResultConfiguration.OutputLocation')
-          if [ -z "$OUTPUT_URI" ] || [ "$OUTPUT_URI" = "null" ]; then
-            echo "::error::Athena did not return an output location for query $QID" >&2
-            exit 1
-          fi
-          echo "OutputLocation=$OUTPUT_URI"
-          DOWNLOAD_OK="false"
-          for attempt in $(seq 1 5); do
-            if aws s3 cp "$OUTPUT_URI" rowcount.csv; then
-              DOWNLOAD_OK="true"
-              break
-            fi
-            echo "Waiting for result file to appear... (attempt $attempt)"
-            sleep 2
-          done
-          if [ "$DOWNLOAD_OK" != "true" ]; then
-            echo "::error::Failed to download Athena results from $OUTPUT_URI" >&2
-            exit 1
-          fi
-          echo "Row count:"; cat rowcount.csv
-
-      - name: Post-run summary
-        run: |
-          echo "Metadata catalog workflow completed.";
-          echo "Table: ${TABLE_NAME}";
-          echo "S3 Base Path: ${S3_BASE_PATH}";
-          echo "Database: ${ATHENA_DATABASE}";
-
-    # Optional: simple failure notification step could be added here.
