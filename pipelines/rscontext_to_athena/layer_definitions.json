@@ -13,7 +13,7 @@
                     "name": "huc",
                     "dtype": "TEXT",
                     "friendly_name": "",
-                    "data_unit": "",
+                    "data_unit": "NA",
                     "description": "",
                     "is_key": false,
                     "is_required": false,
@@ -25,7 +25,7 @@
                     "name": "hucName",
                     "dtype": "TEXT",
                     "friendly_name": "Watershed Name",
-                    "data_unit": "",
+                    "data_unit": "NA",
                     "description": "",
                     "is_key": false,
                     "is_required": false,
@@ -96,7 +96,7 @@
                     "name": "flowlineFeatureCount",
                     "dtype": "INTEGER",
                     "friendly_name": "Number of Stream Segments",
-                    "data_unit": "Unitless"
+                    "data_unit": "count"
                 },
                 {
                     "name": "waterbodyAreaSqKm",
@@ -108,7 +108,7 @@
                     "name": "waterbodyFeatureCount",
                     "dtype": "INTEGER",
                     "friendly_name": "Total count of Waterbodies",
-                    "data_unit": "Unitless"
+                    "data_unit": "count"
                 },
                 {
                     "name": "waterbodyLakesPondsAreaSqKm",
@@ -150,8 +150,6 @@
                     "name": "dem_bins.min",
                     "dtype": "REAL",
                     "friendly_name": "Lowest Elevation",
-                    "data_unit": "",
-                    "description": "",
                     "is_key": false,
                     "is_required": false,
                     "theme": "",
@@ -258,7 +256,7 @@
                     "name": "dem_bins.bins.cell_count",
                     "dtype": "INTEGER",
                     "friendly_name": "",
-                    "data_unit": "",
+                    "data_unit": "count",
                     "description": "",
                     "is_key": false,
                     "is_required": false,
