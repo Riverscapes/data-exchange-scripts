@@ -30,7 +30,7 @@ dependencies = [
   "six==1.17.0",
   "termcolor==2.5.0",
   "urllib3>=2.3",
-  "riverscapes-metadata @ git+https://github.com/Riverscapes/RiverscapesXML.git@master#subdirectory=riverscapes_metadata"
+  "riverscapes-metadata @ git+https://github.com/Riverscapes/RiverscapesXML.git@metapythonstuff#subdirectory=riverscapes_metadata"
 ]
 
 [project.optional-dependencies]
