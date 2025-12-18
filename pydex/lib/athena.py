@@ -5,13 +5,63 @@ a version/copy of these functions can be found in multiple Riverscapes repositor
 * athena 
 * cybercastor_scripts
 
-Consider porting any improvements to these other repositories. 
+Consider porting any improvements to/from these other repositories. 
 """
 import time
 import re
+import uuid
+# 3rd party
 import boto3
+import awswrangler as wr
+import pandas as pd
 
 from rsxml import Logger
+S3_ATHENA_BUCKET = "riverscapes-athena-output"
+
+
+def query_to_dataframe(query: str, querylabel: str = "") -> pd.DataFrame:
+    """uses awswrangler to return a DataFrame for a given query
+    args: 
+        query : the query to execute
+        querylabel : optional label for log messages, handy when queries are running in parallel
+
+    * ctas False, unload True is "approach 2"
+    Does an UNLOAD query on Athena and parse the Parquet result on s3
+    see docs for details https://aws-sdk-pandas.readthedocs.io/en/3.14.0/stubs/awswrangler.athena.read_sql_query.html
+
+    PROS:
+    *   Faster for mid and big result sizes 
+    *   Can handle some level of nested types.
+    *   Does not modify Glue Data Catalog
+
+    CONS:
+    *   Output S3 path must be empty (thus use UUID).
+    *   Does not support timestamp with time zone.
+    *   Does not support columns with repeated names.
+    *   Does not support columns with undefined data types.
+    *   data has to fit into RAM memory. do not use for results with millions of rows
+    """
+    log = Logger("Athena unload query to DF")
+    s3_output = f's3://{S3_ATHENA_BUCKET}/athena_unload/{uuid.uuid4()}/'
+
+    query_bytes = len(query.encode('utf-8'))
+    if query_bytes > 262144:
+        raise ValueError(f"Query exceeds Athena's 256 KB limit ({query_bytes} bytes).")
+
+    log.debug(f"Query {querylabel}:\n{query}")
+    try:
+        df = wr.athena.read_sql_query(
+            query,
+            database='default',
+            ctas_approach=False,
+            unload_approach=True,  # only PARQUET format is supported with this option
+            s3_output=s3_output,
+        )
+        log.debug(f"Query {querylabel} to dataframe completed.")
+        return df
+    except Exception as e:
+        log.warning(f"Query {querylabel} failed or returned no results: {e}")
+        return pd.DataFrame()  # Return empty DataFrame for downstream code
 
 
 def fix_s3_uri(argstr: str) -> str:

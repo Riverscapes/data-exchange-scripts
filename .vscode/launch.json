@@ -39,7 +39,7 @@
       "program": "${file}",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
-      },      
+      },
       "console": "integratedTerminal",
       "args": "${command:pickArgs}"
     },
@@ -318,11 +318,7 @@
         // Working folder (downloads + parquet output)
         "{env:DATA_ROOT}/rme-athena",
         // Optional filters / flags
-        "--tags",
-        "2025CONUS",
-        // "--huc_filter", "160",
         // "--delete",
-        // "--force_update"
       ]
     },
     {
@@ -474,7 +470,8 @@
         "False",
         "c7d8c487-c377-42b0-a5b6-4c16db18fb41",
         // "--visit_id", "744"
-        "--watershed", "Yankee Fork",
+        "--watershed",
+        "Yankee Fork",
       ]
     },
     // {

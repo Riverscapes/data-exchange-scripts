@@ -10,6 +10,7 @@ Enhances Philip's June 2025 rme_to_athena.py
 import argparse
 import logging
 import os
+from pathlib import Path
 import re
 import shutil
 import warnings
@@ -22,10 +23,10 @@ from shapely import wkb
 from semver import Version
 
 from rsxml.util import safe_makedirs
-from rsxml import dotenv, Logger
+from rsxml import dotenv, Logger, ProgressBar
 
-from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
-from pydex.lib.athena import athena_query_get_parsed
+from pydex import RiverscapesAPI, RiverscapesProject
+from pydex.lib.athena import query_to_dataframe
 
 # Environment-configurable buckets. These represent stable infrastructure and
 # should not vary run-to-run, so we prefer environment variables over CLI args.
@@ -35,6 +36,29 @@ DEFAULT_DATA_BUCKET = "riverscapes-athena"
 
 DATA_BUCKET = os.getenv(DATA_BUCKET_ENV_VAR, DEFAULT_DATA_BUCKET)
 ATHENA_OUTPUT_BUCKET = os.getenv(OUTPUT_BUCKET_ENV_VAR, DATA_BUCKET)  # fallback to data bucket if not set
+
+# Query to identify projects to add/replace. No semicolon allowed.
+missing_projects_query = """
+with huc_projects_dex as
+         (select project_id,
+                 huc,
+                 created_on
+          from vw_projects
+          WHERE project_type_id = 'rs_metric_engine'
+            and owner = 'a52b8094-7a1d-4171-955c-ad30ae935296'
+            AND created_on >= 1735689600
+            AND (contains(tags, '2025CONUS')
+              OR contains(tags, 'conus_athena'))),
+    huc_projects_scraped as
+        (select substr(huc12, 1, 10) as huc10,
+                raw_rme_pq2.rme_date_created_ts
+         from raw_rme_pq2)
+select distinct project_id, huc, created_on, rme_date_created_ts
+from huc_projects_dex dex
+    left join huc_projects_scraped scr on dex.huc = scr.huc10
+where scr.huc10 is null
+   or scr.rme_date_created_ts < truncate(dex.created_on/1000)*1000
+"""
 
 
 def semver_to_int(version: Version) -> int:
@@ -51,30 +75,6 @@ def semver_to_int(version: Version) -> int:
     return version.major * MAJOR + version.minor * MINOR + version.patch
 
 
-def get_athena_rme_projects(output_bucket: str) -> dict[str, int]:
-    """
-    Query Athena for existing RME projects  
-    return: lookup dict consisting of watershedID (ie huc10,str) and timestamp (integer)
-    FUTURE ENHANCEMENT: if we're only interested in updating a subset, no need to return everything in rme
-    """
-    # FUTURE ENHANCEMENT - unless watershed_id a global id across countries we need something better
-    existing_rme = athena_query_get_parsed(output_bucket, 'SELECT DISTINCT watershed_id, rme_date_created_ts FROM raw_rme_pq2')
-    # this should look like:
-    # [{'rme_date_created_ts': '1752810123000', 'watershed_id': '1704020402'},
-    #  {'rme_date_created_ts': '1756512492000', 'watershed_id': '1030010112'},
-    # ...
-    # ]
-    if not existing_rme:
-        print("got nothing back! failure?!")
-        raise NotImplementedError
-
-    # Convert list of dicts to a dict keyed by watershed_id. assumes no null values
-    return {
-        row['watershed_id']: int(row['rme_date_created_ts'])
-        for row in existing_rme
-    }
-
-
 def download_file(rs_api: RiverscapesAPI, project_id: str, download_dir: str, regex: str) -> str:
     """
     Download files from a project on Data Exchange that match the regex string
@@ -84,7 +84,7 @@ def download_file(rs_api: RiverscapesAPI, project_id: str, download_dir: str, re
     log = Logger('download RS DEX file')
     gpkg_path = get_matching_file(download_dir, regex)
     if gpkg_path is not None and os.path.isfile(gpkg_path):
-        log.debug(f'file for {project_id} previously downloaded')
+        log.debug(f'file for matching {regex} previously downloaded')
         return gpkg_path
 
     rs_api.download_files(project_id, download_dir, [regex])
@@ -127,6 +127,7 @@ def download_rme_geopackage(
     """
     # RegEx string for finding RME output GeoPackages
     RME_SCRAPE_GPKG_REGEX = r'.*riverscapes_metrics.gpkg'
+    # NOTE: will not overwrite existing files - which can be a problem.
     rme_gpkg = download_file(rs_api, project.id, huc_dir, RME_SCRAPE_GPKG_REGEX)  # pyright: ignore[reportArgumentType]
     return rme_gpkg
 
@@ -223,12 +224,9 @@ def upload_to_s3(
 def scrape_rme(
     rs_api: RiverscapesAPI,
     spatialite_path: str,
-    search_params: RiverscapesSearchParams,
-    download_dir: str,
+    download_dir: str | Path,
     data_bucket: str,
-    athena_output_bucket: str,
     delete_downloads_when_done: bool,
-    force_update: bool,
 ) -> None:
     """
     Orchestrate the scraping, processing, and uploading of RME projects.
@@ -244,23 +242,23 @@ def scrape_rme(
 
     log = Logger('Scrape RME')
 
-    rme_in_athena = get_athena_rme_projects(athena_output_bucket)
-    log.debug(f'{len(rme_in_athena)} existing rme projects found in athena')
-    # loop through data exchange projects
+    # NEW WAY
+    # run Athena query to find all eligible projects that are newer than what is already scraped
+    projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
+    if projects_to_add_df.empty:
+        log.info("Query to identify projects to scrape returned no results.")
+        return
+
     count = 0
-    for project, _stats, _searchtotal, prg in rs_api.search(search_params, progress_bar=True, page_size=100):
+    prg = ProgressBar(projects_to_add_df.shape[0], text="Scrape Progress")
+    for project_id in projects_to_add_df['project_id']:
+        project = rs_api.get_project_full(project_id)
         if project.huc is None or project.huc == '':
             log.warning(f'Project {project.id} does not have a HUC. Skipping.')
             continue
 
-        # check whether the project is already in Athena with the same or newer date
+        # this truncates to nearest second, for whatever reason
         project_created_date_ts = int(project.created_date.timestamp()) * 1000  # pyright: ignore[reportOptionalMemberAccess] Projects always have a created_date
-        if project.huc in rme_in_athena and rme_in_athena[project.huc] <= project_created_date_ts:
-            if force_update:
-                log.info(f'Force update project {project.id} as {project.huc} is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
-            else:
-                log.info(f'Skipping project {project.id} as {project.huc} is already in Athena with the same or newer date. DEX ts = {project_created_date_ts}; Athena ts={rme_in_athena[project.huc]}')
-                continue
 
         if project.model_version is None:
             log.warning(f'Project {project.id} does not have a model version. Skipping.')
@@ -296,6 +294,7 @@ def scrape_rme(
         except Exception as e:
             log.error(f'Error scraping HUC {project.huc}: {e}')
             raise
+    prg.finish()
 
 
 def main():
@@ -303,14 +302,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('spatialite_path', help='Path to the mod_spatialite library', type=str)
-    # Bucket configuration now via environment variables (RME_DATA_BUCKET, RME_ATHENA_OUTPUT_BUCKET)
-    # Remove old CLI bucket arguments to reduce noise and accidental misconfiguration.
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
-    parser.add_argument('--tags', help='Data Exchange tags to search for projects', type=str)
-    parser.add_argument('--collection', help='Collection GUID', type=str)
     parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
-    parser.add_argument('--huc_filter', help='HUC filter SQL prefix ("17%")', type=str, default='')
-    parser.add_argument('--force_update', help='Generate and upload new parquet even if data exists', action='store_true', default=False)
     args = dotenv.parse_args_env(parser)
 
     # Set up some reasonable folders to store things
@@ -323,20 +316,6 @@ def main():
 
     log.title("rme scrape to parquet to athena")
 
-    # Data Exchange Search Params
-    search_params = RiverscapesSearchParams({
-        'projectTypeId': 'rs_metric_engine',
-    })
-
-    if args.collection != '.':
-        search_params.collection = args.collection
-
-    if args.tags is not None and args.tags != '.':
-        search_params.tags = args.tags.split(',')
-
-    if args.huc_filter != '' and args.huc_filter != '.':
-        search_params.meta = {'HUC':  args.huc_filter}
-
     # Log bucket resolution
     if ATHENA_OUTPUT_BUCKET == DATA_BUCKET:
         log.warning(f"Using single bucket for data & Athena output: {DATA_BUCKET} (override with {OUTPUT_BUCKET_ENV_VAR})")
@@ -347,12 +326,9 @@ def main():
         scrape_rme(
             api,
             args.spatialite_path,
-            search_params,
             download_folder,
             DATA_BUCKET,
-            ATHENA_OUTPUT_BUCKET,
-            args.delete,
-            args.force_update,
+            args.delete
         )
 
     log.info('Process complete')
