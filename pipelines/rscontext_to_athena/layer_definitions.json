@@ -264,6 +264,47 @@
                     "dtype": "STRUCT",
                     "friendly_name": "Existing Vegetation Bins",
                     "description": "Categorical bins extracted from the LandFire Existing Vegetation Type (EVT) raster. Complexes of plant communities representing NatureServe's terrestrial Ecological Systems classification."
+                },
+                {
+                    "name": "precipMaximum",
+                    "dtype": "REAL",
+                    "friendly_name": "Max Precipitation",
+                    "data_unit": "mm",
+                    "description": "Maximum 30-year-average annual precipitation"
+                },
+                {
+                    "name": "precipMinimum",
+                    "dtype": "REAL",
+                    "friendly_name": "Min Precipitation",
+                    "data_unit": "mm",
+                    "description": "Minimum 30-year-average annual precipation"
+                },
+                {
+                    "name": "precipSum",
+                    "dtype": "REAL",
+                    "data_unit": "mm",
+                    "friendly_name": "Sum of Precipitation Grid Values",
+                    "description": "Sum of individual 800-meter grid cell values for 30-year-average annual precipitation. Meaningless on its own, this is useful for calculating spatial average."
+                },
+                {
+                    "name": "precipCount",
+                    "dtype": "INTEGER",
+                    "friendly_name": "Number of Precipitation Grid Cells",
+                    "data_unit": "count",
+                    "description": "Count of individual 800-meter grid cell values used in aggregations. Meaningless on its own, this is useful for calculating spatial average."
+                },
+                {
+                    "name": "precipMean",
+                    "dtype": "REAL",
+                    "friendly_name": "Mean Precipitation",
+                    "data_unit": "mm"
+                },
+                {
+                    "name": "precipRange",
+                    "dtype": "REAL",
+                    "friendly_name": "Precipitation Spatial Range",
+                    "data_unit": "mm",
+                    "description": "Spatial variability (difference between Max and Min precipitation areas) in 30-year average precipitation."
                 }
             ]
         }
