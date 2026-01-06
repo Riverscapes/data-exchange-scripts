@@ -268,43 +268,50 @@
                 {
                     "name": "precipMaximum",
                     "dtype": "REAL",
-                    "friendly_name": "Max Precipitation",
+                    "friendly_name": "Precipitation Spatial Max",
                     "data_unit": "mm",
-                    "description": "Maximum 30-year-average annual precipitation"
+                    "description": "Maximum 30-year-average annual precipitation",
+                    "theme": "PRISM Climate"
                 },
                 {
                     "name": "precipMinimum",
                     "dtype": "REAL",
-                    "friendly_name": "Min Precipitation",
+                    "friendly_name": "Precipitation Spatial Min",
                     "data_unit": "mm",
-                    "description": "Minimum 30-year-average annual precipation"
+                    "description": "Minimum 30-year-average annual precipation",
+                    "theme": "PRISM Climate"
                 },
                 {
                     "name": "precipSum",
                     "dtype": "REAL",
                     "data_unit": "mm",
-                    "friendly_name": "Sum of Precipitation Grid Values",
-                    "description": "Sum of individual 800-meter grid cell values for 30-year-average annual precipitation. Meaningless on its own, this is useful for calculating spatial average."
+                    "friendly_name": "Precipitation Spatial Sum of Grid Values",
+                    "description": "Sum of individual 800-meter grid cell values for 30-year-average annual precipitation. Meaningless on its own, this is useful for calculating spatial average.",
+                    "theme": "PRISM Climate"
                 },
                 {
                     "name": "precipCount",
                     "dtype": "INTEGER",
                     "friendly_name": "Number of Precipitation Grid Cells",
                     "data_unit": "count",
-                    "description": "Count of individual 800-meter grid cell values used in aggregations. Meaningless on its own, this is useful for calculating spatial average."
+                    "description": "Count of individual 800-meter grid cell values used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
+                    "theme": "PRISM Climate"
                 },
                 {
                     "name": "precipMean",
                     "dtype": "REAL",
-                    "friendly_name": "Mean Precipitation",
-                    "data_unit": "mm"
+                    "friendly_name": "Precipitation Spatial Mean",
+                    "data_unit": "mm",
+                    "description": "Mean across the geography of the 30-year average annual precipitation.",
+                    "theme": "PRISM Climate"
                 },
                 {
                     "name": "precipRange",
                     "dtype": "REAL",
                     "friendly_name": "Precipitation Spatial Range",
                     "data_unit": "mm",
-                    "description": "Spatial variability (difference between Max and Min precipitation areas) in 30-year average precipitation."
+                    "description": "Spatial variability (difference between Max and Min precipitation areas) in 30-year average precipitation.",
+                    "theme": "PRISM Climate"
                 }
             ]
         }
