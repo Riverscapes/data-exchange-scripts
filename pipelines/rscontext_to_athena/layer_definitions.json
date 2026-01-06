@@ -291,6 +291,70 @@
                     "theme": "PRISM Climate"
                 },
                 {
+                    "name": "catchmentLength",
+                    "dtype": "REAL",
+                    "friendly_name": "Catchment Length",
+                    "data_unit": "km",
+                    "description": "",
+                    "theme": "Morphometric"
+                },
+                {
+                    "name": "catchmentArea",
+                    "dtype": "REAL",
+                    "friendly_name": "Catchment Area",
+                    "data_unit": "km^2",
+                    "description": "",
+                    "theme": "Morphometric"
+                },
+                {
+                    "name": "catchmentPerimeter",
+                    "dtype": "REAL",
+                    "friendly_name": "Catchment Perimeter",
+                    "data_unit": "km",
+                    "description": "",
+                    "theme": "Morphometric"
+                },
+                {
+                    "name": "circularityRatio",
+                    "dtype": "REAL",
+                    "friendly_name": "Circularity Ratio",
+                    "data_unit": "dimensionless",
+                    "description": "Calculated as `catchment_area / bounding_circle_area` (both in same units)",
+                    "theme": "Morphometric"
+                },
+                {
+                    "name": "elongationRatio",
+                    "dtype": "REAL",
+                    "friendly_name": "Elongation Ratio",
+                    "data_unit": "dimensionless",
+                    "description": "Calculated as `catchment_area_km2**0.5 / catchment_length_km`",
+                    "theme": "Morphometric"
+                },
+                {
+                    "name": "formFactor",
+                    "dtype": "REAL",
+                    "friendly_name": "Form Factor",
+                    "data_unit": "dimensionless",
+                    "description": "Calculated as `catchment_area_km2 / catchment_length_km**2`",
+                    "theme": "Morphometric"
+                },
+                {
+                    "name": "catchmentRelief",
+                    "dtype": "REAL",
+                    "friendly_name": "Catchment Relief",
+                    "data_unit": "m",
+                    "description": "The difference between highest and lowest elevation. Equivalent to DEM Range",
+                    "theme": "Morphometric"
+                },
+                {
+                    "name": "reliefRatio",
+                    "dtype": "REAL",
+                    "friendly_name": "Relief Ratio",
+                    "data_unit": "dimensionless",
+                    "description": "Calculated as relief (in km) divided by catchment length (in km).",
+                    "theme": "Morphometric"
+                },
+                {
                     "name": "dem_bins.min",
                     "dtype": "REAL",
                     "friendly_name": "Lowest Elevation",
