@@ -195,6 +195,54 @@
                     "theme": "Elevation"
                 },
                 {
+                    "name": "slopeMaximum",
+                    "dtype": "REAL",
+                    "friendly_name": "Slope Max",
+                    "data_unit": "degree",
+                    "description": "Maximum Slope",
+                    "theme": "Slope"
+                },
+                {
+                    "name": "slopeMinimum",
+                    "dtype": "REAL",
+                    "friendly_name": "Slope Min",
+                    "data_unit": "degree",
+                    "description": "Minimum Slope",
+                    "theme": "Slope"
+                },
+                {
+                    "name": "slopeSum",
+                    "dtype": "REAL",
+                    "data_unit": "degree",
+                    "friendly_name": "Slope Spatial Sum of Grid Values",
+                    "description": "Sum of individual grid cell values for slope. Meaningless on its own, this is useful for calculating spatial average.",
+                    "theme": "Slope"
+                },
+                {
+                    "name": "slopeCount",
+                    "dtype": "INTEGER",
+                    "friendly_name": "Number of Slope Grid Cells",
+                    "data_unit": "count",
+                    "description": "Count of individual grid cells used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
+                    "theme": "Slope"
+                },
+                {
+                    "name": "slopeMean",
+                    "dtype": "REAL",
+                    "friendly_name": "Slope Spatial Mean",
+                    "data_unit": "degree",
+                    "description": "Mean slope across the geography.",
+                    "theme": "Slope"
+                },
+                {
+                    "name": "slopeRange",
+                    "dtype": "REAL",
+                    "friendly_name": "Slope Spatial Range",
+                    "data_unit": "degree",
+                    "description": "Spatial variability, ie difference between Max and Min slope across subject area.",
+                    "theme": "Slope"
+                },
+                {
                     "name": "precipMaximum",
                     "dtype": "REAL",
                     "friendly_name": "Precipitation Spatial Max",
