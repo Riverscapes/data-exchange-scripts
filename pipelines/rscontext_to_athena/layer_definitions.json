@@ -147,6 +147,102 @@
                     "data_unit": "km^2"
                 },
                 {
+                    "name": "demMaximum",
+                    "dtype": "REAL",
+                    "friendly_name": "DEM Max",
+                    "data_unit": "m",
+                    "description": "Maximum Elevation",
+                    "theme": "Elevation"
+                },
+                {
+                    "name": "demMinimum",
+                    "dtype": "REAL",
+                    "friendly_name": "DEM Min",
+                    "data_unit": "m",
+                    "description": "Minimum Elevation",
+                    "theme": "Elevation"
+                },
+                {
+                    "name": "demSum",
+                    "dtype": "REAL",
+                    "data_unit": "m",
+                    "friendly_name": "DEM Spatial Sum of Grid Values",
+                    "description": "Sum of individual grid cell values for elevation. Meaningless on its own, this is useful for calculating spatial average.",
+                    "theme": "Elevation"
+                },
+                {
+                    "name": "demCount",
+                    "dtype": "INTEGER",
+                    "friendly_name": "Number of DEM Grid Cells",
+                    "data_unit": "count",
+                    "description": "Count of individual grid cells used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
+                    "theme": "Elevation"
+                },
+                {
+                    "name": "demMean",
+                    "dtype": "REAL",
+                    "friendly_name": "DEM Spatial Mean",
+                    "data_unit": "m",
+                    "description": "Mean elevation across the geography.",
+                    "theme": "Elevation"
+                },
+                {
+                    "name": "demRange",
+                    "dtype": "REAL",
+                    "friendly_name": "DEM Spatial Range",
+                    "data_unit": "m",
+                    "description": "Spatial variability, ie difference between Max and Min elevation across subject area.",
+                    "theme": "Elevation"
+                },
+                {
+                    "name": "precipMaximum",
+                    "dtype": "REAL",
+                    "friendly_name": "Precipitation Spatial Max",
+                    "data_unit": "mm",
+                    "description": "Maximum 30-year-average annual precipitation",
+                    "theme": "PRISM Climate"
+                },
+                {
+                    "name": "precipMinimum",
+                    "dtype": "REAL",
+                    "friendly_name": "Precipitation Spatial Min",
+                    "data_unit": "mm",
+                    "description": "Minimum 30-year-average annual precipation",
+                    "theme": "PRISM Climate"
+                },
+                {
+                    "name": "precipSum",
+                    "dtype": "REAL",
+                    "data_unit": "mm",
+                    "friendly_name": "Precipitation Spatial Sum of Grid Values",
+                    "description": "Sum of individual 800-meter grid cell values for 30-year-average annual precipitation. Meaningless on its own, this is useful for calculating spatial average.",
+                    "theme": "PRISM Climate"
+                },
+                {
+                    "name": "precipCount",
+                    "dtype": "INTEGER",
+                    "friendly_name": "Number of Precipitation Grid Cells",
+                    "data_unit": "count",
+                    "description": "Count of individual 800-meter grid cell values used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
+                    "theme": "PRISM Climate"
+                },
+                {
+                    "name": "precipMean",
+                    "dtype": "REAL",
+                    "friendly_name": "Precipitation Spatial Mean",
+                    "data_unit": "mm",
+                    "description": "Mean across the geography of the 30-year average annual precipitation.",
+                    "theme": "PRISM Climate"
+                },
+                {
+                    "name": "precipRange",
+                    "dtype": "REAL",
+                    "friendly_name": "Precipitation Spatial Range",
+                    "data_unit": "mm",
+                    "description": "Spatial variability (difference between Max and Min precipitation areas) in 30-year average precipitation.",
+                    "theme": "PRISM Climate"
+                },
+                {
                     "name": "dem_bins.min",
                     "dtype": "REAL",
                     "friendly_name": "Lowest Elevation",
@@ -264,54 +360,6 @@
                     "dtype": "STRUCT",
                     "friendly_name": "Existing Vegetation Bins",
                     "description": "Categorical bins extracted from the LandFire Existing Vegetation Type (EVT) raster. Complexes of plant communities representing NatureServe's terrestrial Ecological Systems classification."
-                },
-                {
-                    "name": "precipMaximum",
-                    "dtype": "REAL",
-                    "friendly_name": "Precipitation Spatial Max",
-                    "data_unit": "mm",
-                    "description": "Maximum 30-year-average annual precipitation",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipMinimum",
-                    "dtype": "REAL",
-                    "friendly_name": "Precipitation Spatial Min",
-                    "data_unit": "mm",
-                    "description": "Minimum 30-year-average annual precipation",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipSum",
-                    "dtype": "REAL",
-                    "data_unit": "mm",
-                    "friendly_name": "Precipitation Spatial Sum of Grid Values",
-                    "description": "Sum of individual 800-meter grid cell values for 30-year-average annual precipitation. Meaningless on its own, this is useful for calculating spatial average.",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipCount",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Number of Precipitation Grid Cells",
-                    "data_unit": "count",
-                    "description": "Count of individual 800-meter grid cell values used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipMean",
-                    "dtype": "REAL",
-                    "friendly_name": "Precipitation Spatial Mean",
-                    "data_unit": "mm",
-                    "description": "Mean across the geography of the 30-year average annual precipitation.",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipRange",
-                    "dtype": "REAL",
-                    "friendly_name": "Precipitation Spatial Range",
-                    "data_unit": "mm",
-                    "description": "Spatial variability (difference between Max and Min precipitation areas) in 30-year average precipitation.",
-                    "theme": "PRISM Climate"
                 }
             ]
         }
