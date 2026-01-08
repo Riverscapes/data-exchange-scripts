@@ -1,0 +1,396 @@
+"""
+Searches Data Exchange for RSDynamics projects matching criteria
+Generates parquet files from metrics in the GeoPackages
+Uploads to s3
+
+Pgilip Bailey
+Jan 2026
+Enhances Lorin's Sep 2025 script rme_to_athena_parquet.py
+"""
+import argparse
+import logging
+import os
+from pathlib import Path
+import re
+import shutil
+import warnings
+
+import apsw
+import boto3
+import geopandas as gpd
+import pandas as pd
+from shapely import wkb
+from semver import Version
+
+from rsxml.util import safe_makedirs
+from rsxml import dotenv, Logger, ProgressBar
+
+from pydex import RiverscapesAPI, RiverscapesProject
+from pydex.lib.athena import query_to_dataframe
+
+# Environment-configurable buckets. These represent stable infrastructure and
+# should not vary run-to-run, so we prefer environment variables over CLI args.
+DATA_BUCKET_ENV_VAR = "RME_DATA_BUCKET"
+OUTPUT_BUCKET_ENV_VAR = "RME_ATHENA_OUTPUT_BUCKET"
+DEFAULT_DATA_BUCKET = "riverscapes-athena"
+
+DATA_BUCKET = os.getenv(DATA_BUCKET_ENV_VAR, DEFAULT_DATA_BUCKET)
+ATHENA_OUTPUT_BUCKET = os.getenv(OUTPUT_BUCKET_ENV_VAR, DATA_BUCKET)  # fallback to data bucket if not set
+
+# # Query to identify projects to add/replace. No semicolon allowed.
+missing_projects_query = """
+    SELECT project_id , huc, created_on FROM vw_projects where project_type_id ='rsdynamics' and archived = false
+"""
+# with huc_projects_dex as
+#          (select project_id,
+#                  huc,
+#                  created_on
+#           from vw_projects
+#           WHERE project_type_id = 'rs_metric_engine'
+#             and owner = 'a52b8094-7a1d-4171-955c-ad30ae935296'
+#             AND created_on >= 1735689600
+#             AND (contains(tags, '2025CONUS')
+#               OR contains(tags, 'conus_athena'))),
+#     huc_projects_scraped as
+#         (select substr(huc12, 1, 10) as huc10,
+#                 raw_rme_pq2.rme_date_created_ts
+#          from raw_rme_pq2)
+# select distinct project_id, huc, created_on, rme_date_created_ts
+# from huc_projects_dex dex
+#     left join huc_projects_scraped scr on dex.huc = scr.huc10
+# where scr.huc10 is null
+#    or scr.rme_date_created_ts < truncate(dex.created_on/1000)*1000
+# """
+
+
+def semver_to_int(version: Version) -> int:
+    """convert to integer for easier comparisons
+
+    Args:
+        version (Version): semver Version e.g. 3.1.5
+
+    Returns:
+        int: integerpresentation e.g. 3001005
+    """
+    MAJOR = 1000000
+    MINOR = 1000
+    return version.major * MAJOR + version.minor * MINOR + version.patch
+
+
+def download_file(rs_api: RiverscapesAPI, project_id: str, download_dir: str, regex: str) -> str:
+    """
+    Download files from a project on Data Exchange that match the regex string
+    Return the path to the downloaded file
+    """
+    # check if it has previously been downloaded
+    log = Logger('download RS DEX file')
+    gpkg_path = get_matching_file(download_dir, regex)
+    if gpkg_path is not None and os.path.isfile(gpkg_path):
+        log.debug(f'file for matching {regex} previously downloaded')
+        return gpkg_path
+
+    rs_api.download_files(project_id, download_dir, [regex])
+
+    gpkg_path = get_matching_file(download_dir, regex)
+    log.debug(f'file for {project_id} downloaded to {gpkg_path}')
+
+    # Cannot proceed with this HUC if the output GeoPackage is missing
+    if gpkg_path is None or not os.path.isfile(gpkg_path):
+        raise FileNotFoundError(f'Could not find output GeoPackage in {download_dir}')
+
+    return gpkg_path
+
+
+def get_matching_file(parent_dir: str, regex_str: str) -> str | None:
+    """
+    Get the path to the *first* file in the parent directory that matches the regex.
+    Returns None if no file is found.
+    This is used to check if the output GeoPackage has already been downloaded and
+    to avoid downloading it again.
+    """
+
+    regex = re.compile(regex_str)
+    for root, __dirs, files in os.walk(parent_dir):
+        for file_name in files:
+            # Check if the file name matches the regex
+            if regex.match(file_name):
+                return os.path.join(root, file_name)
+
+    return None
+
+
+def download_rsdynamics_geopackage(
+    rs_api: RiverscapesAPI,
+    project: RiverscapesProject,
+    huc_dir: str
+) -> str:
+    """
+    Download the RSDynamics GeoPackage for a project and return its file path.
+    """
+    # RegEx string for finding RSDynamics output GeoPackages
+    RSDYNAMICS_SCRAPE_GPKG_REGEX = r'.*rsdynamics.gpkg$'
+    # NOTE: will not overwrite existing files - which can be a problem.
+    rsdynamics_gpkg = download_file(rs_api, project.id, huc_dir, RSDYNAMICS_SCRAPE_GPKG_REGEX)  # pyright: ignore[reportArgumentType]
+    return rsdynamics_gpkg
+
+
+def extract_dgo_metrics_to_dataframe(gpkg_path: str, spatialite_path: str) -> pd.DataFrame:
+
+    conn = apsw.Connection(gpkg_path)
+    conn.enable_load_extension(True)
+    conn.load_extension(spatialite_path)
+    curs = conn.cursor()
+
+    # This regex matches all the metric columns
+    # Regex explanation:
+    # ^(active|wet)         -> Starts with landcover
+    # _(5yr|30yr)           -> Followed by epoch_length
+    # _(\d{4}_\d{4})        -> Followed by the year range (epoch_name)
+    # _(68|95)pc           -> Followed by confidence percentile
+    # _(.*)                 -> The rest is the metric/percentile info
+    pattern = r'^(active|wet)_(5|30)yr_(\d{4}_\d{4})_(68|95)pc_(.*)'
+
+    # Query the SQLite schema to get the column names from vbet_dgos table. Then filter to just metric columns
+    curs.execute('PRAGMA table_info(vbet_dgos)')
+    col_names = [row[1] for row in curs.fetchall() if re.match(pattern, row[1]) or row[1] == 'fid']
+
+    sql = f'SELECT {", ".join(col_names)} FROM vbet_dgos'  # WHERE FID = 8101 LIMIT 10'
+    df = pd.read_sql_query(sql, conn)
+
+    # Pivot the "Wide" columns into "Long" rows. This moves the 'active_5yr...' metric cols into two cols: 'original_col' and 'measurement'
+    df_long = df.melt(id_vars=['fid'], var_name='original_col', value_name='measurement')
+    # print(df_long.head())
+
+    # 4. Extract categories using Regex and rename the columns
+    extracted = df_long['original_col'].str.extract(pattern)
+    extracted.columns = ['landcover', 'epoch_length', 'epoch_name', 'confidence', 'metric_name']
+
+    # Combine the extracted columns back into the DataFrame
+    df_final = pd.concat([df_long.drop(columns=['original_col']), extracted], axis=1)
+
+    # Pivot the data back to that metric_name becomes columns again
+    df_final = df_final.pivot_table(
+        index=['fid', 'landcover', 'epoch_length', 'epoch_name', 'confidence'],
+        columns='metric_name',
+        values='measurement'
+    ).reset_index()
+
+    # Rename the fid column to dgo_id
+    df_final = df_final.rename(columns={'fid': 'dgo_id'})
+    # print(df_final.head())
+
+    return df_final
+
+
+def extract_dgos_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd.GeoDataFrame:
+    """
+    Connect to the GeoPackage, run the SQL, and return a GeoDataFrame.
+    """
+    conn = apsw.Connection(gpkg_path)
+    conn.enable_load_extension(True)
+    conn.load_extension(spatialite_path)
+
+    sql = '''
+        SELECT
+            fid as dgo_id,
+            level_path,
+            seg_distance,
+            fcode,
+            low_lying_floodplain_area,
+            low_lying_floodplain_prop,
+            active_channel_area,
+            active_channel_prop,
+            elevated_floodplain_area,
+            elevated_floodplain_prop,
+            floodplain_area,
+            floodplain_prop,
+            centerline_length,
+            segment_area,
+            integrated_width,
+            geom as dgo_geom
+        FROM vbet_dgos
+    '''
+
+    # we need apsw / spatialite . this seems to work despite pandas not supporting it
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="pandas only supports SQLAlchemy connectable")
+        df = pd.read_sql_query(sql, conn)
+
+    # because there are nulls, the combination of sqlites dynamic typing and pandas' type inference mis-assigns data types
+    # actually the problem is that it is sometimes a double, sometimes INT64. Needs to be consistent
+    # TODO: this should look up the types from our data dictionary but i am hardcoding for now
+    for field in ['fcode', 'seg_distance', 'stream_order', 'headwater', 'confluences', 'diffluences', 'tributaries']:
+        df[field] = df[field].astype('Int64')  # Note the capital 'I' for pandas nullable integer
+
+    # Remove all columns named 'dgoid' (case-insensitive, even if duplicated)
+    df = df.loc[:, [col for col in df.columns if col.lower() != 'dgoid']]
+    # convert wkb geometry to shapely objects
+    df['dgo_geom'] = df['dgo_geom'].apply(wkb.loads)  # pyright: ignore[reportCallIssue, reportArgumentType]
+    gdf = gpd.GeoDataFrame(df, geometry='dgo_geom', crs='EPSG:4326')
+
+    bbox_df = gdf.geometry.bounds.rename(columns={'minx': 'xmin', 'miny': 'ymin', 'maxx': 'xmax', 'maxy': 'ymax'})
+    # Combine into a struct-like dict for each row
+    gdf['dgo_geom_bbox'] = bbox_df.apply(
+        lambda row: {'xmin': float(row.xmin), 'ymin': float(row.ymin), 'xmax': float(row.xmax), 'ymax': float(row.ymax)},
+        axis=1
+    )
+
+    return gdf
+
+
+def delete_folder(dirpath: str) -> None:
+    """delete a local folder and its contents"""
+    log = Logger('delete downloads')
+    if os.path.isdir(dirpath):
+        try:
+            log.info(f'Deleting directory {dirpath}')
+            shutil.rmtree(dirpath)
+            log.debug(f'removed {dirpath}')
+        except Exception as e:
+            log.error(f'Error deleting download directory {dirpath}: {e}')
+
+
+def upload_to_s3(
+        file_path: str,
+        s3_bucket: str,
+        s3_key: str
+) -> None:
+    """upload a file to s3
+
+    Args:
+        file_path (str): local file path
+        s3_bucket (str): s3 bucket name
+        s3_key (str): s3_key (including 'folders'?)
+    """
+    log = Logger('upload to s3')
+    s3 = boto3.client('s3')
+    s3.upload_file(file_path, s3_bucket, s3_key)
+    log.debug(f'file uploaded to s3 {s3_bucket} {s3_key}')
+
+
+def scrape_rme(
+    rs_api: RiverscapesAPI,
+    spatialite_path: str,
+    download_dir: str | Path,
+    data_bucket: str,
+    delete_downloads_when_done: bool,
+) -> None:
+    """
+    Orchestrate the scraping, processing, and uploading of RME projects.
+    """
+    # 1. Get list of projects to process
+    # 2. For each project:
+    #    - create a folder
+    #    - Download and validate
+    #    - Extract metrics as GeoDataFrame
+    #    - Write GeoParquet
+    #    - Upload to S3
+    #    - Optionally clean up
+
+    log = Logger('Scrape RS Dynamics')
+
+    # NEW WAY
+    # run Athena query to find all eligible projects that are newer than what is already scraped
+    projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
+    if projects_to_add_df.empty:
+        log.info("Query to identify projects to scrape returned no results.")
+        return
+
+    count = 0
+    prg = ProgressBar(projects_to_add_df.shape[0], text="Scrape Progress")
+    for project_id in projects_to_add_df['project_id']:
+        project = rs_api.get_project_full(project_id)
+        if project.huc is None or project.huc == '':
+            log.warning(f'Project {project.id} does not have a HUC. Skipping.')
+            continue
+
+        # this truncates to nearest second, for whatever reason
+        project_created_date_ts = int(project.created_date.timestamp()) * 1000  # pyright: ignore[reportOptionalMemberAccess] Projects always have a created_date
+
+        if project.model_version is None:
+            log.warning(f'Project {project.id} does not have a model version. Skipping.')
+            continue
+
+        model_version_int = semver_to_int(project.model_version)
+
+        try:
+            huc_dir = os.path.join(download_dir, project.huc)
+            safe_makedirs(huc_dir)
+            gpkg_path = download_rsdynamics_geopackage(rs_api, project, huc_dir)
+            data_gdf = extract_dgos_to_geodataframe(gpkg_path, spatialite_path)
+            # add common project-level columns
+            data_gdf['rme_project_id'] = project.id
+            data_gdf['rme_date_created_ts'] = project_created_date_ts
+            data_gdf['rme_version'] = str(project.model_version)
+            data_gdf['rme_version_int'] = model_version_int
+
+            log.debug(f"Dataframe prepared with shape {data_gdf.shape}")
+            # until we have a more robust schema check this is something
+            if len(data_gdf.columns) != 134:
+                log.warning(f"Expected 134 columns, got {len(data_gdf.columns)}")
+            rme_pq_filepath = os.path.join(huc_dir, f'rme_{project.huc}.parquet')
+            data_gdf.to_parquet(rme_pq_filepath)
+            # don't use os.path.join because this is aws os, not system os
+            s3_key = f'data_exchange/rsdynamics/{os.path.basename(rme_pq_filepath)}'
+            upload_to_s3(rme_pq_filepath, data_bucket, s3_key)
+
+            # Now process the metrics into a separate table
+            data_metrics = extract_dgo_metrics_to_dataframe(gpkg_path, spatialite_path)
+
+            # Write the data_metrics data frame to parquet
+            metrics_pq_filepath = os.path.join(huc_dir, f'rme_metrics_{project.huc}.parquet')
+            data_metrics.to_parquet(metrics_pq_filepath)
+            # Upload to S3
+            s3_key_metrics = f'data_exchange/rsdynamics_metrics/{os.path.basename(metrics_pq_filepath)}'
+            upload_to_s3(metrics_pq_filepath, data_bucket, s3_key_metrics)
+
+            if delete_downloads_when_done:
+                delete_folder(download_dir)
+
+            count += 1
+            prg.update(count)
+        except Exception as e:
+            log.error(f'Error scraping HUC {project.huc}: {e}')
+            raise
+    prg.finish()
+
+
+def main():
+    """Process arguments, set up logs and orchestrate call to other functions"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('stage', help='Environment: staging or production', type=str)
+    parser.add_argument('spatialite_path', help='Path to the mod_spatialite library', type=str)
+    parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
+    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
+    args = dotenv.parse_args_env(parser)
+
+    # Set up some reasonable folders to store things
+    working_folder = args.working_folder
+    download_folder = os.path.join(working_folder, 'downloads')
+
+    safe_makedirs(working_folder)
+    log = Logger('Setup')
+    log.setup(log_path=os.path.join(working_folder, 'rme-athena.log'), log_level=logging.DEBUG)
+
+    log.title("RSDynamics scrape to parquet to athena")
+
+    # Log bucket resolution
+    if ATHENA_OUTPUT_BUCKET == DATA_BUCKET:
+        log.warning(f"Using single bucket for data & Athena output: {DATA_BUCKET} (override with {OUTPUT_BUCKET_ENV_VAR})")
+    else:
+        log.info(f"Data bucket: {DATA_BUCKET} (env {DATA_BUCKET_ENV_VAR}); Athena output bucket: {ATHENA_OUTPUT_BUCKET} (env {OUTPUT_BUCKET_ENV_VAR})")
+
+    with RiverscapesAPI(stage=args.stage) as api:
+        scrape_rme(
+            api,
+            args.spatialite_path,
+            download_folder,
+            DATA_BUCKET,
+            args.delete
+        )
+
+    log.info('Process complete')
+
+
+if __name__ == '__main__':
+    main()
