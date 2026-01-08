@@ -322,6 +322,28 @@
       ]
     },
     {
+      "name": "🆕Scrape RS Dynamics to Athena-Parquet",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/pipelines/rsdynamics_to_athena/rsdynamics_to_athena_parquet.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        // Stage (staging | production)
+        "production",
+        // Spatialite library path from env
+        "{env:SPATIALITE_LIB}",
+        // Working folder (downloads + parquet output)
+        "{env:DATA_ROOT}/rsdynamics-athena",
+        // Optional filters / flags
+        // "--delete",
+      ]
+    },
+    {
       "name": "DGO Cartography Geoms to Athena",
       "type": "debugpy",
       "request": "launch",
