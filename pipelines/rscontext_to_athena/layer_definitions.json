@@ -12,11 +12,11 @@
                 {
                     "name": "huc",
                     "dtype": "TEXT",
-                    "friendly_name": "",
+                    "friendly_name": "HUC10",
                     "data_unit": "NA",
-                    "description": "",
-                    "is_key": false,
-                    "is_required": false,
+                    "description": "HUC10 Watershed ID",
+                    "is_key": true,
+                    "is_required": true,
                     "theme": "",
                     "preferred_bin_definition": "",
                     "default_value": null
