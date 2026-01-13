@@ -1,0 +1,27 @@
+{
+    "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
+    "authority_name": "rsdynamics_to_athena",
+    "tool_schema_version": "1.0.0",
+    "layers": [
+        {
+            "layer_id": "rsdynamics",
+            "layer_name": "RSDynamics DGOs",
+            "description": "Riverscapes Dynamics Project DGO attributes from VBET",
+            "columns": [
+                {
+                    "name": "dgo_id"
+                }
+            ]
+        },
+        {
+            "layer_id": "rsdynamics_metrics",
+            "layer_name": "RSDynamics Metrics",
+            "description": "Riverscapes Dynamics Project Metrics data for each DGO, landcover, epoch",
+            "columns": [
+                {
+                    "name": "dgo_id"
+                }
+            ]
+        }
+    ]
+}
