@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import time
 import warnings
 
 import apsw
@@ -41,26 +42,29 @@ ATHENA_OUTPUT_BUCKET = os.getenv(OUTPUT_BUCKET_ENV_VAR, DATA_BUCKET)  # fallback
 missing_projects_query = """
     SELECT project_id , huc, created_on FROM vw_projects where project_type_id ='rsdynamics' and archived = false
 """
-# with huc_projects_dex as
-#          (select project_id,
-#                  huc,
-#                  created_on
-#           from vw_projects
-#           WHERE project_type_id = 'rs_metric_engine'
-#             and owner = 'a52b8094-7a1d-4171-955c-ad30ae935296'
-#             AND created_on >= 1735689600
-#             AND (contains(tags, '2025CONUS')
-#               OR contains(tags, 'conus_athena'))),
-#     huc_projects_scraped as
-#         (select substr(huc12, 1, 10) as huc10,
-#                 raw_rme_pq2.rme_date_created_ts
-#          from raw_rme_pq2)
-# select distinct project_id, huc, created_on, rme_date_created_ts
-# from huc_projects_dex dex
-#     left join huc_projects_scraped scr on dex.huc = scr.huc10
-# where scr.huc10 is null
-#    or scr.rme_date_created_ts < truncate(dex.created_on/1000)*1000
-# """
+missing_projects_query = """
+-- find all eligible rsdynamics projects
+with huc_projects_dex as
+         (select project_id,
+                 huc,
+                 created_on
+          from vw_projects
+          WHERE project_type_id = 'rsdynamics'
+            and owner = 'e7b017ae-9657-46e1-973a-aa50b7e245ad' -- New Zealand Riverscapes Organization
+             AND archived = false
+          ),
+huc_projects_scraped as (
+-- projects are loaded (both dgos and at least something in metrics)
+    select distinct r.rd_project_id, r.huc, r.rd_date_created_ts
+    from rsdynamics r
+    where exists (select 1 from rsdynamics_metrics rm where r.rd_project_id = rm.rd_project_id limit 1))
+-- find the difference between them -- ones that need to be scraped
+select distinct project_id, dex.huc, created_on, rd_date_created_ts
+from huc_projects_dex dex
+    left join huc_projects_scraped scr on dex.huc = scr.huc
+where scr.huc is null
+   or scr.rd_date_created_ts < truncate(dex.created_on/1000)*1000
+"""
 
 
 def semver_to_int(version: Version) -> int:
@@ -135,11 +139,27 @@ def download_rsdynamics_geopackage(
 
 
 def extract_dgo_metrics_to_dataframe(gpkg_path: str, spatialite_path: str) -> pd.DataFrame:
+    """
+    Extracts DGO metric columns from a GeoPackage table into a normalized pandas DataFrame.
 
+    Connects to the given GeoPackage, loads the spatialite extension, and queries the 'vbet_dgos' table for columns matching
+    the expected metric naming pattern. The function pivots the wide metric columns into a long format, extracts metric
+    attributes using regex, and then pivots back to a normalized table where each row represents a unique metric for a DGO.
+
+    Args:
+        gpkg_path (str): Path to the input GeoPackage file.
+        spatialite_path (str): Path to the mod_spatialite library for enabling spatial functions.
+
+    Returns:
+        pd.DataFrame: DataFrame with DGO metrics, one row per DGO/metric combination, columns for metric attributes and values.
+    """
+    log = Logger('Extract DGO metrics')
+    t0 = time.time()
     conn = apsw.Connection(gpkg_path)
     conn.enable_load_extension(True)
     conn.load_extension(spatialite_path)
     curs = conn.cursor()
+    log.debug(f"Opened connection and loaded spatialite in {time.time() - t0:.2f}s")
 
     # This regex matches all the metric columns
     # Regex explanation:
@@ -150,30 +170,47 @@ def extract_dgo_metrics_to_dataframe(gpkg_path: str, spatialite_path: str) -> pd
     # _(.*)                 -> The rest is the metric/percentile info
     pattern = r'^(active|wet)_(5|30)yr_(\d{4}_\d{4})_(68|95)pc_(.*)'
 
-    # Query the SQLite schema to get the column names from vbet_dgos table. Then filter to just metric columns
+    t1 = time.time()
     curs.execute('PRAGMA table_info(vbet_dgos)')
     col_names = [row[1] for row in curs.fetchall() if re.match(pattern, row[1]) or row[1] == 'fid']
+    log.debug(f"Fetched and filtered column names in {time.time() - t1:.2f}s (total {len(col_names)} columns)")
 
-    sql = f'SELECT {", ".join(col_names)} FROM vbet_dgos'  # WHERE FID = 8101 LIMIT 10'
+    t2 = time.time()
+    sql = f'SELECT {", ".join(col_names)} FROM vbet_dgos'
     df = pd.read_sql_query(sql, conn)
+    log.debug(f"Loaded data from sql to dataframe in {time.time() - t2:.2f}s. Shape {df.shape}")
 
+    t3 = time.time()
     # Pivot the "Wide" columns into "Long" rows. This moves the 'active_5yr...' metric cols into two cols: 'original_col' and 'measurement'
     df_long = df.melt(id_vars=['fid'], var_name='original_col', value_name='measurement')
     # print(df_long.head())
+    log.debug(f"Pivoted columns with melt in {time.time() - t3:.2f}s")
 
+    t4 = time.time()
     # 4. Extract categories using Regex and rename the columns
     extracted = df_long['original_col'].str.extract(pattern)
-    extracted.columns = ['landcover', 'epoch_length', 'epoch_name', 'confidence', 'metric_name']
+    new_column_names = ['landcover', 'epoch_length', 'epoch_name', 'confidence', 'metric_name']
+    extracted.columns = new_column_names
+    log.debug(f"Extract categories using Regex in {time.time() - t4:.2f}s")
+    # convert to categorical - see if it helps with the pivot later
+    t4b = time.time()
+    for col in new_column_names:
+        extracted[col] = extracted[col].astype('category')
+    log.debug(f"Convert columns to categorical in {time.time() - t4b:.2f}s")
 
+    t5 = time.time()
     # Combine the extracted columns back into the DataFrame
     df_final = pd.concat([df_long.drop(columns=['original_col']), extracted], axis=1)
+    log.debug(f"Combine columns back into dataframe in {time.time() - t5:.2f}s")
 
-    # Pivot the data back to that metric_name becomes columns again
+    t6 = time.time()
+    # Pivot the data back to that metric_name becomes columns again. VERY SLOW STEP
     df_final = df_final.pivot_table(
         index=['fid', 'landcover', 'epoch_length', 'epoch_name', 'confidence'],
         columns='metric_name',
         values='measurement'
     ).reset_index()
+    log.debug(f"Pivot data {time.time() - t6:.2f}s")
 
     # Rename the fid column to dgo_id
     df_final = df_final.rename(columns={'fid': 'dgo_id'})
@@ -207,7 +244,7 @@ def extract_dgos_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd.Ge
             centerline_length,
             segment_area,
             integrated_width,
-            geom as dgo_geom
+            ST_AsBinary(CastAutomagic(geom)) as dgo_geom
         FROM vbet_dgos
     '''
 
@@ -215,15 +252,17 @@ def extract_dgos_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd.Ge
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="pandas only supports SQLAlchemy connectable")
         df = pd.read_sql_query(sql, conn)
+        # standardize all columns to lower case - since neither geopackage nor athena distinguish the difference
+        df.columns = [col.lower() for col in df.columns]
 
     # because there are nulls, the combination of sqlites dynamic typing and pandas' type inference mis-assigns data types
     # actually the problem is that it is sometimes a double, sometimes INT64. Needs to be consistent
     # TODO: this should look up the types from our data dictionary but i am hardcoding for now
-    for field in ['fcode', 'seg_distance', 'stream_order', 'headwater', 'confluences', 'diffluences', 'tributaries']:
+    for field in ['fcode', 'seg_distance']:
         df[field] = df[field].astype('Int64')  # Note the capital 'I' for pandas nullable integer
 
     # Remove all columns named 'dgoid' (case-insensitive, even if duplicated)
-    df = df.loc[:, [col for col in df.columns if col.lower() != 'dgoid']]
+    df = df.loc[:, [col for col in df.columns if col != 'dgoid']]
     # convert wkb geometry to shapely objects
     df['dgo_geom'] = df['dgo_geom'].apply(wkb.loads)  # pyright: ignore[reportCallIssue, reportArgumentType]
     gdf = gpd.GeoDataFrame(df, geometry='dgo_geom', crs='EPSG:4326')
@@ -238,7 +277,7 @@ def extract_dgos_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd.Ge
     return gdf
 
 
-def delete_folder(dirpath: str) -> None:
+def delete_folder(dirpath: str | Path) -> None:
     """delete a local folder and its contents"""
     log = Logger('delete downloads')
     if os.path.isdir(dirpath):
@@ -251,7 +290,7 @@ def delete_folder(dirpath: str) -> None:
 
 
 def upload_to_s3(
-        file_path: str,
+        file_path: str | Path,
         s3_bucket: str,
         s3_key: str
 ) -> None:
@@ -268,7 +307,7 @@ def upload_to_s3(
     log.debug(f'file uploaded to s3 {s3_bucket} {s3_key}')
 
 
-def scrape_rme(
+def scrape_rd(
     rs_api: RiverscapesAPI,
     spatialite_path: str,
     download_dir: str | Path,
@@ -276,7 +315,7 @@ def scrape_rme(
     delete_downloads_when_done: bool,
 ) -> None:
     """
-    Orchestrate the scraping, processing, and uploading of RME projects.
+    Orchestrate the scraping, processing, and uploading of riverscapes dynamics projects.
     """
     # 1. Get list of projects to process
     # 2. For each project:
@@ -288,10 +327,18 @@ def scrape_rme(
     #    - Optionally clean up
 
     log = Logger('Scrape RS Dynamics')
-
+    download_dir = Path(download_dir)
     # NEW WAY
     # run Athena query to find all eligible projects that are newer than what is already scraped
-    projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
+    # because this is slow, cache results during debugging
+    cache_path = download_dir / "projects_to_add_cache.parquet"
+    if cache_path.exists():
+        projects_to_add_df = pd.read_parquet(cache_path)
+        log.info(f"Loaded projects DataFrame from cached results at {cache_path}")
+    else:
+        projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
+        projects_to_add_df.to_parquet(cache_path)
+        log.info(f"Saved projects DataFrame to cache at {cache_path}")
     if projects_to_add_df.empty:
         log.info("Query to identify projects to scrape returned no results.")
         return
@@ -299,7 +346,10 @@ def scrape_rme(
     count = 0
     prg = ProgressBar(projects_to_add_df.shape[0], text="Scrape Progress")
     for project_id in projects_to_add_df['project_id']:
+        t0 = time.time()
+        log.info(f"Starting processing for project_id: {project_id}")
         project = rs_api.get_project_full(project_id)
+        log.debug(f"Fetched project metadata from Data Exchange API for {project_id} in {time.time() - t0:.2f}s")
         if project.huc is None or project.huc == '':
             log.warning(f'Project {project.id} does not have a HUC. Skipping.')
             continue
@@ -314,41 +364,63 @@ def scrape_rme(
         model_version_int = semver_to_int(project.model_version)
 
         try:
-            huc_dir = os.path.join(download_dir, project.huc)
-            safe_makedirs(huc_dir)
+            huc_dir = download_dir / str(project.huc)
+            t1 = time.time()
+            safe_makedirs(str(huc_dir))
             gpkg_path = download_rsdynamics_geopackage(rs_api, project, huc_dir)
+            log.info(f"Downloaded GeoPackage for {project.id} in {time.time() - t1:.2f}s")
+
+            t3 = time.time()
             data_gdf = extract_dgos_to_geodataframe(gpkg_path, spatialite_path)
+            log.info(f"Extracted main GeoDataFrame for {project.id} in {time.time() - t3:.2f}s")
+
             # add common project-level columns
-            data_gdf['rme_project_id'] = project.id
-            data_gdf['rme_date_created_ts'] = project_created_date_ts
-            data_gdf['rme_version'] = str(project.model_version)
-            data_gdf['rme_version_int'] = model_version_int
+            data_gdf['huc'] = project.huc
+            data_gdf['rd_project_id'] = project.id
+            data_gdf['rd_date_created_ts'] = project_created_date_ts
+            data_gdf['rd_version'] = str(project.model_version)
+            data_gdf['rd_version_int'] = model_version_int
 
             log.debug(f"Dataframe prepared with shape {data_gdf.shape}")
             # until we have a more robust schema check this is something
-            if len(data_gdf.columns) != 134:
-                log.warning(f"Expected 134 columns, got {len(data_gdf.columns)}")
-            rme_pq_filepath = os.path.join(huc_dir, f'rme_{project.huc}.parquet')
-            data_gdf.to_parquet(rme_pq_filepath)
-            # don't use os.path.join because this is aws os, not system os
-            s3_key = f'data_exchange/rsdynamics/{os.path.basename(rme_pq_filepath)}'
-            upload_to_s3(rme_pq_filepath, data_bucket, s3_key)
+            if len(data_gdf.columns) != 22:
+                log.warning(f"Expected 22 columns, got {len(data_gdf.columns)}")
+
+            t4 = time.time()
+            rd_pq_filepath = huc_dir / f'rd_{project.huc}.parquet'
+            data_gdf.to_parquet(rd_pq_filepath)
+            log.info(f"Wrote main GeoDataFrame to parquet in {time.time() - t4:.2f}s")
+
+            s3_key = f'data_exchange/rsdynamics/{rd_pq_filepath.name}'
+            t5 = time.time()
+            upload_to_s3(rd_pq_filepath, data_bucket, s3_key)
+            log.info(f"Uploaded main parquet to S3 in {time.time() - t5:.2f}s")
 
             # Now process the metrics into a separate table
+            t6 = time.time()
             data_metrics = extract_dgo_metrics_to_dataframe(gpkg_path, spatialite_path)
+            log.info(f"Extracted metrics DataFrame for {project.id} in {time.time() - t6:.2f}s")
+            # add common fields. Need at least one of these to join the two tables.
+            data_metrics['huc'] = project.huc
+            data_metrics['rd_project_id'] = project.id
 
-            # Write the data_metrics data frame to parquet
-            metrics_pq_filepath = os.path.join(huc_dir, f'rme_metrics_{project.huc}.parquet')
+            t7 = time.time()
+            metrics_pq_filepath = huc_dir / f'rd_metrics_{project.huc}.parquet'
             data_metrics.to_parquet(metrics_pq_filepath)
-            # Upload to S3
+            log.info(f"Wrote metrics DataFrame to parquet in {time.time() - t7:.2f}s")
+
+            t8 = time.time()
             s3_key_metrics = f'data_exchange/rsdynamics_metrics/{os.path.basename(metrics_pq_filepath)}'
             upload_to_s3(metrics_pq_filepath, data_bucket, s3_key_metrics)
+            log.info(f"Uploaded metrics parquet to S3 in {time.time() - t8:.2f}s")
 
             if delete_downloads_when_done:
                 delete_folder(download_dir)
+                log.info(f"Deleted downloads")
 
             count += 1
             prg.update(count)
+            log.info(f"Finished processing for project_id: {project_id} in {time.time() - t0:.2f}s\n")
         except Exception as e:
             log.error(f'Error scraping HUC {project.huc}: {e}')
             raise
@@ -370,7 +442,7 @@ def main():
 
     safe_makedirs(working_folder)
     log = Logger('Setup')
-    log.setup(log_path=os.path.join(working_folder, 'rme-athena.log'), log_level=logging.DEBUG)
+    log.setup(log_path=os.path.join(working_folder, 'rd-athena.log'), log_level=logging.DEBUG)
 
     log.title("RSDynamics scrape to parquet to athena")
 
@@ -381,7 +453,7 @@ def main():
         log.info(f"Data bucket: {DATA_BUCKET} (env {DATA_BUCKET_ENV_VAR}); Athena output bucket: {ATHENA_OUTPUT_BUCKET} (env {OUTPUT_BUCKET_ENV_VAR})")
 
     with RiverscapesAPI(stage=args.stage) as api:
-        scrape_rme(
+        scrape_rd(
             api,
             args.spatialite_path,
             download_folder,
