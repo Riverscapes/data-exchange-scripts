@@ -9,7 +9,114 @@
             "description": "Riverscapes Dynamics Project DGO attributes from VBET",
             "columns": [
                 {
-                    "name": "dgo_id"
+                    "name": "dgo_id",
+                    "friendly_name": "DGO ID",
+                    "dtype": "bigint"
+                },
+                {
+                    "name": "level_path",
+                    "friendly_name": "Level Path",
+                    "dtype": "string"
+                },
+                {
+                    "name": "seg_distance",
+                    "friendly_name": "Segment Distance",
+                    "dtype": "bigint"
+                },
+                {
+                    "name": "fcode",
+                    "friendly_name": "Feature Code",
+                    "dtype": "bigint"
+                },
+                {
+                    "name": "low_lying_floodplain_area",
+                    "friendly_name": "Low-Lying Floodplain Area",
+                    "dtype": "double"
+                },
+                {
+                    "name": "low_lying_floodplain_prop",
+                    "friendly_name": "Low-Lying Floodplain Proportion",
+                    "dtype": "double"
+                },
+                {
+                    "name": "active_channel_area",
+                    "friendly_name": "Active Channel Area",
+                    "dtype": "double"
+                },
+                {
+                    "name": "active_channel_prop",
+                    "friendly_name": "Active Channel Proportion",
+                    "dtype": "double"
+                },
+                {
+                    "name": "elevated_floodplain_area",
+                    "friendly_name": "Elevated Floodplain Area",
+                    "dtype": "double"
+                },
+                {
+                    "name": "elevated_floodplain_prop",
+                    "friendly_name": "Elevated Floodplain Proportion",
+                    "dtype": "double"
+                },
+                {
+                    "name": "floodplain_area",
+                    "friendly_name": "Floodplain Area",
+                    "dtype": "double"
+                },
+                {
+                    "name": "floodplain_prop",
+                    "friendly_name": "Floodplain Proportion",
+                    "dtype": "double"
+                },
+                {
+                    "name": "centerline_length",
+                    "friendly_name": "Centerline Length",
+                    "dtype": "double"
+                },
+                {
+                    "name": "segment_area",
+                    "friendly_name": "Segment Area",
+                    "dtype": "double"
+                },
+                {
+                    "name": "integrated_width",
+                    "friendly_name": "Integrated Width",
+                    "dtype": "double"
+                },
+                {
+                    "name": "dgo_geom",
+                    "friendly_name": "DGO Geometry",
+                    "dtype": "binary"
+                },
+                {
+                    "name": "dgo_geom_bbox",
+                    "friendly_name": "DGO Geometry Bounding Box",
+                    "dtype": "struct"
+                },
+                {
+                    "name": "rd_project_id",
+                    "friendly_name": "RSDynamics Project ID",
+                    "dtype": "string"
+                },
+                {
+                    "name": "rd_date_created_ts",
+                    "friendly_name": "RSDynamics Project Created Timestamp",
+                    "dtype": "bigint"
+                },
+                {
+                    "name": "rd_version",
+                    "friendly_name": "RSDynamics Model Version",
+                    "dtype": "string"
+                },
+                {
+                    "name": "rd_version_int",
+                    "friendly_name": "RSDynamics Model Version (Int)",
+                    "dtype": "bigint"
+                },
+                {
+                    "name": "huc",
+                    "friendly_name": "HUC",
+                    "dtype": "string"
                 }
             ]
         },
@@ -19,7 +126,59 @@
             "description": "Riverscapes Dynamics Project Metrics data for each DGO, landcover, epoch",
             "columns": [
                 {
-                    "name": "dgo_id"
+                    "name": "dgo_id",
+                    "friendly_name": "DGO ID",
+                    "dtype": "bigint"
+                },
+                {
+                    "name": "landcover",
+                    "friendly_name": "Landcover",
+                    "dtype": "string"
+                },
+                {
+                    "name": "epoch_length",
+                    "friendly_name": "Epoch Length",
+                    "dtype": "string"
+                },
+                {
+                    "name": "epoch_name",
+                    "friendly_name": "Epoch Name",
+                    "dtype": "string"
+                },
+                {
+                    "name": "confidence",
+                    "friendly_name": "Confidence",
+                    "dtype": "string"
+                },
+                {
+                    "name": "area",
+                    "friendly_name": "Area",
+                    "dtype": "double"
+                },
+                {
+                    "name": "areapc",
+                    "friendly_name": "Area Percent",
+                    "dtype": "double"
+                },
+                {
+                    "name": "width",
+                    "friendly_name": "Width",
+                    "dtype": "double"
+                },
+                {
+                    "name": "widthpc",
+                    "friendly_name": "Width Percent",
+                    "dtype": "double"
+                },
+                {
+                    "name": "huc",
+                    "friendly_name": "HUC",
+                    "dtype": "string"
+                },
+                {
+                    "name": "rd_project_id",
+                    "friendly_name": "RSDynamics Project ID",
+                    "dtype": "string"
                 }
             ]
         }
