@@ -31,37 +31,47 @@
                 {
                     "name": "low_lying_floodplain_area",
                     "friendly_name": "Low-Lying Floodplain Area",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m**2"
                 },
                 {
                     "name": "low_lying_floodplain_prop",
                     "friendly_name": "Low-Lying Floodplain Proportion",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "dimensionless",
+                    "description": "Ratio of low-lying floodplain to DGO area"
                 },
                 {
                     "name": "active_channel_area",
                     "friendly_name": "Active Channel Area",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m**2"
                 },
                 {
                     "name": "active_channel_prop",
                     "friendly_name": "Active Channel Proportion",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "dimensionless",
+                    "description": "Ratio of active channel to DGO area"
                 },
                 {
                     "name": "elevated_floodplain_area",
                     "friendly_name": "Elevated Floodplain Area",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m**2"
                 },
                 {
                     "name": "elevated_floodplain_prop",
                     "friendly_name": "Elevated Floodplain Proportion",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "dimensionless",
+                    "description": "Ratio of elevated floodplain to DGO area"
                 },
                 {
                     "name": "floodplain_area",
                     "friendly_name": "Floodplain Area",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m**2"
                 },
                 {
                     "name": "floodplain_prop",
@@ -71,17 +81,20 @@
                 {
                     "name": "centerline_length",
                     "friendly_name": "Centerline Length",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m"
                 },
                 {
                     "name": "segment_area",
                     "friendly_name": "Segment Area",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m**2"
                 },
                 {
                     "name": "integrated_width",
                     "friendly_name": "Integrated Width",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m"
                 },
                 {
                     "name": "dgo_geom",
@@ -96,7 +109,8 @@
                 {
                     "name": "rd_project_id",
                     "friendly_name": "RSDynamics Project ID",
-                    "dtype": "string"
+                    "dtype": "string",
+                    "data_unit": "NA"
                 },
                 {
                     "name": "rd_date_created_ts",
@@ -123,12 +137,13 @@
         {
             "layer_id": "rsdynamics_metrics",
             "layer_name": "RSDynamics Metrics",
-            "description": "Riverscapes Dynamics Project Metrics data for each DGO, landcover, epoch",
+            "description": "Riverscapes Dynamics Project Metrics data for each DGO, landcover, epoch. Join with rsdynamics on rd_project_id + dgo_id.",
             "columns": [
                 {
                     "name": "dgo_id",
                     "friendly_name": "DGO ID",
-                    "dtype": "bigint"
+                    "dtype": "bigint",
+                    "data_unit": "NA"
                 },
                 {
                     "name": "landcover",
@@ -153,22 +168,26 @@
                 {
                     "name": "area",
                     "friendly_name": "Area",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m**2"
                 },
                 {
                     "name": "areapc",
                     "friendly_name": "Area Percent",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "%"
                 },
                 {
                     "name": "width",
                     "friendly_name": "Width",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "m"
                 },
                 {
                     "name": "widthpc",
                     "friendly_name": "Width Percent",
-                    "dtype": "double"
+                    "dtype": "double",
+                    "data_unit": "%"
                 },
                 {
                     "name": "huc",
