@@ -177,6 +177,7 @@ def extract_dgo_metrics_to_dataframe(gpkg_path: str, spatialite_path: str) -> pd
 
     t2 = time.time()
     sql = f'SELECT {", ".join(col_names)} FROM vbet_dgos'
+    log.debug(f"Select query:\n{sql}")
     df = pd.read_sql_query(sql, conn)
     log.debug(f"Loaded data from sql to dataframe in {time.time() - t2:.2f}s. Shape {df.shape}")
 
@@ -208,7 +209,8 @@ def extract_dgo_metrics_to_dataframe(gpkg_path: str, spatialite_path: str) -> pd
     df_final = df_final.pivot_table(
         index=['fid', 'landcover', 'epoch_length', 'epoch_name', 'confidence'],
         columns='metric_name',
-        values='measurement'
+        values='measurement',
+        observed=True
     ).reset_index()
     log.debug(f"Pivot data {time.time() - t6:.2f}s")
 
@@ -222,6 +224,7 @@ def extract_dgo_metrics_to_dataframe(gpkg_path: str, spatialite_path: str) -> pd
 def extract_dgos_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd.GeoDataFrame:
     """
     Connect to the GeoPackage, run the SQL, and return a GeoDataFrame.
+    Assumes data are in EPSG:2193 (True for at least one of the New Zealand projects)
     """
     conn = apsw.Connection(gpkg_path)
     conn.enable_load_extension(True)
@@ -265,7 +268,8 @@ def extract_dgos_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd.Ge
     df = df.loc[:, [col for col in df.columns if col != 'dgoid']]
     # convert wkb geometry to shapely objects
     df['dgo_geom'] = df['dgo_geom'].apply(wkb.loads)  # pyright: ignore[reportCallIssue, reportArgumentType]
-    gdf = gpd.GeoDataFrame(df, geometry='dgo_geom', crs='EPSG:4326')
+    gdf = gpd.GeoDataFrame(df, geometry='dgo_geom', crs='EPSG:2193')  # SOURCE EPSG
+    gdf = gdf.to_crs('EPSG:4326')  # DESTINATION EPSG
 
     bbox_df = gdf.geometry.bounds.rename(columns={'minx': 'xmin', 'miny': 'ymin', 'maxx': 'xmax', 'maxy': 'ymax'})
     # Combine into a struct-like dict for each row
