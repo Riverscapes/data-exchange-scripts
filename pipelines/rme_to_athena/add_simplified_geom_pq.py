@@ -3,14 +3,17 @@
 2. process it, generating new file
 3. upload that to a different prefix in s3
 """
+import logging
 from pathlib import Path
+
 import geopandas as gpd
 import boto3
 
 from rsxml import Logger
-from rme_to_athena.rme_to_athena_parquet import upload_to_s3
+from rme_to_athena_parquet import upload_to_s3
 
 DEFAULT_DATA_BUCKET = "riverscapes-athena"
+DATA_ROOT = Path(r"F:\nardata\work\rme_extraction")
 
 
 def download_s3_file(s3_bucket: str, s3_key: str, local_file_path: Path):
@@ -33,27 +36,35 @@ def list_s3_files(bucket, prefix):
 
 def process_multiple(filepattern: str):
     """process all files starting with filepattern (empty means all files)"""
+    log = Logger("Process multiple")
     s3_prefix = 'data_exchange/riverscape_metrics/'
-    s3_prefix_new = 'data_exchange/rs_metric_engine2'
-    local_folder_source = Path(r"F:\nardata\work\rme_extraction\from-s3-rsathena-data_exchange_rsmetrics")
-    local_folder_dest = Path(r"F:\nardata\work\rme_extraction\to-s3-rsathena-data_exchange_rsmetrics2")
+    s3_prefix_new = 'data_exchange/rs_metric_engine2/'
+    local_folder_downloaded = DATA_ROOT / "from-s3-rsathena-data_exchange_rsmetrics"
+    local_folder_processed = DATA_ROOT / "to-s3-rsathena-data_exchange_rsmetrics2"
 
     files = list_s3_files(DEFAULT_DATA_BUCKET, s3_prefix + filepattern)
-    print(f'Found {len(files)} files matching pattern {filepattern}')
-    for filename in files:
-        print(f'Processing {filename}')
-        s3key = s3_prefix + filename
-        local_file_path_from_s3 = local_folder_source / filename
-        local_file_path_newto_s3 = local_folder_dest / filename
-        s3key_new = s3_prefix_new + 'filename'
-        download_s3_file(DEFAULT_DATA_BUCKET, s3key, local_file_path_from_s3)
-        process_pq1_to_pq2(local_file_path_from_s3, local_file_path_newto_s3)
-        upload_to_s3(local_file_path_newto_s3, DEFAULT_DATA_BUCKET, s3key_new)
+    log.info(f'Found {len(files)} files matching pattern {filepattern}')
+    for filekey in files:
+        log.info(f'Processing {filekey}')
+        filename = Path(filekey).name
+        local_file_path_downloaded = local_folder_downloaded / filename
+        local_file_path_processed = local_folder_processed / filename
+        s3key_new = s3_prefix_new + filename
+        try:
+            log.debug(f'Downloading to {local_file_path_downloaded}')
+            download_s3_file(DEFAULT_DATA_BUCKET, filekey, local_file_path_downloaded)
+            log.debug(f'Processing to {local_file_path_processed}')
+            process_pq1_to_pq2(local_file_path_downloaded, local_file_path_processed)
+            log.debug(f'Uploading to {s3key_new}')
+            upload_to_s3(local_file_path_processed, DEFAULT_DATA_BUCKET, s3key_new)
+        except Exception as e:
+            log.error(f"Failed to process {filename}: {e}")
+            raise e
 
     return
 
 
-def process_pq1_to_pq2(inputpqpath: Path, outputpqpath: Path):
+def process_pq1_to_pq2(inputpqpath: Path, outputpqpath: Path, tolerance: float = 11):
     """take a geo-parquet file, add a simplified geometry column, save back to new geo-parquet file"""
     gdf = gpd.read_parquet(inputpqpath)
 
@@ -71,6 +82,9 @@ def process_pq1_to_pq2(inputpqpath: Path, outputpqpath: Path):
 
 def main():
     """Main entry point"""
+    log = Logger('Setup')
+    log.setup(log_path=str(DATA_ROOT / 'add_simplified_geom.log'), log_level=logging.DEBUG)
+    log.title('Add simplified geometry')
     process_multiple('rme_16020204')
 
 
