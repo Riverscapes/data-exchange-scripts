@@ -5,9 +5,11 @@
 """
 import logging
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import geopandas as gpd
 import boto3
+from tqdm import tqdm  # trying this instead of ProgressBar, I've heard good things
 
 from rsxml import Logger
 from rme_to_athena_parquet import upload_to_s3
@@ -34,6 +36,25 @@ def list_s3_files(bucket, prefix):
     return files
 
 
+def process_one_file(filekey: str, local_folder_downloaded: Path, local_folder_processed: Path, s3_prefix_new: str):
+    """download, process to new file, then upload"""
+    log = Logger('Process One')
+    tqdm.write(f'Processing {filekey}')
+    filename = Path(filekey).name
+    local_file_path_downloaded = local_folder_downloaded / filename
+    local_file_path_processed = local_folder_processed / filename
+    s3key_new = s3_prefix_new + filename
+    try:
+        log.debug(f'Downloading to {local_file_path_downloaded}')
+        download_s3_file(DEFAULT_DATA_BUCKET, filekey, local_file_path_downloaded)
+        log.debug(f'Processing to {local_file_path_processed}')
+        process_pq1_to_pq2(local_file_path_downloaded, local_file_path_processed)
+        log.debug(f'Uploading to {s3key_new}')
+        upload_to_s3(local_file_path_processed, DEFAULT_DATA_BUCKET, s3key_new)
+    except Exception as e:
+        log.error(f"Failed to process {filename}: {e}")
+
+
 def process_multiple(filepattern: str):
     """process all files starting with filepattern (empty means all files)"""
     log = Logger("Process multiple")
@@ -44,24 +65,10 @@ def process_multiple(filepattern: str):
 
     files = list_s3_files(DEFAULT_DATA_BUCKET, s3_prefix + filepattern)
     log.info(f'Found {len(files)} files matching pattern {filepattern}')
-    for filekey in files:
-        log.info(f'Processing {filekey}')
-        filename = Path(filekey).name
-        local_file_path_downloaded = local_folder_downloaded / filename
-        local_file_path_processed = local_folder_processed / filename
-        s3key_new = s3_prefix_new + filename
-        try:
-            log.debug(f'Downloading to {local_file_path_downloaded}')
-            download_s3_file(DEFAULT_DATA_BUCKET, filekey, local_file_path_downloaded)
-            log.debug(f'Processing to {local_file_path_processed}')
-            process_pq1_to_pq2(local_file_path_downloaded, local_file_path_processed)
-            log.debug(f'Uploading to {s3key_new}')
-            upload_to_s3(local_file_path_processed, DEFAULT_DATA_BUCKET, s3key_new)
-        except Exception as e:
-            log.error(f"Failed to process {filename}: {e}")
-            raise e
-
-    return
+    with ThreadPoolExecutor(max_workers=12) as executor:  # ADJUST as needed
+        futures = [executor.submit(process_one_file, filekey, local_folder_downloaded, local_folder_processed, s3_prefix_new) for filekey in files]
+        for _ in tqdm(as_completed(futures), total=len(futures)):
+            pass  # Optionally handle results or exceptions here
 
 
 def process_pq1_to_pq2(inputpqpath: Path, outputpqpath: Path, tolerance: float = 11):
@@ -83,9 +90,10 @@ def process_pq1_to_pq2(inputpqpath: Path, outputpqpath: Path, tolerance: float =
 def main():
     """Main entry point"""
     log = Logger('Setup')
-    log.setup(log_path=str(DATA_ROOT / 'add_simplified_geom.log'), log_level=logging.DEBUG)
+    log.setup(log_path=str(DATA_ROOT / 'add_simplified_geom.log'), log_level=logging.INFO)
     log.title('Add simplified geometry')
-    process_multiple('rme_16020204')
+    process_multiple('rme_16')
+    log.title('Completed.')
 
 
 if __name__ == '__main__':
