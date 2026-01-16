@@ -204,7 +204,7 @@ def delete_folder(dirpath: str) -> None:
 
 
 def upload_to_s3(
-        file_path: str,
+        file_path: str | Path,
         s3_bucket: str,
         s3_key: str
 ) -> None:
