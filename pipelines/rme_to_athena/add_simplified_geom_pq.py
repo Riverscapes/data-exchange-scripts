@@ -92,7 +92,7 @@ def main():
     log = Logger('Setup')
     log.setup(log_path=str(DATA_ROOT / 'add_simplified_geom.log'), log_level=logging.INFO)
     log.title('Add simplified geometry')
-    process_multiple('rme_16')
+    process_multiple('rme')
     log.title('Completed.')
 
 
