@@ -33,6 +33,7 @@ dependencies = [
   "riverscapes-metadata @ git+https://github.com/Riverscapes/RiverscapesXML.git@master#subdirectory=riverscapes_metadata",
   "awswrangler>=3.10.1",
   "pandas>=2.3.3",
+  "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]
