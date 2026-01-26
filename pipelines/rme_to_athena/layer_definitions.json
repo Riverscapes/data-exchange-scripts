@@ -1,6 +1,5 @@
 {
   "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
-  "authority_name": "rme_to_athena",
   "tool_schema_version": "1.0.2",
   "layers": [
     {
@@ -11,7 +10,7 @@
       "columns": [
         {
           "name": "brat_capacity",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Existing Beaver Dam Capacity",
           "data_unit": "km^-1",
           "description": "The existing number of beaver dams per unit of riverscape length that the riverscape can support",
@@ -23,7 +22,7 @@
         },
         {
           "name": "brat_hist_capacity",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historical Beaver Dam Capacity",
           "data_unit": "km^-1",
           "description": "The historic number of beaver dams per unit of riverscapes length that the riverscape could support based on modeled historic vegetation",
@@ -35,7 +34,7 @@
         },
         {
           "name": "brat_risk",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Risks to Beaver Dam Restoration",
           "data_unit": "NA",
           "description": "Categorical values of risk that beaver dam building activity could pose to human infrastructure",
@@ -47,7 +46,7 @@
         },
         {
           "name": "brat_opportunity",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Opportunities for Beaver Dam Restoration",
           "data_unit": "NA",
           "description": "Categorical values of beaver-related restoration and conservation opportunities",
@@ -59,7 +58,7 @@
         },
         {
           "name": "brat_limitation",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Limiting Factors to Bever Dam Restoration",
           "data_unit": "NA",
           "description": "Categorical natural and anthropogenic limitations on beaver dam building",
@@ -71,7 +70,7 @@
         },
         {
           "name": "brat_complex_size",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Existing Beaver Dam Complex Size",
           "data_unit": "count",
           "description": "The number of dams the section of riverscape could support",
@@ -83,7 +82,7 @@
         },
         {
           "name": "brat_hist_complex_size",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historical Beaver Dam Complex Size",
           "data_unit": "count",
           "description": "The number of dams the section of riverscapes could historically support based on modeled historic vegetation",
@@ -95,7 +94,7 @@
         },
         {
           "name": "dam_setting",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Dam Setting",
           "data_unit": "NA",
           "description": "Beaver dam setting (classic, steep, floodplain)",
@@ -107,7 +106,7 @@
         },
         {
           "name": "ownership",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Ownership Code",
           "data_unit": "NA",
           "description": "Dominant ownership within the DGO",
@@ -119,7 +118,7 @@
         },
         {
           "name": "state",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "US State",
           "data_unit": "NA",
           "description": "The dominant US state within the DGO",
@@ -131,7 +130,7 @@
         },
         {
           "name": "county",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "US County",
           "data_unit": "NA",
           "description": "The dominant county within the DGO",
@@ -143,7 +142,7 @@
         },
         {
           "name": "drainage_area",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Drainage Area",
           "data_unit": "km^2",
           "description": "The drainage area of the primary channel in the DGO",
@@ -155,7 +154,7 @@
         },
         {
           "name": "watershed_id",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Watershed ID",
           "data_unit": "NA",
           "description": "The 10-digit USGS watershed Hydrologic Unit Code",
@@ -167,7 +166,7 @@
         },
         {
           "name": "stream_name",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Stream Name",
           "data_unit": "NA",
           "description": "The name of the primary stream in the DGO",
@@ -203,7 +202,7 @@
         },
         {
           "name": "stream_length",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Stream Length",
           "data_unit": "m",
           "description": "Sum of stream segment lengths (NHD flow lines) within the DGO",
@@ -215,7 +214,7 @@
         },
         {
           "name": "waterbody_type",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Waterbody Type",
           "data_unit": "NA",
           "description": "The NHD FCode of waterbody within the DGO",
@@ -227,7 +226,7 @@
         },
         {
           "name": "waterbody_extent",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Waterbody Extent",
           "data_unit": "m^2",
           "description": "The area of waterbody within the DGO",
@@ -239,7 +238,7 @@
         },
         {
           "name": "ecoregion3",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Ecoregion 3",
           "data_unit": "NA",
           "description": "EPA Ecoregion Level 3",
@@ -251,7 +250,7 @@
         },
         {
           "name": "ecoregion4",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Ecoregion 4",
           "data_unit": "NA",
           "description": "EPA Ecoregion Level 4",
@@ -263,7 +262,7 @@
         },
         {
           "name": "elevation",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Elevation",
           "data_unit": "m",
           "description": "The minimum elevation in the DGO",
@@ -275,7 +274,7 @@
         },
         {
           "name": "geology",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Geology",
           "data_unit": "NA",
           "description": "The dominant geology type within the DGO",
@@ -287,7 +286,7 @@
         },
         {
           "name": "huc12",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "HUC12",
           "data_unit": "NA",
           "description": "The 12-digit USGS watershed Hydrologic Unit Code",
@@ -299,7 +298,7 @@
         },
         {
           "name": "prim_channel_gradient",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Primary Channel Gradient",
           "data_unit": "%",
           "description": "The gradient of the primary channel in the DGO",
@@ -311,7 +310,7 @@
         },
         {
           "name": "valleybottom_gradient",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Valley Bottom Gradient",
           "data_unit": "%",
           "description": "The gradient of the riverscape centerline",
@@ -323,7 +322,7 @@
         },
         {
           "name": "rel_flow_length",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Relative Flow Length",
           "data_unit": "m/m",
           "description": "Sum of stream lengths in the DGO divided by length of valley centerline",
@@ -371,7 +370,7 @@
         },
         {
           "name": "tribs_per_km",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Tributaries per Kilometer",
           "data_unit": "km^-1",
           "description": "The number of tributaries per unit of riverscape length.",
@@ -383,7 +382,7 @@
         },
         {
           "name": "planform_sinuosity",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Planform Sinuosity",
           "data_unit": "m/m",
           "description": "Sum of river length divided by the valley bottom length within moving window.",
@@ -395,7 +394,7 @@
         },
         {
           "name": "lowlying_area",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Low-lying Area",
           "data_unit": "m^2",
           "description": "The area of valley bottom classified as 'low_lying' within the DGO",
@@ -407,7 +406,7 @@
         },
         {
           "name": "elevated_area",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Elevated Area",
           "data_unit": "m^2",
           "description": "The area of valley bottom classified as 'elevated' within the DGO",
@@ -419,7 +418,7 @@
         },
         {
           "name": "channel_area",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Channel Area",
           "data_unit": "m^2",
           "description": "The area of active channel within the DGO.",
@@ -431,7 +430,7 @@
         },
         {
           "name": "floodplain_area",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Floodplain Area",
           "data_unit": "m^2",
           "description": "The area of active floodplain within the DGO.",
@@ -443,7 +442,7 @@
         },
         {
           "name": "integrated_width",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Integrated Width",
           "data_unit": "m",
           "description": "The width of the riverscape",
@@ -455,7 +454,7 @@
         },
         {
           "name": "active_channel_ratio",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Active Channel Ratio",
           "data_unit": "m^2/m^2",
           "description": "The proportion of the riverscape that is active channel",
@@ -467,7 +466,7 @@
         },
         {
           "name": "low_lying_ratio",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Low Lying Ratio",
           "data_unit": "m^2/m^2",
           "description": "The proportion of the riversape that is relatively low-lying surface",
@@ -479,7 +478,7 @@
         },
         {
           "name": "elevated_ratio",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Elevated Ratio",
           "data_unit": "m^2/m^2",
           "description": "The proportion of the riverscape that is relatively elevated surface",
@@ -491,7 +490,7 @@
         },
         {
           "name": "floodplain_ratio",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Floodplain Ratio",
           "data_unit": "m^2/m^2",
           "description": "proportion of the riverscape that is floodplain (low-lying + elevated; not channel)",
@@ -503,7 +502,7 @@
         },
         {
           "name": "acres_vb_per_mile",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Acres Valley Bottom Per Mile",
           "data_unit": "acre/mile",
           "description": "Area of valley bottom per riverscape length",
@@ -515,7 +514,7 @@
         },
         {
           "name": "hect_vb_per_km",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Hectares Valley Bottom Per Kilometer",
           "data_unit": "ha/km",
           "description": "Area of valley bottom per riverscape length",
@@ -527,7 +526,7 @@
         },
         {
           "name": "channel_width",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Channel Width",
           "data_unit": "m",
           "description": "Width of the primary channel in the DGO",
@@ -539,7 +538,7 @@
         },
         {
           "name": "confinement_ratio",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Confinement Ratio",
           "data_unit": "m/m",
           "description": "The ratio of channel length that abuts a confining margin to the total channel length",
@@ -551,7 +550,7 @@
         },
         {
           "name": "constriction_ratio",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Constriction Ratio",
           "data_unit": "m/m",
           "description": "The ratio of channel length constricted by confining margins on both sides to total channel length",
@@ -563,7 +562,7 @@
         },
         {
           "name": "confining_margins",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Confining Margins",
           "data_unit": "m",
           "description": "The length of confining margins within the DGO",
@@ -575,7 +574,7 @@
         },
         {
           "name": "constricting_margins",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Constricting Margins",
           "data_unit": "m",
           "description": "The length of constricting margins (confining on both sides of the channel simultaneously) within the DGO",
@@ -587,7 +586,7 @@
         },
         {
           "name": "qlow",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Low Flow",
           "data_unit": "ft^3/s",
           "description": "Low flow value of the primary channel in the DGO",
@@ -599,7 +598,7 @@
         },
         {
           "name": "q2",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "High Flow",
           "data_unit": "ft^3/s",
           "description": "Typical flood (Q2) flow value of the primary channel in the DGO",
@@ -611,7 +610,7 @@
         },
         {
           "name": "splow",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Low Stream Power",
           "data_unit": "W",
           "description": "Low flow stream power",
@@ -623,7 +622,7 @@
         },
         {
           "name": "sphigh",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "High Stream Power",
           "data_unit": "W",
           "description": "Typical flood (Q2) stream power",
@@ -635,7 +634,7 @@
         },
         {
           "name": "road_len",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Road Length",
           "data_unit": "m",
           "description": "Length of roads within the DGO",
@@ -647,7 +646,7 @@
         },
         {
           "name": "road_dens",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Road Density",
           "data_unit": "m/m",
           "description": "Length of roads per length of riverscape centerline",
@@ -659,7 +658,7 @@
         },
         {
           "name": "rail_len",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Rail Length",
           "data_unit": "m",
           "description": "Length of railroads within the DGO",
@@ -671,7 +670,7 @@
         },
         {
           "name": "rail_dens",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Rail Density (m/m)",
           "data_unit": "m/m",
           "description": "Length of railroads per length of riverscape centerline",
@@ -683,7 +682,7 @@
         },
         {
           "name": "land_use_intens",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Land Use Intensity",
           "data_unit": "NA",
           "description": "Land use intensity from 0 (None) to 100 (High) within the DGO",
@@ -695,7 +694,7 @@
         },
         {
           "name": "road_dist",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Minimum Distance Between Channel and Roads",
           "data_unit": "m",
           "description": "The minimum distance between roads and river channels",
@@ -707,7 +706,7 @@
         },
         {
           "name": "rail_dist",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Minimum Distance Between Channel and Railroads",
           "data_unit": "m",
           "description": "The minimum distance between railroads and river channels",
@@ -719,7 +718,7 @@
         },
         {
           "name": "div_dist",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Minimum Distance Between Channel and Diversions",
           "data_unit": "m",
           "description": "The minimum distance between diversion points and river channels",
@@ -731,7 +730,7 @@
         },
         {
           "name": "canal_dist",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Minimum Distance Between Channel and Canals",
           "data_unit": "m",
           "description": "The minimum distance between canals and river channels",
@@ -743,7 +742,7 @@
         },
         {
           "name": "infra_dist",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Minimum Distance Between Channel and Infrastructure",
           "data_unit": "m",
           "description": "The minimum distance between any infrastructure and river channels",
@@ -755,7 +754,7 @@
         },
         {
           "name": "fldpln_access",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Floodplain Accessibility",
           "data_unit": "m^2/m^2",
           "description": "The proportion of flooplain accessible to the channel (e.g., via lateral migration)",
@@ -767,7 +766,7 @@
         },
         {
           "name": "access_fldpln_extent",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Floodplain Acessibility Extent",
           "data_unit": "m^2",
           "description": "The area of the accessible floodplain",
@@ -779,7 +778,7 @@
         },
         {
           "name": "lf_evt",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Dominant Existing Vegetation Classes",
           "data_unit": "NA",
           "description": "The dominant Landfire EVT classes",
@@ -791,7 +790,7 @@
         },
         {
           "name": "lf_bps",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Dominstant Historical Vegetation Classes",
           "data_unit": "NA",
           "description": "The dominant Landfire BpS classes",
@@ -803,7 +802,7 @@
         },
         {
           "name": "lf_agriculture_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Agriculture",
           "data_unit": "m^2/m^2",
           "description": "The proportion of agricultural cover in the riverscape",
@@ -815,7 +814,7 @@
         },
         {
           "name": "lf_agriculture",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Agriculture",
           "data_unit": "m^2",
           "description": "The area of agricultural cover in the riverscape",
@@ -827,7 +826,7 @@
         },
         {
           "name": "lf_conifer_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proprotion Coniferous",
           "data_unit": "m^2/m^2",
           "description": "The proportion of conifer cover in the riverscape",
@@ -839,7 +838,7 @@
         },
         {
           "name": "lf_conifer",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Coniferous",
           "data_unit": "m^2",
           "description": "The area of conifer cover in the riverscape",
@@ -851,7 +850,7 @@
         },
         {
           "name": "lf_conifer_hardwood_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Mixed Hardwood/Coniferous",
           "data_unit": "m^2/m^2",
           "description": "The proportion of mixed conifer-hardwood cover in the riverscape",
@@ -863,7 +862,7 @@
         },
         {
           "name": "lf_conifer_hardwood",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Mixed Hardwood/Coniferous",
           "data_unit": "m^2",
           "description": "The area of mixed conifer-hardwood cover in the riverscape",
@@ -875,7 +874,7 @@
         },
         {
           "name": "lf_developed_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Developed",
           "data_unit": "m^2/m^2",
           "description": "The proportion of the riverscape that is developed",
@@ -887,7 +886,7 @@
         },
         {
           "name": "lf_developed",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Developed",
           "data_unit": "m^2",
           "description": "The area of the riverscape that is developed",
@@ -899,7 +898,7 @@
         },
         {
           "name": "lf_exotic_herbaceous_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Exotic Herbacious",
           "data_unit": "m^2/m^2",
           "description": "The proportion exotic herbaceous cover in the riverscape",
@@ -911,7 +910,7 @@
         },
         {
           "name": "lf_exotic_herbaceous",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Exotic Herbacious",
           "data_unit": "m^2",
           "description": "The area of exotic herbaceous cover in the riverscape",
@@ -923,7 +922,7 @@
         },
         {
           "name": "lf_exotic_tree_shrub_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Exotic Trees or Shrubs",
           "data_unit": "m^2/m^2",
           "description": "The proportion of exotic tree and shrub cover in the riverscape",
@@ -935,7 +934,7 @@
         },
         {
           "name": "lf_exotic_tree_shrub",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Exotic Tree or Shrub",
           "data_unit": "m^2",
           "description": "The area of exotic tree and shrub cover in the riverscape",
@@ -947,7 +946,7 @@
         },
         {
           "name": "lf_grassland_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Grassland",
           "data_unit": "m^2/m^2",
           "description": "The proportion of grassland cover in the riverscape",
@@ -959,7 +958,7 @@
         },
         {
           "name": "lf_grassland",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Grassland",
           "data_unit": "m^2",
           "description": "The area of grassland cover in the riverscape",
@@ -971,7 +970,7 @@
         },
         {
           "name": "lf_hardwood_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Hardwood",
           "data_unit": "m^2/m^2",
           "description": "The proportion of hardwood forest cover in the riverscape",
@@ -983,7 +982,7 @@
         },
         {
           "name": "lf_hardwood",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Hardwood",
           "data_unit": "m^2",
           "description": "The area of hardwood forest cover in the riverscape",
@@ -995,7 +994,7 @@
         },
         {
           "name": "lf_riparian_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Riparian Vegetation",
           "data_unit": "m^2/m^2",
           "description": "The proportion of riparian vegetation cover in the riverscape",
@@ -1007,7 +1006,7 @@
         },
         {
           "name": "lf_riparian",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Riparian Vegetation",
           "data_unit": "m^2",
           "description": "The area of riparian vegetation cover in the riverscape (from LandFire)",
@@ -1019,7 +1018,7 @@
         },
         {
           "name": "lf_shrubland_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Shrubland",
           "data_unit": "m^2/m^2",
           "description": "The proportion of shrubland cover in the riverscape",
@@ -1031,7 +1030,7 @@
         },
         {
           "name": "lf_shrubland",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Shrubland",
           "data_unit": "m^2",
           "description": "The area of shrubland cover in the riverscape",
@@ -1043,7 +1042,7 @@
         },
         {
           "name": "lf_sparsely_vegetated_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion Sparsely Vegetated",
           "data_unit": "m^2/m^2",
           "description": "The proportion of the riverscape that is sparsely vegetated",
@@ -1055,7 +1054,7 @@
         },
         {
           "name": "lf_sparsely_vegetated",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area Sparsely Vegetated",
           "data_unit": "m^2",
           "description": "The area of the riverscape that is sparsely vegetated",
@@ -1067,7 +1066,7 @@
         },
         {
           "name": "lf_hist_conifer_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Coniferous",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of conifer cover in the riverscape",
@@ -1079,7 +1078,7 @@
         },
         {
           "name": "lf_hist_conifer",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Coniferous",
           "data_unit": "m^2",
           "description": "The historic area of conifer cover in the riverscape",
@@ -1091,7 +1090,7 @@
         },
         {
           "name": "lf_hist_conifer_hardwood_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Hisotric Proportion Mixed Coniferous/Hardwood",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of mixed conifer-hardwood forest in the riverscape",
@@ -1103,7 +1102,7 @@
         },
         {
           "name": "lf_hist_conifer_hardwood",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Mixed Coniferous/Hardwood",
           "data_unit": "m^2",
           "description": "The historic area of mixed conifer-hardwood forest in the riverscape",
@@ -1115,7 +1114,7 @@
         },
         {
           "name": "lf_hist_grassland_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Grassland",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of grassland in the riverscape",
@@ -1127,7 +1126,7 @@
         },
         {
           "name": "lf_hist_grassland",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Grassland",
           "data_unit": "m^2",
           "description": "The historic area of grassland in the riverscape",
@@ -1139,7 +1138,7 @@
         },
         {
           "name": "lf_hist_hardwood_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Hardwood",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of hardwood forest in the riverscape",
@@ -1151,7 +1150,7 @@
         },
         {
           "name": "lf_hist_hardwood",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Hardwood",
           "data_unit": "m^2",
           "description": "The historic area of hardwood forest in the riverscape",
@@ -1163,7 +1162,7 @@
         },
         {
           "name": "lf_hist_hardwood_conifer_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Mixed Hardwood/Conifer",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of mixed hardwood-conifer forest in the riverscape",
@@ -1175,7 +1174,7 @@
         },
         {
           "name": "lf_hist_hardwood_conifer",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Mixed Hardwood/Conifer",
           "data_unit": "m^2",
           "description": "The historic area of mixed hardwood-conifer forest in the riverscape",
@@ -1187,7 +1186,7 @@
         },
         {
           "name": "lf_hist_peatland_forest_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Peatland",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of peatland forest in the riverscape",
@@ -1199,7 +1198,7 @@
         },
         {
           "name": "lf_hist_peatland_forest",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Peatland",
           "data_unit": "m^2",
           "description": "The historic area of peatland forest in the riverscape",
@@ -1211,7 +1210,7 @@
         },
         {
           "name": "lf_hist_peatland_nonforest_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Peatland or Non-Forest",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of non-forested peatland in the riverscape",
@@ -1223,7 +1222,7 @@
         },
         {
           "name": "lf_hist_peatland_nonforest",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Peatland or Non-Forest",
           "data_unit": "m^2",
           "description": "The historic area of non-forested peatland in the riverscape",
@@ -1235,7 +1234,7 @@
         },
         {
           "name": "lf_hist_riparian_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Riparian Vegetation",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of riparian vegetation in the riverscape",
@@ -1247,7 +1246,7 @@
         },
         {
           "name": "lf_hist_riparian",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Riparian Vegetation",
           "data_unit": "m^2",
           "description": "The historic area of riparian vegetation in the riverscape",
@@ -1259,7 +1258,7 @@
         },
         {
           "name": "lf_hist_savanna_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Savanna",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of savanna in the riverscape",
@@ -1271,7 +1270,7 @@
         },
         {
           "name": "lf_hist_savanna",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Savanna",
           "data_unit": "m^2",
           "description": "The historic area of savanna in the riverscape",
@@ -1283,7 +1282,7 @@
         },
         {
           "name": "lf_hist_shrubland_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion Shrubland",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of shrubland in the riverscape",
@@ -1295,7 +1294,7 @@
         },
         {
           "name": "lf_hist_shrubland",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area Shrubland",
           "data_unit": "m^2",
           "description": "The historic area of shrubland in the riverscape",
@@ -1307,7 +1306,7 @@
         },
         {
           "name": "lf_hist_sparsely_vegetated_prop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion of Sparse Vegetation",
           "data_unit": "m^2/m^2",
           "description": "The historic proportion of the riverscape that was sparsely vegetated",
@@ -1319,7 +1318,7 @@
         },
         {
           "name": "lf_hist_sparsely_vegetated",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area of Sparse Vegetation",
           "data_unit": "m^2",
           "description": "The historic area of the riverscape that was sparsely vegetated",
@@ -1331,7 +1330,7 @@
         },
         {
           "name": "ex_riparian",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Area of Riparian Vegetation",
           "data_unit": "m^2",
           "description": "Area of existing riparian vegetation (as calculated by RCAT, which includes additonal landfire categories)",
@@ -1343,7 +1342,7 @@
         },
         {
           "name": "hist_riparian",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Area of Riparian Vegetation",
           "data_unit": "m^2",
           "description": "Area of historic riparian vegetation (as calculated by RCAT, which includes additonal landfire categories)",
@@ -1355,7 +1354,7 @@
         },
         {
           "name": "prop_riparian",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Proportion of Riparian Vegetation",
           "data_unit": "m^2/m^2",
           "description": "The area of existing riparian cover divided by the area of the riverscape",
@@ -1367,7 +1366,7 @@
         },
         {
           "name": "hist_prop_riparian",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Historic Proportion of Riparian Vegetation",
           "data_unit": "m^2/m^2",
           "description": "The area of historic riparian cover divided by the area of the riverscape",
@@ -1379,7 +1378,7 @@
         },
         {
           "name": "riparian_veg_departure",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Riparian Proportion Current over Historic",
           "data_unit": "m^2/m^2",
           "description": "Ratio of existing riparian vegetation cover over historic riparian vegetation cover. This is often expressed or symbolized as departure from historic which is 1 minus this value. Value of -9999 means valley too narrow to sample.",
@@ -1391,7 +1390,7 @@
         },
         {
           "name": "ag_conversion",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Conversion from Riparian to Agriculture",
           "data_unit": "m^2/m^2",
           "description": "The proportion of historic riparian vegetation converted to agriculture",
@@ -1403,7 +1402,7 @@
         },
         {
           "name": "develop",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Conversion from Riparian to Developed",
           "data_unit": "m^2/m^2",
           "description": "The proportion of historic riparian vegetation converted to developed",
@@ -1415,7 +1414,7 @@
         },
         {
           "name": "grass_shrub_conversion",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Conversion from Riparian to Grass/Shrubland",
           "data_unit": "m^2/m^2",
           "description": "The proportion of historic riparian vegetation converted to grass-shrubland",
@@ -1427,7 +1426,7 @@
         },
         {
           "name": "conifer_encroachment",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Conversion from Riparian to Conifer",
           "data_unit": "m^2/m^2",
           "description": "The proportion of historic riparian vegetation converted to conifer",
@@ -1439,7 +1438,7 @@
         },
         {
           "name": "invasive_conversion",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Conversion from Native Riparian to Invasive",
           "data_unit": "m^2/m^2",
           "description": "The proportion of historic riparian vegetation converted to invasive vegetation",
@@ -1451,7 +1450,7 @@
         },
         {
           "name": "riparian_condition",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Riparian Condition Index",
           "data_unit": "NA",
           "description": "A riparian condition index from (0) poor to (1) intact based on riparian vegetation departure, land use intensity, and floodplain accessibility",
@@ -1463,7 +1462,7 @@
         },
         {
           "name": "geom",
-          "dtype": "POINT",
+          "dtype": "GEOMETRY",
           "friendly_name": "DGO Geometry",
           "data_unit": "",
           "description": "Well-known-binary (WKB) representation of the DGO Polygon",
@@ -1475,7 +1474,7 @@
         },
         {
           "name": "level_path",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "Level Path",
           "data_unit": "",
           "description": "the NHD level path, which is a unique identifier for each stream from its origin to its end in the NHDPlusHR dataset",
@@ -1487,7 +1486,7 @@
         },
         {
           "name": "seg_distance",
-          "dtype": "MEDIUMINT",
+          "dtype": "INTEGER",
           "friendly_name": "Segment Distance",
           "data_unit": "",
           "description": "(From VBET) the distance along a given level path that the IGO is located (used for toplogical purposes)",
@@ -1499,7 +1498,7 @@
         },
         {
           "name": "centerline_length",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Riverscape Length",
           "data_unit": "m",
           "description": "The length of valley centerline",
@@ -1511,7 +1510,7 @@
         },
         {
           "name": "segment_area",
-          "dtype": "REAL",
+          "dtype": "FLOAT",
           "friendly_name": "Riverscape Area",
           "data_unit": "m^2",
           "description": "the area of the DGO polygon",
@@ -1523,7 +1522,7 @@
         },
         {
           "name": "fcode",
-          "dtype": "MEDIUMINT",
+          "dtype": "INTEGER",
           "friendly_name": "Feature Code",
           "data_unit": "",
           "description": "The NHD Feature Code representing flow type of the primary channel",
@@ -1535,7 +1534,7 @@
         },
         {
           "name": "rme_project_id",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "RME Project ID",
           "data_unit": "",
           "description": "Project ID for the source metric engine project on Riverscapes Data Exchange, data.riverscapes.net",
@@ -1559,7 +1558,7 @@
         },
         {
           "name": "rme_version",
-          "dtype": "TEXT",
+          "dtype": "STRING",
           "friendly_name": "RME Project Version",
           "data_unit": "",
           "description": "RME Version as string, e.g. 1.3.4",
@@ -1583,5 +1582,6 @@
         }
       ]
     }
-  ]
+  ],
+  "tool_schema_name": "rme_to_athena"
 }
