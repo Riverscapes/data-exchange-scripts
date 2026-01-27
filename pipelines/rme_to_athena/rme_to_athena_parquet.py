@@ -8,6 +8,7 @@ Sept 2025
 Enhances Philip's June 2025 rme_to_athena.py
 """
 import argparse
+import json
 import logging
 import os
 from pathlib import Path
@@ -120,7 +121,7 @@ def get_matching_file(parent_dir: str, regex_str: str) -> str | None:
 def download_rme_geopackage(
     rs_api: RiverscapesAPI,
     project: RiverscapesProject,
-    huc_dir: str
+    huc_dir: str | Path
 ) -> str:
     """
     Download the RME GeoPackage for a project and return its file path.
@@ -130,6 +131,23 @@ def download_rme_geopackage(
     # NOTE: will not overwrite existing files - which can be a problem.
     rme_gpkg = download_file(rs_api, project.id, huc_dir, RME_SCRAPE_GPKG_REGEX)  # pyright: ignore[reportArgumentType]
     return rme_gpkg
+
+
+def get_layer_columns_dict(layer_definitions_path: Path, layer_id: str) -> dict[str, dict]:
+    """
+    Load the layer_definitions.json and return a dictionary of columns and their properties for the given layer_id.
+    Args:
+        layer_definitions_path (Path): the Path to the json file to use
+        layer_id (str): The layer_id to look up.
+    Returns:
+        dict[str, dict]: Dictionary mapping column names to their property dicts.
+    """
+    with layer_definitions_path.open('r', encoding='utf-8') as f:
+        data = json.load(f)
+    for layer in data.get('layers', []):
+        if layer.get('layer_id') == layer_id:
+            return {col['name']: col for col in layer.get('columns', [])}
+    raise ValueError(f"Layer ID '{layer_id}' not found in {layer_definitions_path}")
 
 
 def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd.GeoDataFrame:
@@ -169,17 +187,35 @@ def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd
         warnings.filterwarnings("ignore", message="pandas only supports SQLAlchemy connectable")
         df = pd.read_sql_query(sql, conn)
 
+    # Use the data dictionary to set column types.
     # because there are nulls, the combination of sqlites dynamic typing and pandas' type inference mis-assigns data types
     # actually the problem is that it is sometimes a double, sometimes INT64. Needs to be consistent
-    # TODO: this should look up the types from our data dictionary but i am hardcoding for now
-    for field in ['fcode', 'seg_distance', 'stream_order', 'headwater', 'confluences', 'diffluences', 'tributaries']:
-        df[field] = df[field].astype('Int64')  # Note the capital 'I' for pandas nullable integer
+    try:
+        # NOTE - using this one definitions file to describe both INPUT AND OUTPUT structure
+        # ideally we'd take the data types from the RME data dictionary and write them (along with any changes we're making) to the raw_rme version. But that doesn't exist yet
+        # Possible enhancement: check the is_required property and if TRUE then we could use a nullable integer
+        columns_dict = get_layer_columns_dict(Path(__file__).parent / 'layer_definitions.json', 'raw_rme')
+        for field, props in columns_dict.items():
+            if props.get('dtype') == 'INTEGER' and field in df.columns:
+                df[field] = df[field].astype('Int64')  # pandas nullable integer
+    except Exception as e:
+        raise Exception(f"Could not apply data dictionary types: {e}") from e
 
     # Remove all columns named 'dgoid' (case-insensitive, even if duplicated)
     df = df.loc[:, [col for col in df.columns if col.lower() != 'dgoid']]
     # convert wkb geometry to shapely objects
     df['dgo_geom'] = df['dgo_geom'].apply(wkb.loads)  # pyright: ignore[reportCallIssue, reportArgumentType]
     gdf = gpd.GeoDataFrame(df, geometry='dgo_geom', crs='EPSG:4326')
+
+    # Reproject to EPSG:5070 for simplification
+    gdf_proj = gdf.to_crs(epsg=5070)
+
+    # Use simplify_coverage for topology-preserving simplification
+    gdf["geometry_simplified"] = gdf_proj.geometry.simplify_coverage(tolerance=tolerance)
+    # Reproject simplified geometry back to EPSG:4326
+    gdf["geometry_simplified"] = gpd.GeoSeries(gdf["geometry_simplified"], crs=5070).to_crs(epsg=4326)
+    gdf = gdf.set_crs(epsg=4326)
+    gdf = gdf.reset_index(drop=True)
 
     bbox_df = gdf.geometry.bounds.rename(columns={'minx': 'xmin', 'miny': 'ymin', 'maxx': 'xmax', 'maxy': 'ymax'})
     # Combine into a struct-like dict for each row
@@ -191,10 +227,10 @@ def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd
     return gdf
 
 
-def delete_folder(dirpath: str) -> None:
+def delete_folder(dirpath: Path) -> None:
     """delete a local folder and its contents"""
     log = Logger('delete downloads')
-    if os.path.isdir(dirpath):
+    if dirpath.is_dir():
         try:
             log.info(f'Deleting directory {dirpath}')
             shutil.rmtree(dirpath)
@@ -241,7 +277,7 @@ def scrape_rme(
     #    - Optionally clean up
 
     log = Logger('Scrape RME')
-
+    download_dir = Path(download_dir)
     # NEW WAY
     # run Athena query to find all eligible projects that are newer than what is already scraped
     projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
@@ -267,7 +303,7 @@ def scrape_rme(
         model_version_int = semver_to_int(project.model_version)
 
         try:
-            huc_dir = os.path.join(download_dir, project.huc)
+            huc_dir = download_dir / project.huc
             safe_makedirs(huc_dir)
             gpkg_path = download_rme_geopackage(rs_api, project, huc_dir)
             data_gdf = extract_metrics_to_geodataframe(gpkg_path, spatialite_path)
@@ -281,10 +317,10 @@ def scrape_rme(
             # until we have a more robust schema check this is something
             if len(data_gdf.columns) != 134:
                 log.warning(f"Expected 134 columns, got {len(data_gdf.columns)}")
-            rme_pq_filepath = os.path.join(huc_dir, f'rme_{project.huc}.parquet')
+            rme_pq_filepath = huc_dir / f'rme_{project.huc}.parquet'
             data_gdf.to_parquet(rme_pq_filepath)
             # don't use os.path.join because this is aws os, not system os
-            s3_key = f'data_exchange/riverscape_metrics/{os.path.basename(rme_pq_filepath)}'
+            s3_key = f'data_exchange/riverscape_metrics/{rme_pq_filepath.name}'
             upload_to_s3(rme_pq_filepath, data_bucket, s3_key)
 
             if delete_downloads_when_done:
