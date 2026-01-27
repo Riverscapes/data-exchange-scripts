@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Dict, List, Generator, Tuple
 import webbrowser
 import re
@@ -325,17 +326,21 @@ class RiverscapesAPI:
         with open(os.path.join(os.path.dirname(__file__), '..', 'graphql', 'queries', f'{query_name}.graphql'), 'r', encoding='utf-8') as queryFile:
             return queryFile.read()
 
-    def load_mutation(self, mutation_name: str) -> str:
-        """ Load a mutation file from the file system.
+    def load_mutation(self, mutation_name: str | Path) -> str:
+        """ Load a mutation file from the file system graphql/mutations folder or from a specific path.
 
         Args:
-            mutationName (str): _description_
+            mutationName (str|Path): name of mutation in library, or Path to .graphql file
 
         Returns:
-            str: _description_
+            str: the contents of the file
         """
-        with open(os.path.join(os.path.dirname(__file__), '..',  'graphql', 'mutations', f'{mutation_name}.graphql'), 'r', encoding='utf-8') as queryFile:
-            return queryFile.read()
+        if Path(mutation_name).exists():
+            mutation_file_path = Path(mutation_name)
+        else:
+            mutation_file_path = Path(__file__).parent.parent / 'graphql' / 'mutations' / f'{mutation_name}.graphql'
+
+        return mutation_file_path.read_text(encoding='utf-8')
 
     def search(self, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: List[str] = None, max_results: int = None, search_query_name: str = None) -> Generator[Tuple[RiverscapesProject, Dict, int], None, None]:
         """ A simple function to make a yielded search on the riverscapes API
