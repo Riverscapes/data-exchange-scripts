@@ -9,14 +9,19 @@ There are three ways someone might want to change attribution:
 2. replace (remove any existing attribution and apply new)
 3. remove (remove specific attribution but leave all others in place)
 
+* This currently implements MODE 2 ONLY.
+* The project will show as having been UPDATED BY the user running the script
+
 Lorin Gaertner
 January 2026
 """
+from pathlib import Path
 import argparse
 
 from rsxml import ProgressBar, dotenv, Logger
 from pydex import RiverscapesAPI
 # from pydex.generated_types import AttributionRoleEnum, ProjectAttributionInput, ProjectInput
+# ============================================================================================
 from typing import TypedDict
 from enum import Enum
 
@@ -45,6 +50,7 @@ class ProjectInput(TypedDict, total=False):
     name: str
     summary: str
     tags: list[str]
+# ============================================================================================
 
 
 def build_attribution_params() -> tuple[list[str], str, list[str]]:
@@ -53,7 +59,7 @@ def build_attribution_params() -> tuple[list[str], str, list[str]]:
     * ProjectAttribution Object Organization ID
     * ProjectAttribution Object list of AttributionRoleEnum
     """
-    return (['73cc1ada-c82b-499e-b3b2-5dc70393e340'], 'cc4fff44-f470-4f4f-ada2-99f741d56b28', ['CO_FUNDER', 'DESIGNER'])
+    return (['73cc1ada-c82b-499e-b3b2-5dc70393e340'], 'cc4fff44-f470-4f4f-ada2-99f741d56b28', ['ANALYST'])
 
 
 def apply_attribution(rs_api: RiverscapesAPI, attribution_params: tuple[list[str], str, list[str]]):
@@ -64,7 +70,8 @@ def apply_attribution(rs_api: RiverscapesAPI, attribution_params: tuple[list[str
     # ProjectAttribution is organization: Organization! , role [AttributionRoleEnum!]
     log = Logger('Apply attribution')
     log.title('Apply attribution')
-    mutation = rs_api.load_mutation('updateProject')
+    mutation_file = Path(__file__).parent / 'updateProjectAttribution.graphql'
+    mutation = rs_api.load_mutation(mutation_file)
     project_ids, org_id, roles = attribution_params
 
     attribution_item: ProjectAttributionInput = {
