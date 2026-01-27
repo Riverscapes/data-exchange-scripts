@@ -2,6 +2,17 @@ directive @admin_only on FIELD_DEFINITION
 
 directive @logged_in on FIELD_DEFINITION
 
+enum AttributionRoleEnum {
+  ANALYST
+  CONTRIBUTOR
+  CO_FUNDER
+  DESIGNER
+  FUNDER
+  OWNER
+  QA_QC
+  SUPPORTER
+}
+
 scalar BigInt
 
 type Collection implements DBObj & HasOwner & HasStar & HasTags {
@@ -808,6 +819,8 @@ type ObjectPermissions {
 }
 
 type Organization implements DBObj & HasStar {
+  """Projects attributed to this organization"""
+  attributedProjects(excludeArchived: Boolean, limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
   collections(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedCollections!
   createdBy: User!
   createdOn: DateTime!
@@ -835,6 +848,8 @@ type Organization implements DBObj & HasStar {
   """
   permissions: ObjectPermissions!
   preferences: JSONObject
+
+  """Projects that this organization owns"""
   projects(excludeArchived: Boolean, limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedProjects!
   savedSearches(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedSavedSearches!
   social: SocialLinks
@@ -1108,6 +1123,7 @@ input ProfileInput {
 
 type Project implements DBObj & HasOwner & HasStar {
   archived: Boolean!
+  attribution: [ProjectAttribution!]!
 
   """Banner image (optional)"""
   bounds: ProjectBounds
@@ -1140,7 +1156,6 @@ type Project implements DBObj & HasOwner & HasStar {
   projectType: ProjectType!
   qaqc(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedQAQCEvents!
   ref: String!
-  sponsor: Owner
   starred: Boolean!
   starredCount: Int!
   summary: String!
@@ -1152,6 +1167,16 @@ type Project implements DBObj & HasOwner & HasStar {
   updatedBy: User!
   updatedOn: DateTime!
   visibility: ProjectVisibilityEnum!
+}
+
+type ProjectAttribution {
+  organization: Organization!
+  roles: [AttributionRoleEnum!]!
+}
+
+input ProjectAttributionInput {
+  organizationId: ID!
+  roles: [AttributionRoleEnum!]!
 }
 
 type ProjectBounds implements DBSimpleObj {
@@ -1208,6 +1233,9 @@ input ProjectInput {
   """
   archived: Boolean
 
+  """Attribution"""
+  attribution: [ProjectAttributionInput!]
+
   """
   Project bounds object code you were given from the checkUploadBounds endpoint
   """
@@ -1221,9 +1249,6 @@ input ProjectInput {
 
   """Resets/deletes the user's avatar back to the default"""
   clearHeroImage: Boolean
-
-  """remove the sponsor for the proejct"""
-  clearSponsor: Boolean
 
   """Attach new datasets or add/remove linked datasets"""
   datasets: [DatasetInput!]
@@ -1247,9 +1272,6 @@ input ProjectInput {
 
   """Attache any QAQC tasks in order"""
   qaqc: [QAQCEventInput!]
-
-  """Optional: Sponsor ID"""
-  sponsor: OwnerInput
 
   """Summary or tagline"""
   summary: String
@@ -1308,6 +1330,9 @@ For searching projects we use this for both the searchProjects query AND
 the SavedSearchInput type
 """
 type ProjectSearchParams {
+  """Filter to items attributed to an organization"""
+  attributedOrgId: ID
+
   """bbox: [minLng, minLat, maxLng, maxLat]"""
   bbox: [Float!]
 
@@ -1356,6 +1381,9 @@ For searching projects we use this for both the searchProjects query AND
 the SavedSearchInput type
 """
 input ProjectSearchParamsInput {
+  """Filter to projects attributed to an organization"""
+  attributedOrgId: ID
+
   """bbox: [minLng, minLat, maxLng, maxLat]"""
   bbox: [Float!]
 
@@ -2224,6 +2252,7 @@ type TileService {
   format: String
   indexUrl: String
   lastState: DateTime
+  layerZooms: JSONObject
   layers: [String!]
   localPath: String
   maxZoom: Int
