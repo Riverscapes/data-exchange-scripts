@@ -6,6 +6,10 @@
 
 This project is designed to simplify interaction with the Riverscapes GraphQL API. It uses modern Python packaging standards, including a `pyproject.toml` file for configuration and dependency management.
 
+### Data Exchange API (GraphQL definitions)
+
+This project includes a static local copy of ot he riverscapes data exchange API. We do this as we've had trouble getting linter/VSCode introspection to work with the online version. But it means if the API changes, this code needs to be updated.
+
 ## Using UV for Environment Management
 
 This project uses [uv](https://github.com/astral-sh/uv) to manage Python virtual environments and dependencies. `uv` is an alternative to tools like `pipenv` and `poetry`.
