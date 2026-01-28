@@ -46,3 +46,19 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 pydex = ["**/*.graphql", "**/*.json"]
+
+[tool.ruff]
+line-length = 240
+target-version = "py312"
+
+[tool.ruff.lint]
+# I = isort (import sorting fix)
+# E, F = Flake8 (standard errors)
+# PL = Pylint (replaces Pylint's rules)
+# N = pep8 naming checks
+select = ["I", "E", "F", "PL", "N"]
+
+[tool.ruff.lint.isort]
+# Tells Ruff exactly which imports are "local" to your project
+known-first-party = ["pydex"]
+combine-as-imports = true
