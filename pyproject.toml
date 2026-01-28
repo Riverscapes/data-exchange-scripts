@@ -51,6 +51,9 @@ pydex = ["**/*.graphql", "**/*.json"]
 line-length = 240
 target-version = "py312"
 
+[tool.ruff.format]
+quote-style = "preserve"
+
 [tool.ruff.lint]
 # I = isort (import sorting fix)
 # E, F = Flake8 (standard errors)

@@ -547,18 +547,18 @@ class RiverscapesAPI:
         stats = results['data']['searchProjects']['stats']
         return (total, stats)
 
-    def run_query(self, query, variables):
-        """ A simple function to use requests.post to make the API call. Note the json= section.
+    def run_query(self, query: str, variables: dict) -> dict:
+        """A simple function to use requests.post to make the API call. Note the json= section.
 
         Args:
-            query (_type_): _description_
-            variables (_type_): _description_
+            query (str): GraphQL query string
+            variables (dict): mapping variable names to values
 
         Raises:
-            Exception: _description_
+            Exception: RiverscapesAPIException
 
         Returns:
-            _type_: _description_
+            dict: parsed JSON response from the API
         """
         headers = {"authorization": "Bearer " + self.access_token} if self.access_token else {}
         request = requests.post(self.uri, json={
