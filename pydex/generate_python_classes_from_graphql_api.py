@@ -2,13 +2,14 @@
 Generate Python TypedDict definitions from a GraphQL schema.
 
 This script reads the project's 'graphql.config.json' to locate the schema file,
-parses it, and generates Python `TypedDict` classes for all InputObjects.
+parses it, and generates Python `TypedDict` classes for all InputObjects. and enums. 
 This allows for type-safe construction of GraphQL mutation payloads.
 
 Quickly built with copilot/gemini 3 pro (preview) 2026-01-27 by Lorin 
 NOTE: If we want to go deeper, there are established libraries for this: 
 * ariadne https://github.com/mirumee/ariadne-codegen/ 
 * https://github.com/sauldom102/gql_schema_codegen
+e.g. Could add types, could make Total=True if all fields are required
 """
 
 import argparse
