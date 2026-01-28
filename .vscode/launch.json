@@ -69,16 +69,15 @@
       },
       "args": [
         "--stage",
-        "staging", // staging or production
+        "production", // staging or production
         "--mode",
-        "REMOVE", // ADD, REPLACE or REMOVE
+        "ADD", // ADD, REPLACE or REMOVE
         "--csv-folder",
         "{env:CSV_FOLDER}",
         "--organization",
-        "70bc51f9-f630-43e8-ae33-88765fa611ba",
-        "--roles",
-        "OWNER",
-        "DESIGNER",
+        "f1b8e6ae-d103-4ffb-b402-a9ee0eaf7607", //NAR on production
+        "--roles", // OWNER DESIGNER CO_FUNDER etc. 
+        "CO_FUNDER",
         "--verbose"
       ]
     },

@@ -338,6 +338,7 @@ def main():
     else:
         log_level = logging.INFO
     log_path = Path.cwd() / f"apply_attribution_{datestamp}.log"
+    print(f"Logging to {log_path} with level {log_level}.")
     log.setup(log_path=log_path, log_level=log_level)
     mode_enum = UpdateMode(args.mode)
     # get csv_file of projects
@@ -360,7 +361,7 @@ def main():
         if not org_name:
             log.error(f"Invalid Organization ID: {organization_id}")
         roles = args.roles
-        log.info(f"Ready to alter attribution using {mode_enum} for {organization_id} ({org_name}) (ROLES {roles}) to {len(project_id_list)} projects from {csv_file}.")
+        log.info(f"Ready to alter attribution using {mode_enum} \n for {organization_id} ({org_name}) \n (ROLES {roles}) \n to {len(project_id_list)} projects \n from {csv_file}.")
         # final review for user
         if not args.yes:
             proceed = inquirer.prompt([inquirer.Confirm("proceed", message="Proceed?", default=True)])
