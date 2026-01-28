@@ -1,0 +1,13 @@
+query getProjectAttribution($id: ID!) {
+  project(id: $id) {
+    id
+    name
+    attribution {
+      organization {
+        id
+        name
+      }
+      roles
+    }
+  }
+}
