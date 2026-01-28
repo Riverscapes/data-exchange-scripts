@@ -57,6 +57,32 @@
       "justMyCode": true
     },
     {
+      "name": "Apply attribution to projects in bulk",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/utility/project_attribution/apply_attribution.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "--stage",
+        "staging", // staging or production
+        "--mode",
+        "REMOVE", // ADD, REPLACE or REMOVE
+        "--csv-folder",
+        "{env:CSV_FOLDER}",
+        "--organization",
+        "70bc51f9-f630-43e8-ae33-88765fa611ba",
+        "--roles",
+        "OWNER",
+        "DESIGNER",
+        "--verbose"
+      ]
+    },
+    {
       "name": "📦 Merge Projects Tool",
       "type": "debugpy",
       "request": "launch",
@@ -179,7 +205,7 @@
         "PYTHONPATH": "${workspaceFolder}"
       },
       "args": [
-        "production",
+        "staging",
         "{env:CSV_FOLDER}",
       ]
     },
