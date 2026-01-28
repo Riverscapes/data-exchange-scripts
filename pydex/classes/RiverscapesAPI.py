@@ -1,18 +1,18 @@
-import base64
-import concurrent.futures
-import hashlib
-import json
-import logging
 import os
-import re
-import threading
-import time
-import webbrowser
-from datetime import datetime, timedelta, timezone
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Dict, Generator, List, Tuple
+from typing import Dict, List, Generator, Tuple
+import webbrowser
+import re
+import time
+import concurrent.futures
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlencode, urlparse, urlunparse
+import json
+import threading
+import hashlib
+import base64
+import logging
+from datetime import datetime, timedelta, timezone
 
 # We want to make inquirer optional so that we can use this module in other contexts
 try:
@@ -24,19 +24,21 @@ import requests
 from dateutil.parser import parse as dateparse
 from rsxml import Logger, ProgressBar, calculate_etag
 from rsxml.util import safe_makedirs
-
 from pydex.classes.riverscapes_helpers import RiverscapesProject, RiverscapesProjectType, RiverscapesSearchParams, format_date
 
 # Disable all the weird terminal noise from urllib3
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("urllib3").propagate = False
 
-CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
 LOCAL_PORT = 4721
 ALT_PORT = 4723
-LOGIN_SCOPE = "openid"
+LOGIN_SCOPE = 'openid'
 
-AUTH_DETAILS = {"domain": "auth.riverscapes.net", "clientId": "pH1ADlGVi69rMozJS1cixkuL5DMVLhKC"}
+AUTH_DETAILS = {
+    "domain": "auth.riverscapes.net",
+    "clientId": "pH1ADlGVi69rMozJS1cixkuL5DMVLhKC"
+}
 
 
 class RiverscapesAPIException(Exception):
@@ -61,7 +63,7 @@ class RiverscapesAPI:
     """
 
     def __init__(self, stage: str = None, machine_auth: Dict[str, str] = None, dev_headers: Dict[str, str] = None):
-        self.log = Logger("API")
+        self.log = Logger('API')
         self.stage = stage.upper() if stage else self._get_stage_interactive()
 
         self.machine_auth = machine_auth
@@ -71,14 +73,14 @@ class RiverscapesAPI:
 
         # If the RSAPI_ALTPORT environment variable is set then we use an alternative port for authentication
         # This is useful for keeping a local environment unblocked while also using this code inside a codespace
-        self.auth_port = LOCAL_PORT if not os.environ.get("RSAPI_ALTPORT") else ALT_PORT
+        self.auth_port = LOCAL_PORT if not os.environ.get('RSAPI_ALTPORT') else ALT_PORT
 
-        if self.stage.upper() == "PRODUCTION":
-            self.uri = "https://api.data.riverscapes.net"
-        elif self.stage.upper() == "STAGING":
-            self.uri = "https://api.data.riverscapes.net/staging"
+        if self.stage.upper() == 'PRODUCTION':
+            self.uri = 'https://api.data.riverscapes.net'
+        elif self.stage.upper() == 'STAGING':
+            self.uri = 'https://api.data.riverscapes.net/staging'
         else:
-            raise RiverscapesAPIException(f"Unknown stage: {stage}")
+            raise RiverscapesAPIException(f'Unknown stage: {stage}')
 
     def _get_stage_interactive(self):
         """_summary_
@@ -90,35 +92,37 @@ class RiverscapesAPI:
             raise RiverscapesAPIException("Inquirer is not installed so interactive stage choosing is not possible. Either install inquirer or specify the stage in the constructor.")
 
         questions = [
-            inquirer.List("stage", message="Which Data Exchange stage?", choices=["production", "staging"], default="production"),
+            inquirer.List('stage', message="Which Data Exchange stage?", choices=['production', 'staging'], default='production'),
         ]
         answers = inquirer.prompt(questions)
-        return answers["stage"].upper()
+        return answers['stage'].upper()
 
-    def __enter__(self) -> "RiverscapesAPI":
-        """Allows us to use this class as a context manager"""
+    def __enter__(self) -> 'RiverscapesAPI':
+        """ Allows us to use this class as a context manager
+        """
         self.refresh_token()
         return self
 
     def __exit__(self, _type, _value, _traceback):
-        """Behaviour on close when using the "with RiverscapesAPI():" Syntax"""
+        """Behaviour on close when using the "with RiverscapesAPI():" Syntax
+        """
         # Make sure to shut down the token poll event so the process can exit normally
         self.shutdown()
 
     def _generate_challenge(self, code: str) -> str:
-        return self._base64_url(hashlib.sha256(code.encode("utf-8")).digest())
+        return self._base64_url(hashlib.sha256(code.encode('utf-8')).digest())
 
     def _generate_state(self, length: int) -> str:
-        result = ""
+        result = ''
         i = length
-        chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
         while i > 0:
             result += chars[int(round(os.urandom(1)[0] * (len(chars) - 1)))]
             i -= 1
         return result
 
     def _base64_url(self, string: bytes) -> str:
-        """Convert a string to a base64url string
+        """ Convert a string to a base64url string
 
         Args:
             string (bytes): this is the string to convert
@@ -126,10 +130,10 @@ class RiverscapesAPI:
         Returns:
             str: the base64url string
         """
-        return base64.urlsafe_b64encode(string).decode("utf-8").replace("=", "").replace("+", "-").replace("/", "_")
+        return base64.urlsafe_b64encode(string).decode('utf-8').replace('=', '').replace('+', '-').replace('/', '_')
 
     def _generate_random(self, size: int) -> str:
-        """Generate a random string of a given size
+        """ Generate a random string of a given size
 
         Args:
             size (int): the size of the string to generate
@@ -142,10 +146,11 @@ class RiverscapesAPI:
         for b in buffer:
             index = b % len(CHARSET)
             state.append(CHARSET[index])
-        return "".join(state)
+        return ''.join(state)
 
     def shutdown(self):
-        """_summary_"""
+        """_summary_
+        """
         self.log.debug("Shutting down Riverscapes API")
         if self.token_timeout:
             self.token_timeout.cancel()
@@ -174,28 +179,28 @@ class RiverscapesAPI:
         # Step 1: Determine if we're machine code or user auth
         # If it's machine then we can fetch tokens much easier:
         if self.machine_auth:
-            token_uri = self.uri if self.uri.endswith("/") else self.uri + "/"
-            token_uri += "token"
+            token_uri = self.uri if self.uri.endswith('/') else self.uri + '/'
+            token_uri += 'token'
 
             options = {
-                "method": "POST",
-                "url": token_uri,
-                "headers": {"content-type": "application/x-www-form-urlencoded"},
-                "data": {
-                    "audience": "https://api.riverscapes.net",
-                    "grant_type": "client_credentials",
-                    "scope": "machine:admin",
-                    "client_id": self.machine_auth["clientId"],
-                    "client_secret": self.machine_auth["secretId"],
+                'method': 'POST',
+                'url': token_uri,
+                'headers': {'content-type': 'application/x-www-form-urlencoded'},
+                'data': {
+                    'audience': 'https://api.riverscapes.net',
+                    'grant_type': 'client_credentials',
+                    'scope': 'machine:admin',
+                    'client_id': self.machine_auth['clientId'],
+                    'client_secret': self.machine_auth['secretId'],
                 },
-                "timeout": 30,
+                'timeout': 30
             }
 
             try:
                 get_token_return = requests.request(**options).json()
                 # NOTE: RETRY IS NOT NECESSARY HERE because we do our refresh on the API side of things
                 # self.tokenTimeout = setTimeout(self.refreshToken, 1000 * getTokenReturn['expires_in'] - 20)
-                self.access_token = get_token_return["access_token"]
+                self.access_token = get_token_return['access_token']
                 self.log.info("SUCCESSFUL Machine Authentication")
             except Exception as error:
                 self.log.info(f"Access Token error {error}")
@@ -235,13 +240,14 @@ class RiverscapesAPI:
             response = requests.post(authentication_url, headers={"content-type": "application/x-www-form-urlencoded"}, data=data, timeout=30)
             response.raise_for_status()
             res = response.json()
-            self.token_timeout = threading.Timer(res["expires_in"] - 20, self.refresh_token)
+            self.token_timeout = threading.Timer(
+                res["expires_in"] - 20, self.refresh_token)
             self.token_timeout.start()
             self.access_token = res["access_token"]
             self.log.info("SUCCESSFUL Browser Authentication")
 
     def _wait_for_auth_code(self):
-        """Wait for the auth code to come back from the server using a simple HTTP server
+        """ Wait for the auth code to come back from the server using a simple HTTP server
 
         Raises:
             Exception: _description_
@@ -249,7 +255,6 @@ class RiverscapesAPI:
         Returns:
             _type_: _description_
         """
-
         class AuthHandler(BaseHTTPRequestHandler):
             """_summary_
 
@@ -258,11 +263,13 @@ class RiverscapesAPI:
             """
 
             def stop(self):
-                """Stop the server"""
+                """Stop the server
+                """
                 self.server.shutdown()
 
             def do_GET(self):
-                """Do all the server stuff here"""
+                """ Do all the server stuff here
+                """
                 self.send_response(200)
                 self.send_header("Content-type", "text/html")
                 self.end_headers()
@@ -285,11 +292,12 @@ class RiverscapesAPI:
                     </html>
                 """
 
-                self.wfile.write(success_html_body.encode("utf-8"))
+                self.wfile.write(success_html_body.encode('utf-8'))
 
                 query = urlparse(self.path).query
                 if "=" in query and "code" in query:
-                    self.server.auth_code = dict(x.split("=") for x in query.split("&"))["code"]
+                    self.server.auth_code = dict(x.split("=")
+                                                 for x in query.split("&"))["code"]
                     # Now shut down the server and return
                     self.stop()
 
@@ -307,7 +315,7 @@ class RiverscapesAPI:
         return auth_code
 
     def load_query(self, query_name: str) -> str:
-        """Load a query file from the file system.
+        """ Load a query file from the file system.
 
         Args:
             queryName (str): _description_
@@ -315,11 +323,11 @@ class RiverscapesAPI:
         Returns:
             str: _description_
         """
-        with open(os.path.join(os.path.dirname(__file__), "..", "graphql", "queries", f"{query_name}.graphql"), "r", encoding="utf-8") as queryFile:
+        with open(os.path.join(os.path.dirname(__file__), '..', 'graphql', 'queries', f'{query_name}.graphql'), 'r', encoding='utf-8') as queryFile:
             return queryFile.read()
 
     def load_mutation(self, mutation_name: str | Path) -> str:
-        """Load a mutation file from the file system graphql/mutations folder or from a specific path.
+        """ Load a mutation file from the file system graphql/mutations folder or from a specific path.
 
         Args:
             mutationName (str|Path): name of mutation in library, or Path to .graphql file
@@ -330,14 +338,12 @@ class RiverscapesAPI:
         if Path(mutation_name).exists():
             mutation_file_path = Path(mutation_name)
         else:
-            mutation_file_path = Path(__file__).parent.parent / "graphql" / "mutations" / f"{mutation_name}.graphql"
+            mutation_file_path = Path(__file__).parent.parent / 'graphql' / 'mutations' / f'{mutation_name}.graphql'
 
-        return mutation_file_path.read_text(encoding="utf-8")
+        return mutation_file_path.read_text(encoding='utf-8')
 
-    def search(
-        self, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: List[str] = None, max_results: int = None, search_query_name: str = None
-    ) -> Generator[Tuple[RiverscapesProject, Dict, int], None, None]:
-        """A simple function to make a yielded search on the riverscapes API
+    def search(self, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: List[str] = None, max_results: int = None, search_query_name: str = None) -> Generator[Tuple[RiverscapesProject, Dict, int], None, None]:
+        """ A simple function to make a yielded search on the riverscapes API
 
         This search has two modes: If the total number of records is less than 10,000 then it will do a single paginated query.
         If the total number of records is greater than 10,000 then it will do a date-partitioned search.
@@ -352,12 +358,12 @@ class RiverscapesAPI:
         Yields:
             Tuple[project: RiverscapeProject, stats: Dict[str, any], total: int]: the project, the stats dictionary and the total number of records
         """
-        qry = self.load_query(search_query_name if search_query_name else "searchProjects")
+        qry = self.load_query(search_query_name if search_query_name else 'searchProjects')
         stats = {}
 
         # NOTE: DO NOT CHANGE THE SORT ORDER HERE. IT WILL BREAK THE PAGINATION.
         # why not make this the default argument instead of None? LSG
-        sort = sort if sort else ["DATE_CREATED_DESC"]
+        sort = sort if sort else ['DATE_CREATED_DESC']
 
         if not search_params or not isinstance(search_params, RiverscapesSearchParams):
             raise RiverscapesAPIException("search requires a valid RiverscapesSearchParams object")
@@ -365,32 +371,35 @@ class RiverscapesAPI:
         # First make a quick query to get the total number of records
         search_params_gql = search_params.to_gql()
         stats_results = self.run_query(qry, {"searchParams": search_params_gql, "limit": 0, "offset": 0, "sort": sort})
-        overall_total = stats_results["data"]["searchProjects"]["total"]
-        stats = stats_results["data"]["searchProjects"]["stats"]
-        _prg = ProgressBar(overall_total, 30, "Search Progress")
+        overall_total = stats_results['data']['searchProjects']['total']
+        stats = stats_results['data']['searchProjects']['stats']
+        _prg = ProgressBar(overall_total, 30, 'Search Progress')
         self.log.debug(f"Total records: {overall_total:,} .... starting retrieval...")
         if max_results and max_results > 0:
             self.log.debug(f"   ... but max_results is set to {max_results:,} so we will stop there.")
         # Set initial to and from dates so that we can paginate through more than 10,000 recirds
         now_date = datetime.now(timezone.utc)
-        createdOn = search_params_gql.get("createdOn", {})
-        search_to_date = dateparse(createdOn.get("to")) if createdOn.get("to") else now_date
-        search_from_date = dateparse(createdOn.get("from")) if createdOn.get("from") else None
+        createdOn = search_params_gql.get('createdOn', {})
+        search_to_date = dateparse(createdOn.get('to')) if createdOn.get('to') else now_date
+        search_from_date = dateparse(createdOn.get('from')) if createdOn.get('from') else None
 
         num_results = 1  # Just to get the loop started
         outer_counter = 0
         while outer_counter < overall_total and num_results > 0:
-            search_params_gql["createdOn"] = {"to": format_date(search_to_date), "from": format_date(search_from_date) if search_from_date else None}
+            search_params_gql['createdOn'] = {
+                "to": format_date(search_to_date),
+                "from": format_date(search_from_date) if search_from_date else None
+            }
             if progress_bar:
                 _prg.update(outer_counter)
             # self.log.debug(f"   Searching from {search_from_date} to {search_to_date}")
             results = self.run_query(qry, {"searchParams": search_params_gql, "limit": page_size, "offset": 0, "sort": sort})
-            projects = results["data"]["searchProjects"]["results"]
+            projects = results['data']['searchProjects']['results']
             num_results = len(projects)
             inner_counter = 0
             project = None
             for search_result in projects:
-                project_raw = search_result["item"]
+                project_raw = search_result['item']
                 if progress_bar:
                     _prg.update(outer_counter + inner_counter)
                 project = RiverscapesProject(project_raw)
@@ -416,7 +425,15 @@ class RiverscapesAPI:
             _prg.finish()
         self.log.debug(f"Search complete: retrieved {outer_counter:,} records")
 
-    def process_search_results_async(self, callback: callable, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: List[str] = None, max_results: int = None, max_workers=5):
+    def process_search_results_async(self,
+                                     callback: callable,
+                                     search_params: RiverscapesSearchParams,
+                                     progress_bar: bool = False,
+                                     page_size: int = 500,
+                                     sort: List[str] = None,
+                                     max_results: int = None,
+                                     max_workers=5
+                                     ):
         """
 
         Considerations:
@@ -438,7 +455,7 @@ class RiverscapesAPI:
             max_results (int, optional): SAME AS THE SEARCH FUNCTION
             max_workers (int, optional): Here is where you can set the number of workers for the ThreadPoolExecutor. Defaults to 5.
         """
-        log = Logger("API")
+        log = Logger('API')
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for project, _stats, _total, _prg in self.search(search_params, progress_bar=progress_bar, page_size=page_size, sort=sort, max_results=max_results):
@@ -458,9 +475,10 @@ class RiverscapesAPI:
                     future.result()  # Gather results or handle exceptions
                 except Exception as e:
                     log.error(f"Project {project.id} generated an exception: {e}")
+        return
 
     def get_project_full(self, project_id: str) -> RiverscapesProject:
-        """This gets the full project record
+        """ This gets the full project record
 
         This is a MUCH heavier query than what comes back from the search function. If all you need is the project metadata this is
         probably not the query for you
@@ -471,12 +489,12 @@ class RiverscapesAPI:
         Returns:
             _type_: _description_
         """
-        qry = self.load_query("getProjectFull")
+        qry = self.load_query('getProjectFull')
         results = self.run_query(qry, {"id": project_id})
-        return RiverscapesProject(results["data"]["project"])
+        return RiverscapesProject(results['data']['project'])
 
     def get_project_files(self, project_id: str) -> List[Dict[str, any]]:
-        """This returns the file listing with everything you need to download project files
+        """ This returns the file listing with everything you need to download project files
 
 
         Args:
@@ -485,9 +503,9 @@ class RiverscapesAPI:
         Returns:
             _type_: _description_
         """
-        qry = self.load_query("projectFiles")
+        qry = self.load_query('projectFiles')
         results = self.run_query(qry, {"projectId": project_id})
-        return results["data"]["project"]["files"]
+        return results['data']['project']['files']
 
     def get_project_types(self) -> Dict[str, RiverscapesProjectType]:
         """_summary_
@@ -495,22 +513,22 @@ class RiverscapesAPI:
         Returns:
             _type_: _description_
         """
-        qry = self.load_query("projectTypes")
+        qry = self.load_query('projectTypes')
         offset = 0
         limit = 100
         total = -1
         results = []
         while total < 0 or offset < total:
             qry_results = self.run_query(qry, {"limit": limit, "offset": offset})
-            total = qry_results["data"]["projectTypes"]["total"]
+            total = qry_results['data']['projectTypes']['total']
             offset += limit
-            for x in qry_results["data"]["projectTypes"]["items"]:
+            for x in qry_results['data']['projectTypes']['items']:
                 results.append(x)
 
-        return {x["machineName"]: RiverscapesProjectType(x) for x in results}
+        return {x['machineName']: RiverscapesProjectType(x) for x in results}
 
     def search_count(self, search_params: RiverscapesSearchParams):
-        """Return the number of records that match the search parameters
+        """ Return the number of records that match the search parameters
         Args:
             query (str): _description_
             variables (Dict[str, str]): _description_
@@ -518,38 +536,41 @@ class RiverscapesAPI:
         Returns:
             Tuple[total: int, Dict[str, any]]: the total results and the stats dictionary
         """
-        qry = self.load_query("searchCount")
+        qry = self.load_query('searchCount')
         if not search_params or not isinstance(search_params, RiverscapesSearchParams):
             raise RiverscapesAPIException("searchCount requires a valid RiverscapesSearchParams object")
         if search_params.keywords is not None or search_params.name is not None:
             raise RiverscapesAPIException("searchCount does not support keywords or name search parameters as you will always get a large, non-representative count because of low-scoring items")
 
         results = self.run_query(qry, {"searchParams": search_params.to_gql(), "limit": 0, "offset": 0})
-        total = results["data"]["searchProjects"]["total"]
-        stats = results["data"]["searchProjects"]["stats"]
+        total = results['data']['searchProjects']['total']
+        stats = results['data']['searchProjects']['stats']
         return (total, stats)
 
-    def run_query(self, query: str, variables: dict) -> dict:
-        """A simple function to use requests.post to make the API call. Note the json= section.
+    def run_query(self, query, variables):
+        """ A simple function to use requests.post to make the API call. Note the json= section.
 
         Args:
-            query (str): GraphQL query string
-            variables (dict): mapping variable names to values
+            query (_type_): _description_
+            variables (_type_): _description_
 
         Raises:
-            Exception: RiverscapesAPIException
+            Exception: _description_
 
         Returns:
-            dict: parsed JSON response from the API
+            _type_: _description_
         """
         headers = {"authorization": "Bearer " + self.access_token} if self.access_token else {}
-        request = requests.post(self.uri, json={"query": query, "variables": variables}, headers=headers, timeout=30)
+        request = requests.post(self.uri, json={
+            'query': query,
+            'variables': variables
+        }, headers=headers, timeout=30)
 
         if request.status_code == 200:
             resp_json = request.json()
-            if "errors" in resp_json and len(resp_json["errors"]) > 0:
+            if 'errors' in resp_json and len(resp_json['errors']) > 0:
                 # Authentication timeout: re-login and retry the query
-                if len(list(filter(lambda err: "You must be authenticated" in err["message"], resp_json["errors"]))) > 0:
+                if len(list(filter(lambda err: 'You must be authenticated' in err['message'], resp_json['errors']))) > 0:
                     self.log.debug("Authentication timed out. Fetching new token...")
                     self.refresh_token()
                     self.log.debug("   done. Re-trying query...")
@@ -565,7 +586,7 @@ class RiverscapesAPI:
             raise RiverscapesAPIException(f"Query failed to run by returning code of {request.status_code}. {query} {json.dumps(variables)}")
 
     def download_files(self, project_id: str, download_dir: str, re_filter: List[str] = None, force=False):
-        """From a project id get all relevant files and download them
+        """ From a project id get all relevant files and download them
 
         Args:
             project_id (_type_): _description_
@@ -579,19 +600,12 @@ class RiverscapesAPI:
         # Now filter the list of files to anything that remains after the regex filter
         filtered_files = []
         for file in file_results:
-            if "localPath" not in file:
-                self.log.warning("File has no localPath. Skipping")
+            if not 'localPath' in file:
+                self.log.warning('File has no localPath. Skipping')
                 continue
             # now filter the
             if re_filter is not None and len(re_filter) > 0:
-                if not any(
-                    [
-                        re.compile(x, re.IGNORECASE).match(
-                            file["localPath"],
-                        )
-                        for x in re_filter
-                    ]
-                ):
+                if not any([re.compile(x, re.IGNORECASE).match(file['localPath'], ) for x in re_filter]):
                     continue
             filtered_files.append(file)
 
@@ -600,11 +614,11 @@ class RiverscapesAPI:
             return
 
         for file in filtered_files:
-            local_file_path = os.path.join(download_dir, file["localPath"])
+            local_file_path = os.path.join(download_dir, file['localPath'])
             self.download_file(file, local_file_path, force)
 
     def download_file(self, api_file_obj: Dict[str, any], local_path: str, force=False):
-        """NOTE: The directory for this file will be created if it doesn't exist
+        """ NOTE: The directory for this file will be created if it doesn't exist
 
         Arguments:
             api_file_obj {[type]} -- The dictionary that the API returns. should include the name, md5, size etc
@@ -614,7 +628,7 @@ class RiverscapesAPI:
             force {bool} -- if true we will download regardless
         """
         file_is_there = os.path.exists(local_path) and os.path.isfile(local_path)
-        etag_match = file_is_there and calculate_etag(local_path) == api_file_obj["etag"]
+        etag_match = file_is_there and calculate_etag(local_path) == api_file_obj['etag']
 
         file_directory = os.path.dirname(local_path)
 
@@ -627,9 +641,9 @@ class RiverscapesAPI:
 
         if force is True or not file_is_there or not etag_match:
             if not etag_match and file_is_there:
-                self.log.info(f"        File etag mismatch. Re-downloading: {local_path}")
+                self.log.info(f'        File etag mismatch. Re-downloading: {local_path}')
             elif not file_is_there:
-                self.log.info(f"        Downloading: {local_path}")
+                self.log.info(f'        Downloading: {local_path}')
 
             max_retries = 3  # could parameterize
             for attempt in range(max_retries):
@@ -637,11 +651,11 @@ class RiverscapesAPI:
                     # errors occurred here once, so we try to catch it:
                     # Exception has occurred: ConnectionError
                     # ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))
-                    r = requests.get(api_file_obj["downloadUrl"], allow_redirects=True, stream=True, timeout=30)
-                    total_length = r.headers.get("content-length")
+                    r = requests.get(api_file_obj['downloadUrl'], allow_redirects=True, stream=True, timeout=30)
+                    total_length = r.headers.get('content-length')
 
                     dl = 0
-                    with open(local_path, "wb") as f:
+                    with open(local_path, 'wb') as f:
                         if total_length is None:  # no content length header
                             f.write(r.content)
                         else:
@@ -653,25 +667,28 @@ class RiverscapesAPI:
                             progbar.erase()
                     return True
                 except requests.ConnectionError as e:
-                    self.log.warning(f"Connection error on attempt {attempt + 1}: {e}")
+                    self.log.warning(f"Connection error on attempt {attempt+1}: {e}")
                     if attempt < max_retries - 1:
-                        time.sleep(2**attempt)  # Exponential backoff
+                        time.sleep(2 ** attempt)  # Exponential backoff
                     else:
                         raise
 
         else:
-            self.log.debug(f"        File already exists (skipping): {local_path}")
+            self.log.debug(f'        File already exists (skipping): {local_path}')
             return False
 
 
-if __name__ == "__main__":
-    log = Logger("API")
-    gql = RiverscapesAPI(os.environ.get("RS_API_URL"))
+if __name__ == '__main__':
+    log = Logger('API')
+    gql = RiverscapesAPI(os.environ.get('RS_API_URL'))
     gql.refresh_token()
     log.debug(gql.access_token)
     gql.shutdown()  # remember to shutdown so the threaded timer doesn't keep the process alive
 
-    gql2 = RiverscapesAPI(os.environ.get("RS_API_URL"), {"clientId": os.environ["RS_CLIENT_ID"], "secretId": os.environ["RS_CLIENT_SECRET"]})
+    gql2 = RiverscapesAPI(os.environ.get('RS_API_URL'), {
+        'clientId': os.environ['RS_CLIENT_ID'],
+        'secretId': os.environ['RS_CLIENT_SECRET']
+    })
     gql2.refresh_token()
     log.debug(gql2.access_token)
     gql2.shutdown()  # remember to shutdown so the threaded timer doesn't keep the process alive
