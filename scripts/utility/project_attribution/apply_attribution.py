@@ -78,19 +78,15 @@ def build_attribution_params() -> tuple[list[str], str, list[str]]:
     * ProjectAttribution Object Organization ID
     * ProjectAttribution Object list of AttributionRoleEnum
     """
-    return (['73cc1ada-c82b-499e-b3b2-5dc70393e340'], 'cc4fff44-f470-4f4f-ada2-99f741d56b28', ['ANALYST'])
+    return (['73cc1ada-c82b-499e-b3b2-5dc70393e340'], 'c3addb86-a96d-4831-99eb-3899764924da', ['ANALYST', 'DESIGNER'])
 
 
-def resolve_attribution_list(current_data: list['ProjectAttributionInput'],
-                             target_attrib_item: ProjectAttributionInput,
-                             mode: UpdateMode) -> list['ProjectAttributionInput']:
-    """given the a project attribution, the change mode and the change element, 
-    return the new attribution
-    * For REMOVE - it ignores the input roles and removes all attribution for that organization
-    """
-
-    # 1. Transform the current data from the output format to the input format
+def normalize_api_data(current_data: list[Any]) -> list[ProjectAttributionInput]:
+    """Helper: Convert raw API Output (Nested Dicts) to Input Format (TypedDict)"""
     normalized_list: list[ProjectAttributionInput] = []
+
+    if not current_data:
+        return normalized_list
 
     for item in current_data:
         # Safety check for malformed data
@@ -99,42 +95,75 @@ def resolve_attribution_list(current_data: list['ProjectAttributionInput'],
 
         normalized_list.append({
             "organizationId": item['organization']['id'],
-            # Cast strings back to Enums
+            # Convert string roles back to proper Enums
             "roles": [AttributionRoleEnum(r) for r in item.get('roles', [])]
         })
+    return normalized_list
 
-    target_org_id = target_attrib_item['organizationId']
+
+def is_attribution_equal(list_a: list[ProjectAttributionInput], list_b: list[ProjectAttributionInput]) -> bool:
+    """Compare two attribution lists.
+    * Checks length
+    * Checks Organization ID Match
+    * Checks Roles (Order agnostic using Sets)
+    """
+    if len(list_a) != len(list_b):
+        return False
+
+    # We assume the order of organizations matters (e.g. Primary first)
+    for a, b in zip(list_a, list_b):
+        if a['organizationId'] != b['organizationId']:
+            return False
+
+        # Compare roles as sets to ignore order (['A', 'B'] == ['B', 'A'])
+        if set(a['roles']) != set(b['roles']):
+            return False
+
+    return True
+
+
+def resolve_attribution_list(current_data: list[ProjectAttributionInput],
+                             target_attrib_item: ProjectAttributionInput,
+                             mode: UpdateMode) -> list[ProjectAttributionInput]:
+    """
+    Takes the normalized input list, applies logic, returns new list:
+    * for ADD - adds the specific attribution in target to existing
+    * for REPLACE - all existing attributions ignored, target returned
+    * For REMOVE - removes all attribution for the organization specified in target
+    # TODO: Allow for more targetted removal of a specific role
+    """
 
     # 2. Logic
     if mode == UpdateMode.REPLACE:
         # Override everything
         return [target_attrib_item]
 
-    elif mode == UpdateMode.REMOVE:
+    target_org_id = target_attrib_item['organizationId']
+    if mode == UpdateMode.REMOVE:
         # Return list without this org
-        # TODO: Allow for more targetted removal of a specific role
-        return [x for x in normalized_list if x['organizationId'] != target_org_id]
+        return [x for x in current_data if x['organizationId'] != target_org_id]
 
+    working_list = [x.copy() for x in current_data]
     if mode == UpdateMode.ADD:
         # check if org exists
-        existing_index = next((i for i, x in enumerate(normalized_list) if x['organizationId'] == target_org_id), -1)
+        existing_index = next((i for i, x in enumerate(working_list) if x['organizationId'] == target_org_id), -1)
         if existing_index > -1:
             # MERGE: Combine existing roles with new roles (using set to avoid duplicates)
-            existing_roles = set(normalized_list[existing_index]['roles'])
+            existing_roles = set(working_list[existing_index]['roles'])
             new_roles = set(target_attrib_item['roles'])
 
-            # Update the existing entry with the Union of roles
-            normalized_list[existing_index]['roles'] = list(existing_roles.union(new_roles))
+            # Convert back to list and cast to Enum to satisfy TypedDict
+            merged_roles = [AttributionRoleEnum(r) for r in existing_roles.union(new_roles)]
+            working_list[existing_index]['roles'] = merged_roles
         else:
             # APPEND: Add new entry to list
-            normalized_list.append(target_attrib_item)
+            working_list.append(target_attrib_item)
 
-    return normalized_list
+    return working_list
 
 
 def apply_attribution(rs_api: RiverscapesAPI, attribution_params: tuple[list[str], str, list[str]], mode: UpdateMode):
     """Apply attribution to a project
-    TODO: Add different modes
     """
     # Project.attribution is an array of [ProjectAttribution!]!
     # ProjectAttribution is organization: Organization! , role [AttributionRoleEnum!]
@@ -161,7 +190,8 @@ def apply_attribution(rs_api: RiverscapesAPI, attribution_params: tuple[list[str
         try:
             resp = rs_api.run_query(get_current_attrib_query, {"id": project_id})
             if resp and 'data' in resp:
-                current_attribution = resp['data']['project'].get('attribution', [])
+                raw_data = resp['data']['project'].get('attribution', [])
+                current_attribution = normalize_api_data(raw_data)
             print(current_attribution)
         except Exception as e:
             log.error(f"Failed to fetch current attribution for {project_id}: {e}")
@@ -170,11 +200,11 @@ def apply_attribution(rs_api: RiverscapesAPI, attribution_params: tuple[list[str
 
         # Step 2: Calculate desired new attribution state
         final_list = resolve_attribution_list(current_attribution, target_attrib_item, mode)
-        if current_attribution == final_list:
-            print("No change needed")
+        if is_attribution_equal(current_attribution, final_list):
+            log.debug("No change needed")
         else:
             project_update: ProjectInput = {
-                'attribution': [target_attrib_item]
+                'attribution': final_list
             }
             variables = {
                 "projectId": project_id,
@@ -200,7 +230,7 @@ def main():
                         type=str,
                         choices=['production', 'staging'],
                         default='staging')
-    parser.add_argument('--mode', type=str, choices=[m.value for m in UpdateMode], default='REPLACE',
+    parser.add_argument('--mode', type=str, choices=[m.value for m in UpdateMode], default='ADD',
                         help="ADD: Append/Merge, REPLACE: Overwrite, REMOVE: Delete specific org")
     args = dotenv.parse_args_env(parser)
     log = Logger('Setup')
