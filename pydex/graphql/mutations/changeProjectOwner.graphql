@@ -18,9 +18,6 @@ mutation changeProjectOwner($projectId: ID!, $owner: OwnerInput!) {
     ownedBy {
       ...owner
     }
-    sponsor {
-      ...owner
-    }
     starred
     starredCount
     tags

@@ -43,9 +43,6 @@ query getProjectFull($id: ID!) {
         }
       }
     }
-    sponsor {
-      ...dbobjSm
-    }
     collections(offset: 0, limit: 50) {
       items {
         ...dbobjSm
