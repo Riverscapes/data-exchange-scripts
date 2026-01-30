@@ -337,7 +337,7 @@ def main():
         log_level = logging.DEBUG
     else:
         log_level = logging.INFO
-    log_path = Path.cwd() / f"apply_attribution_{datestamp}.log"
+    log_path = Path.cwd() / "logs" / f"apply_attribution_{datestamp}.log"
     print(f"Logging to {log_path} with level {log_level}.")
     log.setup(log_path=log_path, log_level=log_level)
     mode_enum = UpdateMode(args.mode)
