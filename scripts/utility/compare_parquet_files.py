@@ -53,7 +53,9 @@ def compare_parquet_files(file1: str, file2: str) -> None:
 
 
 def main():
-    # Replace with your file paths
+    """main
+    Replace with your file paths
+    """
     file1 = r"C:\nardata\pydataroot\rme-athena\downloads\0713001203\Jan15_rme_0713001203.parquet"
     file2 = r"C:\nardata\pydataroot\rme-athena\downloads\0713001203\new_rme_0713001203.parquet"
     compare_parquet_files(file1, file2)
