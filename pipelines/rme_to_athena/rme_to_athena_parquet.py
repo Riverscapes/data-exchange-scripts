@@ -280,11 +280,12 @@ def scrape_rme(
     download_dir = Path(download_dir)
     # NEW WAY
     # run Athena query to find all eligible projects that are newer than what is already scraped
-    # projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
-    # if projects_to_add_df.empty:
-    #     log.info("Query to identify projects to scrape returned no results.")
-    #     return
-    projects_to_add_df = pd.DataFrame({'project_id': ['5aeff0f8-5a8e-4db8-8e6c-9e507b20eca0']})
+    projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
+    if projects_to_add_df.empty:
+        log.info("Query to identify projects to scrape returned no results.")
+        return
+    # test a single project
+    # projects_to_add_df = pd.DataFrame({'project_id': ['5aeff0f8-5a8e-4db8-8e6c-9e507b20eca0']})
     count = 0
     prg = ProgressBar(projects_to_add_df.shape[0], text="Scrape Progress")
     for project_id in projects_to_add_df['project_id']:

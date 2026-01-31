@@ -1,6 +1,6 @@
 {
   "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
-  "tool_schema_version": "1.0.2",
+  "tool_schema_version": "1.0.3",
   "layers": [
     {
       "layer_id": "raw_rme",
@@ -1461,17 +1461,26 @@
           "default_value": null
         },
         {
-          "name": "geom",
+          "name": "dgo_geom",
           "dtype": "GEOMETRY",
           "friendly_name": "DGO Geometry",
           "data_unit": "",
           "description": "Well-known-binary (WKB) representation of the DGO Polygon",
           "is_key": false,
           "is_required": false,
-          "theme": "DGOS",
-          "preferred_bin_definition": "",
-          "default_value": null
+          "theme": "DGOS"
         },
+                {
+          "name": "geometry_simplified",
+          "dtype": "GEOMETRY",
+          "friendly_name": "DGO Geometry",
+          "data_unit": "",
+          "description": "Well-known-binary (WKB) representation of the DGO Polygon simplified with a tolerance of 11 metres",
+          "is_key": false,
+          "is_required": false,
+          "theme": "DGOS"
+        },
+        
         {
           "name": "level_path",
           "dtype": "STRING",
