@@ -211,7 +211,7 @@ def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd
     gdf_proj = gdf.to_crs(epsg=5070)
 
     # Use simplify_coverage for topology-preserving simplification
-    gdf["geometry_simplified"] = gdf_proj.geometry.simplify_coverage(tolerance=tolerance)
+    gdf["geometry_simplified"] = gdf_proj.geometry.simplify_coverage(tolerance=11)  # 11 m seems to have worked well
     # Reproject simplified geometry back to EPSG:4326
     gdf["geometry_simplified"] = gpd.GeoSeries(gdf["geometry_simplified"], crs=5070).to_crs(epsg=4326)
     gdf = gdf.set_crs(epsg=4326)
@@ -271,7 +271,7 @@ def scrape_rme(
     # 2. For each project:
     #    - create a folder
     #    - Download and validate
-    #    - Extract metrics as GeoDataFrame
+    #    - Extract metrics, geometries as GeoDataFrame
     #    - Write GeoParquet
     #    - Upload to S3
     #    - Optionally clean up
@@ -280,11 +280,11 @@ def scrape_rme(
     download_dir = Path(download_dir)
     # NEW WAY
     # run Athena query to find all eligible projects that are newer than what is already scraped
-    projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
-    if projects_to_add_df.empty:
-        log.info("Query to identify projects to scrape returned no results.")
-        return
-
+    # projects_to_add_df = query_to_dataframe(missing_projects_query, 'identify new projects')
+    # if projects_to_add_df.empty:
+    #     log.info("Query to identify projects to scrape returned no results.")
+    #     return
+    projects_to_add_df = pd.DataFrame({'project_id': ['5aeff0f8-5a8e-4db8-8e6c-9e507b20eca0']})
     count = 0
     prg = ProgressBar(projects_to_add_df.shape[0], text="Scrape Progress")
     for project_id in projects_to_add_df['project_id']:
@@ -304,7 +304,7 @@ def scrape_rme(
 
         try:
             huc_dir = download_dir / project.huc
-            safe_makedirs(huc_dir)
+            safe_makedirs(str(huc_dir))
             gpkg_path = download_rme_geopackage(rs_api, project, huc_dir)
             data_gdf = extract_metrics_to_geodataframe(gpkg_path, spatialite_path)
             # add common project-level columns
@@ -315,11 +315,11 @@ def scrape_rme(
 
             log.debug(f"Dataframe prepared with shape {data_gdf.shape}")
             # until we have a more robust schema check this is something
-            if len(data_gdf.columns) != 134:
-                log.warning(f"Expected 134 columns, got {len(data_gdf.columns)}")
+            if len(data_gdf.columns) != 135:
+                log.warning(f"Expected 135 columns, got {len(data_gdf.columns)}")
             rme_pq_filepath = huc_dir / f'rme_{project.huc}.parquet'
             data_gdf.to_parquet(rme_pq_filepath)
-            # don't use os.path.join because this is aws os, not system os
+            # do not use os.path.join because this is aws os, not system os
             s3_key = f'data_exchange/riverscape_metrics/{rme_pq_filepath.name}'
             upload_to_s3(rme_pq_filepath, data_bucket, s3_key)
 
@@ -343,10 +343,11 @@ def main():
     args = dotenv.parse_args_env(parser)
 
     # Set up some reasonable folders to store things
-    working_folder = args.working_folder
-    download_folder = os.path.join(working_folder, 'downloads')
+    working_folder = Path(args.working_folder)
+    download_folder = working_folder / 'downloads'
 
-    safe_makedirs(working_folder)
+    safe_makedirs(str(working_folder))
+
     log = Logger('Setup')
     log.setup(log_path=os.path.join(working_folder, 'rme-athena.log'), log_level=logging.DEBUG)
 
