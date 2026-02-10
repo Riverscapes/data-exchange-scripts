@@ -17,7 +17,7 @@ concurrency:
 
 env:
   TABLE_NAME: layer_definitions
-  S3_BASE_PATH: s3://riverscapes-athena/riverscapes_metadata/layer_definitions
+  S3_BASE_PATH: s3://riverscapes-athena/riverscapes_metadata/layer_definitions_raw/0.8/
   ATHENA_DATABASE: default
   ATHENA_RESULT_BUCKET: s3://riverscapes-athena-output/query-results/metadata  # <-- ensure this exists
   AWS_REGION: us-west-2                        
