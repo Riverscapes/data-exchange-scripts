@@ -1,479 +1,479 @@
 {
-    "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
-    "authority_name": "rscontext_to_athena",
-    "tool_schema_version": "1.0.2",
-    "layers": [
+  "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
+  "tool_schema_name": "rscontext_to_athena",
+  "tool_schema_version": "1.0.2",
+  "layers": [
+    {
+      "layer_id": "rs_context_huc10",
+      "layer_name": "rs_context_huc10",
+      "description": "",
+      "layer_type": "DataTable",
+      "columns": [
         {
-            "layer_id": "rs_context_huc10",
-            "layer_name": "rs_context_huc10",
-            "description": "",
-            "layer_type": "DataTable",
-            "columns": [
-                {
-                    "name": "huc",
-                    "dtype": "TEXT",
-                    "friendly_name": "HUC10",
-                    "data_unit": "NA",
-                    "description": "HUC10 Watershed ID",
-                    "is_key": true,
-                    "is_required": true,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
-                },
-                {
-                    "name": "hucName",
-                    "dtype": "TEXT",
-                    "friendly_name": "Watershed Name",
-                    "data_unit": "NA",
-                    "description": "",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "default_value": null
-                },
-                {
-                    "name": "hucStates",
-                    "dtype": "TEXT",
-                    "friendly_name": "State(s)",
-                    "data_unit": "",
-                    "description": "",
-                    "theme": ""
-                },
-                {
-                    "name": "hucAreaSqKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Watershed Area",
-                    "data_unit": "km^2",
-                    "description": "",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "default_value": null
-                },
-                {
-                    "name": "hucAreaAcres",
-                    "dtype": "REAL",
-                    "friendly_name": "Watershed Area (acres)",
-                    "data_unit": "acre",
-                    "description": "",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "default_value": null
-                },
-                {
-                    "name": "flowlineLengthPerennialKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Perrenial Stream Length",
-                    "data_unit": "km"
-                },
-                {
-                    "name": "flowlineLengthIntermittentKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Intermittent Stream Length",
-                    "data_unit": "km"
-                },
-                {
-                    "name": "flowlineLengthEphemeralKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Ephemeral Stream Length",
-                    "data_unit": "km"
-                },
-                {
-                    "name": "flowlineLengthCanalsKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Canal Length",
-                    "data_unit": "km"
-                },
-                {
-                    "name": "flowlineLengthAllKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Total Stream Length",
-                    "data_unit": "km"
-                },
-                {
-                    "name": "flowlineFeatureCount",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Number of Stream Segments",
-                    "data_unit": "count"
-                },
-                {
-                    "name": "waterbodyAreaSqKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Total Waterbody Area",
-                    "data_unit": "km^2"
-                },
-                {
-                    "name": "waterbodyFeatureCount",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Total count of Waterbodies",
-                    "data_unit": "count"
-                },
-                {
-                    "name": "waterbodyLakesPondsAreaSqKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Lake Area",
-                    "data_unit": "km^2"
-                },
-                {
-                    "name": "waterbodyReservoirAreaSqKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Reservoir Area",
-                    "data_unit": "km^2"
-                },
-                {
-                    "name": "waterbodyEstuariesAreaSqKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Estuaries Area",
-                    "data_unit": "km^2"
-                },
-                {
-                    "name": "waterbodyPlayaAreaSqKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Playa Area",
-                    "data_unit": "km^2"
-                },
-                {
-                    "name": "waterbodySwampMarshAreaSqKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Swamp/Marsh Area",
-                    "data_unit": "km^2"
-                },
-                {
-                    "name": "waterbodyIceSnowAreaSqKm",
-                    "dtype": "REAL",
-                    "friendly_name": "Ice/Snow Area",
-                    "data_unit": "km^2"
-                },
-                {
-                    "name": "demMaximum",
-                    "dtype": "REAL",
-                    "friendly_name": "DEM Max",
-                    "data_unit": "m",
-                    "description": "Maximum Elevation",
-                    "theme": "Elevation"
-                },
-                {
-                    "name": "demMinimum",
-                    "dtype": "REAL",
-                    "friendly_name": "DEM Min",
-                    "data_unit": "m",
-                    "description": "Minimum Elevation",
-                    "theme": "Elevation"
-                },
-                {
-                    "name": "demSum",
-                    "dtype": "REAL",
-                    "data_unit": "m",
-                    "friendly_name": "DEM Spatial Sum of Grid Values",
-                    "description": "Sum of individual grid cell values for elevation. Meaningless on its own, this is useful for calculating spatial average.",
-                    "theme": "Elevation"
-                },
-                {
-                    "name": "demCount",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Number of DEM Grid Cells",
-                    "data_unit": "count",
-                    "description": "Count of individual grid cells used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
-                    "theme": "Elevation"
-                },
-                {
-                    "name": "demMean",
-                    "dtype": "REAL",
-                    "friendly_name": "DEM Spatial Mean",
-                    "data_unit": "m",
-                    "description": "Mean elevation across the geography.",
-                    "theme": "Elevation"
-                },
-                {
-                    "name": "demRange",
-                    "dtype": "REAL",
-                    "friendly_name": "DEM Spatial Range",
-                    "data_unit": "m",
-                    "description": "Spatial variability, ie difference between Max and Min elevation across subject area.",
-                    "theme": "Elevation"
-                },
-                {
-                    "name": "slopeMaximum",
-                    "dtype": "REAL",
-                    "friendly_name": "Slope Max",
-                    "data_unit": "degree",
-                    "description": "Maximum Slope",
-                    "theme": "Slope"
-                },
-                {
-                    "name": "slopeMinimum",
-                    "dtype": "REAL",
-                    "friendly_name": "Slope Min",
-                    "data_unit": "degree",
-                    "description": "Minimum Slope",
-                    "theme": "Slope"
-                },
-                {
-                    "name": "slopeSum",
-                    "dtype": "REAL",
-                    "data_unit": "degree",
-                    "friendly_name": "Slope Spatial Sum of Grid Values",
-                    "description": "Sum of individual grid cell values for slope. Meaningless on its own, this is useful for calculating spatial average.",
-                    "theme": "Slope"
-                },
-                {
-                    "name": "slopeCount",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Number of Slope Grid Cells",
-                    "data_unit": "count",
-                    "description": "Count of individual grid cells used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
-                    "theme": "Slope"
-                },
-                {
-                    "name": "slopeMean",
-                    "dtype": "REAL",
-                    "friendly_name": "Slope Spatial Mean",
-                    "data_unit": "degree",
-                    "description": "Mean slope across the geography.",
-                    "theme": "Slope"
-                },
-                {
-                    "name": "slopeRange",
-                    "dtype": "REAL",
-                    "friendly_name": "Slope Spatial Range",
-                    "data_unit": "degree",
-                    "description": "Spatial variability, ie difference between Max and Min slope across subject area.",
-                    "theme": "Slope"
-                },
-                {
-                    "name": "precipMaximum",
-                    "dtype": "REAL",
-                    "friendly_name": "Precipitation Spatial Max",
-                    "data_unit": "mm",
-                    "description": "Maximum 30-year-average annual precipitation",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipMinimum",
-                    "dtype": "REAL",
-                    "friendly_name": "Precipitation Spatial Min",
-                    "data_unit": "mm",
-                    "description": "Minimum 30-year-average annual precipation",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipSum",
-                    "dtype": "REAL",
-                    "data_unit": "mm",
-                    "friendly_name": "Precipitation Spatial Sum of Grid Values",
-                    "description": "Sum of individual 800-meter grid cell values for 30-year-average annual precipitation. Meaningless on its own, this is useful for calculating spatial average.",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipCount",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Number of Precipitation Grid Cells",
-                    "data_unit": "count",
-                    "description": "Count of individual 800-meter grid cell values used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipMean",
-                    "dtype": "REAL",
-                    "friendly_name": "Precipitation Spatial Mean",
-                    "data_unit": "mm",
-                    "description": "Mean across the geography of the 30-year average annual precipitation.",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "precipRange",
-                    "dtype": "REAL",
-                    "friendly_name": "Precipitation Spatial Range",
-                    "data_unit": "mm",
-                    "description": "Spatial variability (difference between Max and Min precipitation areas) in 30-year average precipitation.",
-                    "theme": "PRISM Climate"
-                },
-                {
-                    "name": "catchmentLength",
-                    "dtype": "REAL",
-                    "friendly_name": "Catchment Length",
-                    "data_unit": "km",
-                    "description": "",
-                    "theme": "Morphometric"
-                },
-                {
-                    "name": "catchmentArea",
-                    "dtype": "REAL",
-                    "friendly_name": "Catchment Area",
-                    "data_unit": "km^2",
-                    "description": "",
-                    "theme": "Morphometric"
-                },
-                {
-                    "name": "catchmentPerimeter",
-                    "dtype": "REAL",
-                    "friendly_name": "Catchment Perimeter",
-                    "data_unit": "km",
-                    "description": "",
-                    "theme": "Morphometric"
-                },
-                {
-                    "name": "circularityRatio",
-                    "dtype": "REAL",
-                    "friendly_name": "Circularity Ratio",
-                    "data_unit": "dimensionless",
-                    "description": "Calculated as `catchment_area / bounding_circle_area` (both in same units)",
-                    "theme": "Morphometric"
-                },
-                {
-                    "name": "elongationRatio",
-                    "dtype": "REAL",
-                    "friendly_name": "Elongation Ratio",
-                    "data_unit": "dimensionless",
-                    "description": "Calculated as `catchment_area_km2**0.5 / catchment_length_km`",
-                    "theme": "Morphometric"
-                },
-                {
-                    "name": "formFactor",
-                    "dtype": "REAL",
-                    "friendly_name": "Form Factor",
-                    "data_unit": "dimensionless",
-                    "description": "Calculated as `catchment_area_km2 / catchment_length_km**2`",
-                    "theme": "Morphometric"
-                },
-                {
-                    "name": "catchmentRelief",
-                    "dtype": "REAL",
-                    "friendly_name": "Catchment Relief",
-                    "data_unit": "m",
-                    "description": "The difference between highest and lowest elevation. Equivalent to DEM Range",
-                    "theme": "Morphometric"
-                },
-                {
-                    "name": "reliefRatio",
-                    "dtype": "REAL",
-                    "friendly_name": "Relief Ratio",
-                    "data_unit": "dimensionless",
-                    "description": "Calculated as relief (in km) divided by catchment length (in km).",
-                    "theme": "Morphometric"
-                },
-                {
-                    "name": "dem_bins.min",
-                    "dtype": "REAL",
-                    "friendly_name": "Lowest Elevation",
-                    "data_unit": "m",
-                    "description": "Minimum elevation value within the watershed’s DEM raster.",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.max",
-                    "dtype": "REAL",
-                    "friendly_name": "Highest Elevation",
-                    "description": "Maximum elevation value within the watershed’s DEM raster.",
-                    "data_unit": "m",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.geotransform",
-                    "dtype": "ARRAY",
-                    "friendly_name": "Raster Geotransform",
-                    "data_unit": "NA",
-                    "description": "Affine transformation coefficients for converting raster coordinates to spatial coordinates.",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.proj",
-                    "dtype": "TEXT",
-                    "friendly_name": "Raster Projection (WKT)",
-                    "data_unit": "NA",
-                    "description": "Well-Known Text (WKT) string describing the spatial reference system of the DEM raster.",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.nodata",
-                    "dtype": "REAL",
-                    "friendly_name": "NoData Value",
-                    "data_unit": "NA",
-                    "description": "Value used in the DEM raster to represent missing or undefined data.",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.value_count",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Valid Cell Count",
-                    "data_unit": "count",
-                    "description": "Number of raster cells with valid elevation values (excluding NoData)",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.hist_type",
-                    "dtype": "TEXT",
-                    "friendly_name": "Histogram Type",
-                    "data_unit": "NA",
-                    "description": "Method used to bin elevation values. Continuous means bins are of equal width.",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.bin_size",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Bin Size",
-                    "data_unit": "m",
-                    "description": "Width of each elevation bin used in the hypsometric analysis",
-                    "theme": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.bins.bin",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Elevation Bin Value",
-                    "data_unit": "m",
-                    "description": "Lower bound of the bin",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "default_value": null
-                },
-                {
-                    "name": "dem_bins.bins.cell_count",
-                    "dtype": "INTEGER",
-                    "friendly_name": "Cell Count",
-                    "data_unit": "count",
-                    "description": "Number of raster cells falling within elevation bin",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "default_value": null
-                },
-                {
-                    "name": "existing_veg_bins",
-                    "dtype": "STRUCT",
-                    "friendly_name": "Existing Vegetation Bins",
-                    "description": "Categorical bins extracted from the LandFire Existing Vegetation Type (EVT) raster. Complexes of plant communities representing NatureServe's terrestrial Ecological Systems classification."
-                }
-            ]
+          "name": "huc",
+          "dtype": "STRING",
+          "friendly_name": "HUC10",
+          "data_unit": "NA",
+          "description": "HUC10 Watershed ID",
+          "is_key": true,
+          "is_required": true,
+          "theme": "",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "hucName",
+          "dtype": "STRING",
+          "friendly_name": "Watershed Name",
+          "data_unit": "NA",
+          "description": "",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "default_value": null
+        },
+        {
+          "name": "hucStates",
+          "dtype": "STRING",
+          "friendly_name": "State(s)",
+          "data_unit": "",
+          "description": "",
+          "theme": ""
+        },
+        {
+          "name": "hucAreaSqKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Watershed Area",
+          "data_unit": "km^2",
+          "description": "",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "default_value": null
+        },
+        {
+          "name": "hucAreaAcres",
+          "dtype": "FLOAT",
+          "friendly_name": "Watershed Area (acres)",
+          "data_unit": "acre",
+          "description": "",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "default_value": null
+        },
+        {
+          "name": "flowlineLengthPerennialKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Perrenial Stream Length",
+          "data_unit": "km"
+        },
+        {
+          "name": "flowlineLengthIntermittentKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Intermittent Stream Length",
+          "data_unit": "km"
+        },
+        {
+          "name": "flowlineLengthEphemeralKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Ephemeral Stream Length",
+          "data_unit": "km"
+        },
+        {
+          "name": "flowlineLengthCanalsKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Canal Length",
+          "data_unit": "km"
+        },
+        {
+          "name": "flowlineLengthAllKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Total Stream Length",
+          "data_unit": "km"
+        },
+        {
+          "name": "flowlineFeatureCount",
+          "dtype": "INTEGER",
+          "friendly_name": "Number of Stream Segments",
+          "data_unit": "count"
+        },
+        {
+          "name": "waterbodyAreaSqKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Total Waterbody Area",
+          "data_unit": "km^2"
+        },
+        {
+          "name": "waterbodyFeatureCount",
+          "dtype": "INTEGER",
+          "friendly_name": "Total count of Waterbodies",
+          "data_unit": "count"
+        },
+        {
+          "name": "waterbodyLakesPondsAreaSqKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Lake Area",
+          "data_unit": "km^2"
+        },
+        {
+          "name": "waterbodyReservoirAreaSqKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Reservoir Area",
+          "data_unit": "km^2"
+        },
+        {
+          "name": "waterbodyEstuariesAreaSqKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Estuaries Area",
+          "data_unit": "km^2"
+        },
+        {
+          "name": "waterbodyPlayaAreaSqKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Playa Area",
+          "data_unit": "km^2"
+        },
+        {
+          "name": "waterbodySwampMarshAreaSqKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Swamp/Marsh Area",
+          "data_unit": "km^2"
+        },
+        {
+          "name": "waterbodyIceSnowAreaSqKm",
+          "dtype": "FLOAT",
+          "friendly_name": "Ice/Snow Area",
+          "data_unit": "km^2"
+        },
+        {
+          "name": "demMaximum",
+          "dtype": "FLOAT",
+          "friendly_name": "DEM Max",
+          "data_unit": "m",
+          "description": "Maximum Elevation",
+          "theme": "Elevation"
+        },
+        {
+          "name": "demMinimum",
+          "dtype": "FLOAT",
+          "friendly_name": "DEM Min",
+          "data_unit": "m",
+          "description": "Minimum Elevation",
+          "theme": "Elevation"
+        },
+        {
+          "name": "demSum",
+          "dtype": "FLOAT",
+          "data_unit": "m",
+          "friendly_name": "DEM Spatial Sum of Grid Values",
+          "description": "Sum of individual grid cell values for elevation. Meaningless on its own, this is useful for calculating spatial average.",
+          "theme": "Elevation"
+        },
+        {
+          "name": "demCount",
+          "dtype": "INTEGER",
+          "friendly_name": "Number of DEM Grid Cells",
+          "data_unit": "count",
+          "description": "Count of individual grid cells used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
+          "theme": "Elevation"
+        },
+        {
+          "name": "demMean",
+          "dtype": "FLOAT",
+          "friendly_name": "DEM Spatial Mean",
+          "data_unit": "m",
+          "description": "Mean elevation across the geography.",
+          "theme": "Elevation"
+        },
+        {
+          "name": "demRange",
+          "dtype": "FLOAT",
+          "friendly_name": "DEM Spatial Range",
+          "data_unit": "m",
+          "description": "Spatial variability, ie difference between Max and Min elevation across subject area.",
+          "theme": "Elevation"
+        },
+        {
+          "name": "slopeMaximum",
+          "dtype": "FLOAT",
+          "friendly_name": "Slope Max",
+          "data_unit": "degree",
+          "description": "Maximum Slope",
+          "theme": "Slope"
+        },
+        {
+          "name": "slopeMinimum",
+          "dtype": "FLOAT",
+          "friendly_name": "Slope Min",
+          "data_unit": "degree",
+          "description": "Minimum Slope",
+          "theme": "Slope"
+        },
+        {
+          "name": "slopeSum",
+          "dtype": "FLOAT",
+          "data_unit": "degree",
+          "friendly_name": "Slope Spatial Sum of Grid Values",
+          "description": "Sum of individual grid cell values for slope. Meaningless on its own, this is useful for calculating spatial average.",
+          "theme": "Slope"
+        },
+        {
+          "name": "slopeCount",
+          "dtype": "INTEGER",
+          "friendly_name": "Number of Slope Grid Cells",
+          "data_unit": "count",
+          "description": "Count of individual grid cells used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
+          "theme": "Slope"
+        },
+        {
+          "name": "slopeMean",
+          "dtype": "FLOAT",
+          "friendly_name": "Slope Spatial Mean",
+          "data_unit": "degree",
+          "description": "Mean slope across the geography.",
+          "theme": "Slope"
+        },
+        {
+          "name": "slopeRange",
+          "dtype": "FLOAT",
+          "friendly_name": "Slope Spatial Range",
+          "data_unit": "degree",
+          "description": "Spatial variability, ie difference between Max and Min slope across subject area.",
+          "theme": "Slope"
+        },
+        {
+          "name": "precipMaximum",
+          "dtype": "FLOAT",
+          "friendly_name": "Precipitation Spatial Max",
+          "data_unit": "mm",
+          "description": "Maximum 30-year-average annual precipitation",
+          "theme": "PRISM Climate"
+        },
+        {
+          "name": "precipMinimum",
+          "dtype": "FLOAT",
+          "friendly_name": "Precipitation Spatial Min",
+          "data_unit": "mm",
+          "description": "Minimum 30-year-average annual precipation",
+          "theme": "PRISM Climate"
+        },
+        {
+          "name": "precipSum",
+          "dtype": "FLOAT",
+          "data_unit": "mm",
+          "friendly_name": "Precipitation Spatial Sum of Grid Values",
+          "description": "Sum of individual 800-meter grid cell values for 30-year-average annual precipitation. Meaningless on its own, this is useful for calculating spatial average.",
+          "theme": "PRISM Climate"
+        },
+        {
+          "name": "precipCount",
+          "dtype": "INTEGER",
+          "friendly_name": "Number of Precipitation Grid Cells",
+          "data_unit": "count",
+          "description": "Count of individual 800-meter grid cell values used in aggregations. Meaningless on its own, this is useful for calculating spatial average.",
+          "theme": "PRISM Climate"
+        },
+        {
+          "name": "precipMean",
+          "dtype": "FLOAT",
+          "friendly_name": "Precipitation Spatial Mean",
+          "data_unit": "mm",
+          "description": "Mean across the geography of the 30-year average annual precipitation.",
+          "theme": "PRISM Climate"
+        },
+        {
+          "name": "precipRange",
+          "dtype": "FLOAT",
+          "friendly_name": "Precipitation Spatial Range",
+          "data_unit": "mm",
+          "description": "Spatial variability (difference between Max and Min precipitation areas) in 30-year average precipitation.",
+          "theme": "PRISM Climate"
+        },
+        {
+          "name": "catchmentLength",
+          "dtype": "FLOAT",
+          "friendly_name": "Catchment Length",
+          "data_unit": "km",
+          "description": "",
+          "theme": "Morphometric"
+        },
+        {
+          "name": "catchmentArea",
+          "dtype": "FLOAT",
+          "friendly_name": "Catchment Area",
+          "data_unit": "km^2",
+          "description": "",
+          "theme": "Morphometric"
+        },
+        {
+          "name": "catchmentPerimeter",
+          "dtype": "FLOAT",
+          "friendly_name": "Catchment Perimeter",
+          "data_unit": "km",
+          "description": "",
+          "theme": "Morphometric"
+        },
+        {
+          "name": "circularityRatio",
+          "dtype": "FLOAT",
+          "friendly_name": "Circularity Ratio",
+          "data_unit": "dimensionless",
+          "description": "Calculated as `catchment_area / bounding_circle_area` (both in same units)",
+          "theme": "Morphometric"
+        },
+        {
+          "name": "elongationRatio",
+          "dtype": "FLOAT",
+          "friendly_name": "Elongation Ratio",
+          "data_unit": "dimensionless",
+          "description": "Calculated as `catchment_area_km2**0.5 / catchment_length_km`",
+          "theme": "Morphometric"
+        },
+        {
+          "name": "formFactor",
+          "dtype": "FLOAT",
+          "friendly_name": "Form Factor",
+          "data_unit": "dimensionless",
+          "description": "Calculated as `catchment_area_km2 / catchment_length_km**2`",
+          "theme": "Morphometric"
+        },
+        {
+          "name": "catchmentRelief",
+          "dtype": "FLOAT",
+          "friendly_name": "Catchment Relief",
+          "data_unit": "m",
+          "description": "The difference between highest and lowest elevation. Equivalent to DEM Range",
+          "theme": "Morphometric"
+        },
+        {
+          "name": "reliefRatio",
+          "dtype": "FLOAT",
+          "friendly_name": "Relief Ratio",
+          "data_unit": "dimensionless",
+          "description": "Calculated as relief (in km) divided by catchment length (in km).",
+          "theme": "Morphometric"
+        },
+        {
+          "name": "dem_bins.min",
+          "dtype": "FLOAT",
+          "friendly_name": "Lowest Elevation",
+          "data_unit": "m",
+          "description": "Minimum elevation value within the watershed’s DEM raster.",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.max",
+          "dtype": "FLOAT",
+          "friendly_name": "Highest Elevation",
+          "description": "Maximum elevation value within the watershed’s DEM raster.",
+          "data_unit": "m",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.geotransform",
+          "dtype": "STRUCTURED",
+          "friendly_name": "Raster Geotransform",
+          "data_unit": "NA",
+          "description": "Affine transformation coefficients for converting raster coordinates to spatial coordinates.",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.proj",
+          "dtype": "STRING",
+          "friendly_name": "Raster Projection (WKT)",
+          "data_unit": "NA",
+          "description": "Well-Known Text (WKT) string describing the spatial reference system of the DEM raster.",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.nodata",
+          "dtype": "FLOAT",
+          "friendly_name": "NoData Value",
+          "data_unit": "NA",
+          "description": "Value used in the DEM raster to represent missing or undefined data.",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.value_count",
+          "dtype": "INTEGER",
+          "friendly_name": "Valid Cell Count",
+          "data_unit": "count",
+          "description": "Number of raster cells with valid elevation values (excluding NoData)",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.hist_type",
+          "dtype": "STRING",
+          "friendly_name": "Histogram Type",
+          "data_unit": "NA",
+          "description": "Method used to bin elevation values. Continuous means bins are of equal width.",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.bin_size",
+          "dtype": "INTEGER",
+          "friendly_name": "Bin Size",
+          "data_unit": "m",
+          "description": "Width of each elevation bin used in the hypsometric analysis",
+          "theme": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.bins.bin",
+          "dtype": "INTEGER",
+          "friendly_name": "Elevation Bin Value",
+          "data_unit": "m",
+          "description": "Lower bound of the bin",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "default_value": null
+        },
+        {
+          "name": "dem_bins.bins.cell_count",
+          "dtype": "INTEGER",
+          "friendly_name": "Cell Count",
+          "data_unit": "count",
+          "description": "Number of raster cells falling within elevation bin",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "default_value": null
+        },
+        {
+          "name": "existing_veg_bins",
+          "dtype": "STRUCTURED",
+          "friendly_name": "Existing Vegetation Bins",
+          "description": "Categorical bins extracted from the LandFire Existing Vegetation Type (EVT) raster. Complexes of plant communities representing NatureServe's terrestrial Ecological Systems classification."
         }
-    ]
+      ]
+    }
+  ]
 }
