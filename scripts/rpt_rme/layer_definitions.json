@@ -1,39 +1,39 @@
 {
-    "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
-    "authority_name": "rpt_rme",
-    "tool_schema_version": "1.0.2",
-    "layers": [
+  "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
+  "tool_schema_name": "rpt_rme",
+  "tool_schema_version": "1.0.2",
+  "layers": [
+    {
+      "layer_id": "rpt_rme",
+      "layer_name": "rpt_rme_pq",
+      "description": "report view",
+      "layer_type": "DataTable",
+      "columns": [
         {
-            "layer_id": "rpt_rme",
-            "layer_name": "rpt_rme_pq",
-            "description": "report view",
-            "layer_type": "DataTable",
-            "columns": [
-                {
-                    "name": "fcode_desc",
-                    "dtype": "TEXT",
-                    "friendly_name": "Flow Type",
-                    "data_unit": "",
-                    "description": "",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
-                },
-                {
-                    "name": "ownership_desc",
-                    "dtype": "TEXT",
-                    "friendly_name": "Ownership",
-                    "data_unit": "",
-                    "description": "",
-                    "is_key": false,
-                    "is_required": false,
-                    "theme": "",
-                    "preferred_bin_definition": "",
-                    "default_value": null
-                }
-            ]
+          "name": "fcode_desc",
+          "dtype": "STRING",
+          "friendly_name": "Flow Type",
+          "data_unit": "",
+          "description": "",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "ownership_desc",
+          "dtype": "STRING",
+          "friendly_name": "Ownership",
+          "data_unit": "",
+          "description": "",
+          "is_key": false,
+          "is_required": false,
+          "theme": "",
+          "preferred_bin_definition": "",
+          "default_value": null
         }
-    ]
+      ]
+    }
+  ]
 }
