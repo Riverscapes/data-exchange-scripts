@@ -472,6 +472,25 @@
           "dtype": "STRUCTURED",
           "friendly_name": "Existing Vegetation Bins",
           "description": "Categorical bins extracted from the LandFire Existing Vegetation Type (EVT) raster. Complexes of plant communities representing NatureServe's terrestrial Ecological Systems classification."
+        },
+        {
+          "name": "ownership",
+          "dtype": "STRUCTURED",
+          "description": "A mapping of ownership codes to area"
+        },
+        {
+          "name": "ownership[key]",
+          "friendly_name": "ownership_code",
+          "dtype": "STRING",
+          "data_unit": "NA",
+          "description": "Abbreviated ownership code"
+        },
+        {
+          "name": "ownership[value]",
+          "friendly_name": "ownership_area",
+          "dtype": "FLOAT",
+          "data_unit": "m^2",
+          "description": "Area"
         }
       ]
     }
