@@ -42,5 +42,13 @@
       "**/.venv/**": true,
       "**/__pycache__/**": true
     },
+    "json.schemas": [
+      {
+        "fileMatch": [
+          "**/layer_definitions.json"
+        ],
+        "url": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json"
+      }
+    ]
   }
 }
