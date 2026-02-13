@@ -11,7 +11,8 @@
         {
           "name": "dgo_id",
           "friendly_name": "DGO ID",
-          "dtype": "INTEGER"
+          "dtype": "INTEGER",
+          "data_unit": "NA"
         },
         {
           "name": "level_path",
@@ -21,12 +22,16 @@
         {
           "name": "seg_distance",
           "friendly_name": "Segment Distance",
-          "dtype": "INTEGER"
+          "dtype": "INTEGER",
+          "data_unit": "m",
+          "description": "Approximate distance from the upstream headwater of the level path"
         },
         {
           "name": "fcode",
           "friendly_name": "Feature Code",
-          "dtype": "INTEGER"
+          "dtype": "INTEGER",
+          "description": "Stream classification (46006 Perennial Stream or River; 55800 Artificial path)",
+          "data_unit": "NA"
         },
         {
           "name": "low_lying_floodplain_area",
@@ -76,7 +81,8 @@
         {
           "name": "floodplain_prop",
           "friendly_name": "Floodplain Proportion",
-          "dtype": "FLOAT"
+          "dtype": "FLOAT",
+          "data_unit": "dimensionless"
         },
         {
           "name": "centerline_length",
@@ -99,7 +105,7 @@
         {
           "name": "dgo_geom",
           "friendly_name": "DGO Geometry",
-          "dtype": "BINARY"
+          "dtype": "GEOMETRY"
         },
         {
           "name": "dgo_geom_bbox",
@@ -125,7 +131,8 @@
         {
           "name": "rd_version_int",
           "friendly_name": "RSDynamics Model Version (Int)",
-          "dtype": "INTEGER"
+          "dtype": "INTEGER",
+          "data_unit": "NA"
         },
         {
           "name": "huc",
