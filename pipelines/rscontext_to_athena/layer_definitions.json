@@ -474,7 +474,7 @@
           "description": "Categorical bins extracted from the LandFire Existing Vegetation Type (EVT) raster. Complexes of plant communities representing NatureServe's terrestrial Ecological Systems classification."
         },
         {
-          "name": "ownership",
+          "name": "ownership2",
           "dtype": "STRUCTURED",
           "description": "A mapping of ownership codes to area"
         },
