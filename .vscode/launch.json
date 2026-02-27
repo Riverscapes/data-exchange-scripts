@@ -512,13 +512,12 @@
       "args": [
         "production",
         "CHaMPGooglePostgres",
-        "/Users/philipbailey/GISData/riverscapes/champ/CHaMP_All_Measurements3.sqlite",
+        "/Users/philipbailey/GISData/champ/aux_data/CHaMP_All_Measurements3.sqlite",
         "/Users/philipbailey/GISData/riverscapes/champ/visit_aux_data",
         "False",
         "c7d8c487-c377-42b0-a5b6-4c16db18fb41",
-        // "--visit_id", "744"
-        "--watershed",
-        "Yankee Fork",
+        // "--visit_id", "1165",
+        "--watershed", "Lemhi",
       ]
     },
     // {

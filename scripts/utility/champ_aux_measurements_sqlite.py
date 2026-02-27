@@ -1,17 +1,41 @@
+"""
+Enrich CHaMP topo projects with aux measurement data by exporting from the SQLite database, 
+transforming to JSON files, and uploading to the project on the API. 
+This is meant to be run after the initial upload of topo projects, and will look for any visits
+that have a topo project but are missing aux measurements, then find any measurements in the 
+SQLite database for those visits, export them to JSON files, add them to the project XML, 
+and re-upload the project. The upload will trigger processing on the API to extract the 
+measurement data from the JSON files and insert it into the appropriate database tables.
+
+Philip Bailey
+27 Feb 2026
+
+**** HISTORY ****
+
+champ_aux_measurements_postgres.py
+There were two previous attempts made at this process. They each had a separate Python
+script. One attempted to get the aux measurements from the Google Cloud Postgres database.
+This process was too slow.
+
+champ_aux_measurements.py
+The second attempted to get the aux measurements from the old .net SQLite workbench database.
+Turns out that this database did not possess Aux measurements for all CHaMP visits.
+
+Both these scripts are now deleted, but should be available in the git history.
+"""
 import argparse
 import os
 import json
-import psycopg2
-import psycopg2.extras
 import sqlite3
 import shutil
 import datetime
-from rsxml.util import safe_makedirs
-from rsxml import ProgressBar, dotenv, Logger
+import psycopg2
+import psycopg2.extras
 from psycopg2.extensions import cursor as Cursor
+from rsxml import ProgressBar, dotenv, Logger
+from rsxml.project_xml import Project, Dataset, Meta, MetaData
 from new_project_upload import upload_project
 from pydex import RiverscapesAPI
-from rsxml.project_xml import Project, Dataset, Meta, MetaData
 
 # from scripts.utility.champ_aux_measurements_postgres import COLUMNS_TO_SKIP
 
@@ -343,9 +367,9 @@ def main():
     parser.add_argument('--verbose', help='(optional) a little extra logging ', action='store_true', default=False)
     args = dotenv.parse_args_env(parser)
 
-    log = Logger('CHaMP_Aux_Measurements_Postgres')
+    log = Logger('CHaMP Aux')
     log.setup(log_path=os.path.join(args.download_dir, "champ_aux_measurements.log"), log_level=args.verbose)
-    log.info('Starting CHaMP Aux Measurements Postgres processing.')
+    log.info('Starting CHaMP Aux Measurements processing.')
 
     if args.visit_id is not None and (args.watershed is not None or args.year is not None):
         raise Exception('Visit ID filter cannot be used with watershed or year filters.')
