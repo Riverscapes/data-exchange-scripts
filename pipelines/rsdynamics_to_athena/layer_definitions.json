@@ -24,7 +24,8 @@
           "friendly_name": "Segment Distance",
           "dtype": "INTEGER",
           "data_unit": "m",
-          "description": "Approximate distance from the upstream headwater of the level path"
+          "description": "Approximate distance from the upstream headwater of the level path",
+          "preferred_format": "{:.0f}"
         },
         {
           "name": "fcode",
