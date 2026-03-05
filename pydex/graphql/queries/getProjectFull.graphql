@@ -1,4 +1,4 @@
-query getProjectFull($id: ID!) {
+query getProjectFull($id: ID!, $fileLimit: Int = 500, $fileOffset: Int = 0) {
   project(id: $id) {
     ...dbobj
     bounds {
@@ -54,10 +54,13 @@ query getProjectFull($id: ID!) {
     tags
     totalSize
     visibility
-    files {
-      localPath
-      size
-      contentType
+    files(limit: $fileLimit, offset: $fileOffset) {
+      items {
+        localPath
+        size
+        contentType
+      }
+      ...paginated
     }
     tree {
       defaultView

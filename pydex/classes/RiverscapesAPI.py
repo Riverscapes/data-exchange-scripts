@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, List, Generator, Tuple
 import webbrowser
 import re
+import math
 import time
 import concurrent.futures
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -490,8 +491,29 @@ class RiverscapesAPI:
             _type_: _description_
         """
         qry = self.load_query('getProjectFull')
-        results = self.run_query(qry, {"id": project_id})
-        return RiverscapesProject(results['data']['project'])
+        
+        limit = 500
+        offset = 0
+        
+        results = self.run_query(qry, {"id": project_id, "fileLimit": limit, "fileOffset": offset})
+        project_data = results['data']['project']
+        
+        files_meta = project_data.get('files')
+        if files_meta and 'total' in files_meta:
+            total = files_meta.get('total', 0)
+            items = files_meta.get('items', [])
+            
+            if total > limit:
+                # Calculate how many extra pages we need to fetch
+                num_pages = math.ceil(total / limit)
+                # We already grabbed page 1 (offset 0), so fetch from page 2
+                for page in range(1, num_pages):
+                    page_offset = page * limit
+                    page_results = self.run_query(qry, {"id": project_id, "fileLimit": limit, "fileOffset": page_offset})
+                    page_items = page_results['data']['project'].get('files', {}).get('items', [])
+                    items.extend(page_items)
+                
+        return RiverscapesProject(project_data)
 
     def get_project_files(self, project_id: str) -> List[Dict[str, any]]:
         """ This returns the file listing with everything you need to download project files
@@ -504,8 +526,34 @@ class RiverscapesAPI:
             _type_: _description_
         """
         qry = self.load_query('projectFiles')
-        results = self.run_query(qry, {"projectId": project_id})
-        return results['data']['project']['files']
+        
+        offset = 0
+        limit = 500
+        all_files = []
+        
+        # Initial fetch
+        results = self.run_query(qry, {
+            "projectId": project_id,
+            "limit": limit,
+            "offset": offset
+        })
+        
+        files_meta = results['data']['project']['files']
+        total = files_meta['total']
+        all_files.extend(files_meta['items'])
+        
+        if total > limit:
+            num_pages = math.ceil(total / limit)
+            for page in range(1, num_pages):
+                page_offset = page * limit
+                results = self.run_query(qry, {
+                    "projectId": project_id,
+                    "limit": limit,
+                    "offset": page_offset
+                })
+                all_files.extend(results['data']['project']['files']['items'])
+                
+        return all_files
 
     def get_project_types(self) -> Dict[str, RiverscapesProjectType]:
         """_summary_
