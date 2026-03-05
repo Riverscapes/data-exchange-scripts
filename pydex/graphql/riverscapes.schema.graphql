@@ -1135,7 +1135,7 @@ type Project implements DBObj & HasOwner & HasStar {
   deleted: Boolean!
   description: String!
   dirty: Boolean!
-  files: [FileDownloadMeta!]!
+  files(limit: Int!, offset: Int!): PaginatedFileDownloadMeta!
 
   """Banner image (optional)"""
   heroImage: HeroImage
@@ -2396,6 +2396,7 @@ type User implements DBObj & UserInterface {
   description: String!
   hivebriteProfile: HivebriteProfile
   id: ID!
+  initialized: Boolean
   jobTitle: String
   lastLogin: DateTime!
   location: String
@@ -2466,6 +2467,7 @@ interface UserInterface {
   description: String!
   hivebriteProfile: HivebriteProfile
   id: ID!
+  initialized: Boolean
 
   """Simple job title string field"""
   jobTitle: String
