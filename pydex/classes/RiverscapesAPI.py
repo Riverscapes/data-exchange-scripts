@@ -498,7 +498,7 @@ class RiverscapesAPI:
         results = self.run_query(qry, {"id": project_id, "fileLimit": limit, "fileOffset": offset})
         project_data = results['data']['project']
         
-        files_meta = project_data.get('files')
+        files_meta = project_data.get('projectFiles')
         if files_meta and 'total' in files_meta:
             total = files_meta.get('total', 0)
             items = files_meta.get('items', [])
@@ -510,7 +510,7 @@ class RiverscapesAPI:
                 for page in range(1, num_pages):
                     page_offset = page * limit
                     page_results = self.run_query(qry, {"id": project_id, "fileLimit": limit, "fileOffset": page_offset})
-                    page_items = page_results['data']['project'].get('files', {}).get('items', [])
+                    page_items = page_results['data']['project'].get('projectFiles', {}).get('items', [])
                     items.extend(page_items)
                 
         return RiverscapesProject(project_data)
@@ -538,7 +538,7 @@ class RiverscapesAPI:
             "offset": offset
         })
         
-        files_meta = results['data']['project']['files']
+        files_meta = results['data']['project']['projectFiles']
         total = files_meta['total']
         all_files.extend(files_meta['items'])
         
@@ -551,7 +551,7 @@ class RiverscapesAPI:
                     "limit": limit,
                     "offset": page_offset
                 })
-                all_files.extend(results['data']['project']['files']['items'])
+                all_files.extend(results['data']['project']['projectFiles']['items'])
                 
         return all_files
 

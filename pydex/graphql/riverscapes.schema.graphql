@@ -1135,7 +1135,9 @@ type Project implements DBObj & HasOwner & HasStar {
   deleted: Boolean!
   description: String!
   dirty: Boolean!
-  files(limit: Int!, offset: Int!): PaginatedFileDownloadMeta!
+
+  """DEPRECATED: Use projectFiles instead"""
+  files: [FileDownloadMeta!]! @deprecated(reason: "Use projectFiles instead from now on")
 
   """Banner image (optional)"""
   heroImage: HeroImage
@@ -1153,6 +1155,9 @@ type Project implements DBObj & HasOwner & HasStar {
   This is my relation to this project. This is relatively easy to calculate if I own this object.
   """
   permissions: ObjectPermissions!
+
+  """Get all the files for this project in a paginated list"""
+  projectFiles(limit: Int!, offset: Int!): PaginatedFileDownloadMeta!
   projectType: ProjectType!
   qaqc(limit: Int!, offset: Int!, sort: [SearchSortEnum!]): PaginatedQAQCEvents!
   ref: String!
