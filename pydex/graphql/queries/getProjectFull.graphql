@@ -54,7 +54,7 @@ query getProjectFull($id: ID!, $fileLimit: Int = 500, $fileOffset: Int = 0) {
     tags
     totalSize
     visibility
-    files(limit: $fileLimit, offset: $fileOffset) {
+    projectFiles(limit: $fileLimit, offset: $fileOffset) {
       items {
         localPath
         size
