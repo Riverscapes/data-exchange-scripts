@@ -82,6 +82,22 @@
       ]
     },
     {
+      "name": "Change Ownership (Using CSV)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/utility/change_ownership_by_csv.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "production", // staging or production
+        "{env:CSV_FOLDER}", // location of CSV files with project IDs to change ownership
+      ]
+    },
+    {
       "name": "📦 Merge Projects Tool",
       "type": "debugpy",
       "request": "launch",
