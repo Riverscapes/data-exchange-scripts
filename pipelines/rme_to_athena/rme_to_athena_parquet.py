@@ -1,30 +1,34 @@
 """
 Searches Data Exchange for RME projects matching criteria
 Generates parquet files from metrics in the GeoPackages
+Adds simplified geometry
 Uploads to s3
 
 Lorin Gaertner
 Sept 2025
 Enhances Philip's June 2025 rme_to_athena.py
+POSSIBLE ENHANCEMENTS:
+* Move read of layer_definitions out of the loop
+* Use this to validate the input/output (i.e. warn on fields that are not defined)
 """
+
 import argparse
 import json
 import logging
 import os
-from pathlib import Path
 import re
 import shutil
 import warnings
+from pathlib import Path
 
 import apsw
 import boto3
 import geopandas as gpd
 import pandas as pd
-from shapely import wkb
-from semver import Version
-
+from rsxml import Logger, ProgressBar, dotenv
 from rsxml.util import safe_makedirs
-from rsxml import dotenv, Logger, ProgressBar
+from semver import Version
+from shapely import wkb
 
 from pydex import RiverscapesAPI, RiverscapesProject
 from pydex.lib.athena import query_to_dataframe
@@ -118,11 +122,7 @@ def get_matching_file(parent_dir: str, regex_str: str) -> str | None:
     return None
 
 
-def download_rme_geopackage(
-    rs_api: RiverscapesAPI,
-    project: RiverscapesProject,
-    huc_dir: str | Path
-) -> str:
+def download_rme_geopackage(rs_api: RiverscapesAPI, project: RiverscapesProject, huc_dir: str | Path) -> str:
     """
     Download the RME GeoPackage for a project and return its file path.
     """
@@ -219,10 +219,7 @@ def extract_metrics_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd
 
     bbox_df = gdf.geometry.bounds.rename(columns={'minx': 'xmin', 'miny': 'ymin', 'maxx': 'xmax', 'maxy': 'ymax'})
     # Combine into a struct-like dict for each row
-    gdf['dgo_geom_bbox'] = bbox_df.apply(
-        lambda row: {'xmin': float(row.xmin), 'ymin': float(row.ymin), 'xmax': float(row.xmax), 'ymax': float(row.ymax)},
-        axis=1
-    )
+    gdf['dgo_geom_bbox'] = bbox_df.apply(lambda row: {'xmin': float(row.xmin), 'ymin': float(row.ymin), 'xmax': float(row.xmax), 'ymax': float(row.ymax)}, axis=1)
 
     return gdf
 
@@ -239,11 +236,7 @@ def delete_folder(dirpath: Path) -> None:
             log.error(f'Error deleting download directory {dirpath}: {e}')
 
 
-def upload_to_s3(
-        file_path: str | Path,
-        s3_bucket: str,
-        s3_key: str
-) -> None:
+def upload_to_s3(file_path: str | Path, s3_bucket: str, s3_key: str) -> None:
     """upload a file to s3
 
     Args:
@@ -340,7 +333,7 @@ def main():
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('spatialite_path', help='Path to the mod_spatialite library', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
-    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
+    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages', action='store_true', default=False)
     args = dotenv.parse_args_env(parser)
 
     # Set up some reasonable folders to store things
@@ -361,13 +354,7 @@ def main():
         log.info(f"Data bucket: {DATA_BUCKET} (env {DATA_BUCKET_ENV_VAR}); Athena output bucket: {ATHENA_OUTPUT_BUCKET} (env {OUTPUT_BUCKET_ENV_VAR})")
 
     with RiverscapesAPI(stage=args.stage) as api:
-        scrape_rme(
-            api,
-            args.spatialite_path,
-            download_folder,
-            DATA_BUCKET,
-            args.delete
-        )
+        scrape_rme(api, args.spatialite_path, download_folder, DATA_BUCKET, args.delete)
 
     log.info('Process complete')
 
