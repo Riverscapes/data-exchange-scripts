@@ -6,7 +6,7 @@
     {
       "layer_id": "rpt_rme",
       "layer_name": "rpt_rme_pq",
-      "description": "report view",
+      "description": "report view of RME data with additional lookup table columns",
       "layer_type": "DataTable",
       "columns": [
         {
@@ -17,7 +17,7 @@
           "description": "",
           "is_key": false,
           "is_required": false,
-          "theme": "",
+          "theme": "Descriptive",
           "preferred_bin_definition": "",
           "default_value": null
         },
@@ -26,10 +26,22 @@
           "dtype": "STRING",
           "friendly_name": "Ownership",
           "data_unit": "",
-          "description": "",
+          "description": "Dominant ownership within the DGO (full name)",
           "is_key": false,
           "is_required": false,
-          "theme": "",
+          "theme": "Descriptive",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "rme_project_name",
+          "dtype": "STRING",
+          "friendly_name": "RME Project Name",
+          "data_unit": "",
+          "description": "Project Name for the source metric engine project on Riverscapes Data Exchange, data.riverscapes.net",
+          "is_key": false,
+          "is_required": false,
+          "theme": "meta",
           "preferred_bin_definition": "",
           "default_value": null
         }
