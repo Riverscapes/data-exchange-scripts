@@ -151,93 +151,89 @@ We've loaded it as a requirement in the toml:  `https://github.com/Riverscapes/R
  Partition hierarchy (three levels):
 
 1. `authority` – repository root name (e.g. `data-exchange-scripts`). Derived automatically from the git repo folder name.
-2. `authority_name` – the tool / package authority publishing the layer definitions (from JSON).
+2. `tool_schema_name` – the tool / package name publishing the layer definitions (from JSON).
 3. `tool_schema_version` – semantic version of the tool's layer definition schema (from JSON).
 
 Output pattern:
 
 ```text
+dist/index.json
 dist/metadata/
-  authority=<repo>/authority_name=<authority>/tool_schema_version=<version>/layer_metadata.parquet
-  index.json
+  authority=<repo>/tool_schema_name=<name>/tool_schema_version=<version>/layer_metadata.parquet
 ```
 
 Default behavior:
 
 - Output format: Parquet (use `--format csv` for CSV).
-- Partition columns (`authority`, `authority_name`, `tool_schema_version`) are NOT inside the Parquet/CSV files unless `--include-partition-cols` is passed.
-- A `commit_sha` (current HEAD) is written into every row and stored again in `index.json` with a run timestamp.
-- Schema validation is enforced; any validation error causes a loud failure (non-zero exit code). An `index.json` with `status: validation_failed` and the collected `validation_errors` is still written for diagnostics, but no partition files are produced.
+- Partition columns (`authority`, `tool_schema_name`, `tool_schema_version`) are always written inside the Parquet/CSV files (the Athena table is not partitioned).
+- The `dist/` directory is cleaned before each run.
+- A `commit_sha` (current HEAD) is written into every row and stored again in `dist/index.json` with a run timestamp.
+- Schema validation is enforced; any validation error causes a loud failure (non-zero exit code). A `dist/index.json` with `status: validation_failed` and the collected `validation_errors` is still written for diagnostics, but no partition files are produced.
 
 Run locally:
 
 ```bash
-python scripts/metadata/export_layer_definitions_for_s3.py
+uv run export-layer-definitions-for-s3 --root .
 ```
 
 Optional flags:
 
 ```bash
-python scripts/metadata/export_layer_definitions_for_s3.py --format csv             # CSV instead of Parquet
-python scripts/metadata/export_layer_definitions_for_s3.py --include-partition-cols # Embed partition columns in each file
+uv run export-layer-definitions-for-s3 --root . --format csv   # CSV instead of Parquet
+uv run export-layer-definitions-for-s3 --root . --dry-run      # Validate only, no files written
+```
+
+Validate only (no output files):
+
+```bash
+uv run validate-metadata --root .
 ```
 
 ### Athena External Table
 
-We publish to: `s3://riverscapes-athena/metadata/layer_definitions/`
+We publish to: `s3://riverscapes-athena/riverscapes_metadata/layer_definitions_raw/X.X/` where XX is riverscapes metadata schema version number.
 
-This gets turned into the athena table default.layer_definitions.
+Although the folder is structure is set up as if for partitions, the Athena table is not partitioned.
 
-Add new partitions (after upload):
-
-```sql
--- auto-discover
-MSCK REPAIR TABLE layer_definitions;  
--- OR manual:
-ALTER TABLE layer_definitions
-ADD IF NOT EXISTS PARTITION (
-  authority='data-exchange-scripts',
-  authority_name='rme_to_athena',
-  tool_schema_version='1.0.0'
-)
-LOCATION 's3://riverscapes-athena/metadata/layer_definitions/authority=data-exchange-scripts/authority_name=rme_to_athena/tool_schema_version=1.0.0/';
-```
+This gets turned into the athena table default.layer_definitions and the view `layer_definitions_latest`.
 
 ### GitHub Actions Workflow
 
 Workflow file: `.github/workflows/metadata-catalog.yml`
 
-Steps performed:
+The workflow has two jobs:
 
+**`validate`** (runs on all branches and PRs):
 1. Checkout code.
-2. Assume AWS IAM role via OIDC (secret `METADATA_PUBLISH_ROLE_ARN`).
-3. Install dependencies (Python 3.12 + `uv sync`).
-4. Run flatten script -> partitioned Parquet.
-5. Sync `dist/metadata` to S3 bucket prefix.
-6. Run `MSCK REPAIR TABLE` to load partitions.
-7. Perform sample queries (partition listing / row count).
+2. Install Python 3.12 + `uv sync`.
+3. Run `export-layer-definitions-for-s3 --root .` → validates and produces partitioned Parquet under `dist/`.
+4. Uploads `dist/` as a build artifact.
+
+**`build-and-publish`** (runs on `main` branch only, after `validate`):
+1. Checkout code.
+2. Configure AWS credentials via OIDC (secret `METADATA_PUBLISH_ROLE_ARN`).
+3. Install Python 3.12 + `uv sync`.
+4. Download the `dist/` artifact from the `validate` job.
+5. Run `publish-metadata-to-s3 --root .` → uploads Parquet files to S3 and runs a row-count verification query on Athena.
 
 ### IAM Role (Least Privilege Summary)
 
 The role must allow:
 
-- S3 List/Get/Put/Delete under `metadata/layer_definitions/` and query result prefix.
+- S3 List/Get/Put/Delete under `riverscapes_metadata/layer_definitions_raw/` and query result prefix.
 - Athena: StartQueryExecution, GetQueryExecution, GetQueryResults.
 - Glue: Get/Create/Update table & partitions for the database/table.
 
 ### Future Enhancements
 
 - Validate layer schemas (dtype whitelist, required fields & semantic checks).
-- Explicit partition adds instead of MSCK for faster updates.
 - Historical snapshots (extra partition like `snapshot_date`).
-- Glue Catalog integration (automated table & partition registration without MSCK).
 - Data quality profile summary (row counts, distinct key coverage) in `index.json`.
 
 ## Troubleshooting Metadata
 
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
-| Empty Athena table | Partitions not loaded | Run `MSCK REPAIR TABLE` or add partitions manually |
 | Wrong data types | Created table before column rename | Drop & recreate external table with new DDL |
 | Missing new version | Workflow didn’t run or lacked perms | Check Actions logs & IAM role policies |
 | Zero rows for authority | Upload sync failed | Inspect S3 prefix & re-run workflow |
