@@ -1,0 +1,62 @@
+{
+    "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
+    "tool_schema_name": "climate_engine_api",
+    "tool_schema_version": "1.0.0",
+    "layers": [
+        {
+            "layer_id": "RAP_COVER",
+            "layer_name": "RAP Cover - 30m - Yearly",
+            "description": "Rangeland Analysis Platform data provided via Climate Engine API. Columns defined here represent Variables that can be returned via the API. The return labels include units, unlike the request labels.",
+            "source_url": "https://support.climateengine.org/article/81-rap",
+            "source_title": "Climate Engine - RAP 30m Annual Vegetation Cover and Production",
+            "theme": "vegetation",
+            "columns": [
+                {
+                    "name": "Date"
+                },
+                {
+                    "name": "AFG",
+                    "friendly_name": "Annual Forb and Grass Cover",
+                    "dtype": "FLOAT",
+                    "data_unit": "%",
+                    "description": "Fractional cover of annual forbs and grasses."
+                },
+                {
+                    "name": "PFG",
+                    "friendly_name": "Perennial Forb and Grass Cover",
+                    "dtype": "FLOAT",
+                    "data_unit": "%",
+                    "description": "Fractional cover of perennial forbs and grasses."
+                },
+                {
+                    "name": "SHR",
+                    "friendly_name": "Shrub Cover",
+                    "dtype": "FLOAT",
+                    "data_unit": "%",
+                    "description": "Fractional cover of shrubs."
+                },
+                {
+                    "name": "TRE",
+                    "friendly_name": "Tree Cover",
+                    "dtype": "FLOAT",
+                    "data_unit": "%",
+                    "description": "Fractional cover of trees."
+                },
+                {
+                    "name": "BGR",
+                    "friendly_name": "Bare Ground Cover",
+                    "dtype": "FLOAT",
+                    "data_unit": "%",
+                    "description": "Fractional cover of bare ground."
+                },
+                {
+                    "name": "LTR",
+                    "friendly_name": "Litter Cover",
+                    "dtype": "FLOAT",
+                    "data_unit": "%",
+                    "description": "Fractional cover of litter."
+                }
+            ]
+        }
+    ]
+}
