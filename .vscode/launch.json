@@ -517,6 +517,20 @@
       ],
     },
     {
+      "name": "🆕 Scrape rs_context to Athena",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/pipelines/rscontext_to_athena/rscontext_to_athena.py",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "${input:environment}",
+        "{env:DATA_ROOT}/huc10_athena",
+      ],
+    },
+    {
       "name": "Add ChaMP Aux Measurements to Topo - SQLite",
       "type": "debugpy",
       "request": "launch",
