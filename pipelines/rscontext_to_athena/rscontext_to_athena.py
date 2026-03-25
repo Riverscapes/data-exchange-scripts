@@ -115,9 +115,9 @@ def scrape_rscontext_project(s3, rs_api: RiverscapesAPI, project: RiverscapesPro
             metrics = {}
 
         huc10_json_path = huc_dir / f'huc10_{project.huc}.json'
-        dem_raster = Raster(dem_tif_path)
+        dem_raster = Raster(str(dem_tif_path))
         dem_bins = dem_raster.bin_raster(100)
-        veg_raster = Raster(veg_tif_path)
+        veg_raster = Raster(str(veg_tif_path))
         veg_bins = veg_raster.bin_raster_categorical()
         if 'rs_context' not in metrics:
             metrics['rs_context'] = {}
