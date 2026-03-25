@@ -34,6 +34,12 @@ if [[ "${MAJOR}" -lt 3 ]] || [[ "${MAJOR}" -eq 3 && "${MINOR}" -lt 3 ]]; then
 fi
 
 echo "Installing Python gdal==${GDAL_VERSION} into the current environment..."
-uv pip install "gdal==${GDAL_VERSION}"
+# numpy must be <2.0 for GDAL <= 3.8 — the _gdal_array extension was compiled
+# against the numpy 1.x ABI and will fail to import with numpy 2.x.
+# --no-build-isolation ensures numpy is visible during the source build so that
+# the _gdal_array C extension is actually compiled (isolated environments lack
+# numpy and silently skip that extension, causing "cannot import _gdal_array").
+uv pip install "numpy<2.0"
+uv pip install --no-build-isolation --no-binary gdal --no-cache "gdal==${GDAL_VERSION}"
 
 echo "Done. GDAL Python package installed successfully."

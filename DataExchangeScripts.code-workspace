@@ -55,14 +55,20 @@
   },
   "extensions": {
     "recommendations": [
-      "GitHub.copilot",
+      "GitHub.codespaces",
       "GitHub.copilot-chat",
-      "eriklynd.json-tools",
-      "yzhang.markdown-all-in-one",
-      "unifiedjs.vscode-mdx",
+      "GitHub.copilot",
+      "GraphQL.vscode-graphql",
       "mhutchie.git-graph",
-      "streetsidesoftware.code-spell-checker",
-      "DavidAnson.vscode-markdownlint"
+      "ms-python.debugpy",
+      "ms-python.isort",
+      "ms-python.pylint",
+      "ms-python.python",
+      "ms-vsliveshare.vsliveshare",
+      "njpwerner.autodocstring",
+      "redhat.vscode-xml",
+      "DavidAnson.vscode-markdownlint",
+      "ms-python.debugpy"
     ]
   },
 }
