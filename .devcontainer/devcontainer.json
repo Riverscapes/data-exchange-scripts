@@ -12,6 +12,7 @@
     "RSAPI_ALTPORT": "TRUE",
     "RME_DATA_BUCKET": "riverscapes-athena",
     "RME_ATHENA_OUTPUT_BUCKET": "riverscapes-athena-output",
+    "AWS_DEFAULT_REGION": "us-west-2",
     // mod_spatialite installed via apt (libsqlite3-mod-spatialite)
     "SPATIALITE_LIB": "/usr/lib/x86_64-linux-gnu/mod_spatialite.so",
     "DATA_ROOT": "/workspaces/data"
