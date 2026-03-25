@@ -134,9 +134,9 @@ def scrape_rscontext_project(s3, rs_api: RiverscapesAPI, project: RiverscapesPro
             json.dump(metrics, f, indent=2)
 
         # Now use boto3 to upload the file to S3
-        # log.info(f'Uploading metrics to s3://{S3_BUCKET}/{s3_key}')
+        log.info(f'Uploading metrics to s3://{S3_BUCKET}/{s3_key}')
 
-        # s3.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=json.dumps(metrics['rs_context']))
+        s3.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=json.dumps(metrics['rs_context']))
 
     except Exception as e:
         log.error(f'Error scraping HUC {project.huc}: {e}')
