@@ -497,7 +497,7 @@
     // },
     // This is the new version that pulls aux from Google Postgres
     {
-      "name": "Python: huc10_athena",
+      "name": "Deprecated Python: huc10_athena",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/pipelines/rscontext_to_athena/huc10_athena.py",
