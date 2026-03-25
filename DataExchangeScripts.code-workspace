@@ -2,8 +2,8 @@
   "folders": [
     {
       "name": "📦 pydex",
-      "path": ".",
-    },
+      "path": "."
+    }
   ],
   "settings": {
     "terminal.integrated.defaultProfile.linux": "zsh",
@@ -19,7 +19,9 @@
       "--max-line-length=240"
     ],
     "graphql-config.load.rootDir": "${workspaceFolder}",
-    "python.analysis.extraPaths": ["../../lib/commons"],
+    "python.analysis.extraPaths": [
+      "../../lib/commons"
+    ],
     "python.terminal.activateEnvironment": true,
     "python.testing.pytestEnabled": true,
     "python.testing.unittestEnabled": true,
@@ -50,5 +52,17 @@
         "url": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json"
       }
     ]
-  }
+  },
+  "extensions": {
+    "recommendations": [
+      "GitHub.copilot",
+      "GitHub.copilot-chat",
+      "eriklynd.json-tools",
+      "yzhang.markdown-all-in-one",
+      "unifiedjs.vscode-mdx",
+      "mhutchie.git-graph",
+      "streetsidesoftware.code-spell-checker",
+      "DavidAnson.vscode-markdownlint"
+    ]
+  },
 }

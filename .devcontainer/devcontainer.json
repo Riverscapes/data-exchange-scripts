@@ -9,7 +9,12 @@
 	},
   "containerEnv": {
     // Tell The API to use a different port inside codespaces so that it doesn't conflict with the user's root machine use
-    "RSAPI_ALTPORT": "TRUE"
+    "RSAPI_ALTPORT": "TRUE",
+    "RME_DATA_BUCKET": "riverscapes-athena",
+    "RME_ATHENA_OUTPUT_BUCKET": "riverscapes-athena-output",
+    // mod_spatialite installed via apt (libsqlite3-mod-spatialite)
+    "SPATIALITE_LIB": "/usr/lib/x86_64-linux-gnu/mod_spatialite.so",
+    "DATA_ROOT": "/workspaces/data"
   },
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
