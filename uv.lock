@@ -383,12 +383,6 @@ wheels = [
 ]
 
 [[package]]
-name = "gdal"
-version = "3.11.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/62/e0/1840d476bfd2d1e8c22dacb612027a16ad1dfba60d5d4379bdaaf6a1545f/gdal-3.11.4.tar.gz", hash = "sha256:c28cd5ffda3df98555e21083d922762b0a095d8f10292e2ec60ee0d55651d74a", size = 878351, upload-time = "2025-09-11T09:28:00.097Z" }
-
-[[package]]
 name = "geopandas"
 version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -955,7 +949,6 @@ dependencies = [
 
 [package.optional-dependencies]
 geo = [
-    { name = "gdal" },
     { name = "shapely" },
 ]
 
@@ -964,7 +957,6 @@ requires-dist = [
     { name = "apsw", specifier = ">=3.49.1.0" },
     { name = "awswrangler", specifier = ">=3.10.1" },
     { name = "boto3", specifier = ">=1.7.84" },
-    { name = "gdal", marker = "extra == 'geo'", specifier = "==3.11.4" },
     { name = "geopandas", specifier = ">=1.0.1" },
     { name = "graphql-core", specifier = "==3.2.6" },
     { name = "inquirer", specifier = "==3.4.0" },

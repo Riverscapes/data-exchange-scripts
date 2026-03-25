@@ -38,9 +38,11 @@ dependencies = [
 
 [project.optional-dependencies]
 geo = [
-  "gdal==3.11.4",
   "shapely>=2.1.1",
 ]
+# NOTE: gdal is intentionally excluded from the geo extra because the Python
+# gdal package version must exactly match the system libgdal version, which
+# varies per developer environment. Use `install_geo.sh` to install gdal.
 
 [tool.setuptools]
 include-package-data = true

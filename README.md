@@ -63,17 +63,31 @@ Running scripts this way will also allow you to drop breakpoints in your code an
 
 ## Optional Dependencies
 
-This project includes optional dependencies for geospatial functionality. To install these dependencies, run:
+This project includes optional dependencies for geospatial functionality (e.g. `shapely`). Install them with:
 
 ```bash
 uv sync --extra geo
 ```
 
-This will install packages like `gdal` and `shapely`. Note that `gdal` may require additional system-level dependencies. On macOS, you can install `gdal` using Homebrew:
+### GDAL
 
+`gdal` is **not** pinned in `pyproject.toml` because the Python package version must exactly match the system `libgdal` version, which varies per environment. Instead, use the provided helper script after installing system GDAL:
+
+**Debian/Ubuntu (including Codespaces — requires Debian Bookworm / Ubuntu 22.04+ for Python 3.12 compatibility):**
+```bash
+sudo apt-get install -y libgdal-dev gdal-bin
+bash install_geo.sh
+```
+
+> **Note:** Debian Bullseye (11) ships GDAL 3.2, which is incompatible with Python 3.12. The devcontainer uses Debian Bookworm (12) which provides GDAL 3.6+.
+
+**macOS:**
 ```bash
 brew install gdal
+bash install_geo.sh
 ```
+
+The `install_geo.sh` script calls `gdal-config --version` to detect the installed system GDAL version and installs the exactly matching `gdal` Python package into the active virtual environment.
 
 ## Codespace Instructions
 
@@ -81,9 +95,9 @@ brew install gdal
 2. In VSCode, load the `RiverscapesAPI.code-workspace` workspace.
 3. Ensure the appropriate Python version is selected (e.g., `3.12.9 ('.venv')`).
 
-### Codespace GDAL Limitation
+### Codespace GDAL
 
-> NOTE: The codespace environment does not currently support scripts requiring GDAL (e.g. project merging). Run those locally.
+GDAL is installed automatically when the codespace is created (via `bootstrap.sh`). No extra steps needed — `gdal-config` will be available and `install_geo.sh` will have already run.
 
 ## Best Practices
 
