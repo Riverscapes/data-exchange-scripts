@@ -1,5 +1,6 @@
 """
 Scrape HUC10 information and load it to Athena.
+DEPRECATED - USE rscontext_to_athena instead. 
 
 Philip Bailey
 5 Oct 2025
