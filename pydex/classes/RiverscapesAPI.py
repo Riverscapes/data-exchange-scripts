@@ -491,18 +491,18 @@ class RiverscapesAPI:
             _type_: _description_
         """
         qry = self.load_query('getProjectFull')
-        
+
         limit = 500
         offset = 0
-        
+
         results = self.run_query(qry, {"id": project_id, "fileLimit": limit, "fileOffset": offset})
         project_data = results['data']['project']
-        
+
         files_meta = project_data.get('projectFiles')
         if files_meta and 'total' in files_meta:
             total = files_meta.get('total', 0)
             items = files_meta.get('items', [])
-            
+
             if total > limit:
                 # Calculate how many extra pages we need to fetch
                 num_pages = math.ceil(total / limit)
@@ -512,7 +512,7 @@ class RiverscapesAPI:
                     page_results = self.run_query(qry, {"id": project_id, "fileLimit": limit, "fileOffset": page_offset})
                     page_items = page_results['data']['project'].get('projectFiles', {}).get('items', [])
                     items.extend(page_items)
-                
+
         return RiverscapesProject(project_data)
 
     def get_project_files(self, project_id: str) -> List[Dict[str, any]]:
@@ -526,22 +526,22 @@ class RiverscapesAPI:
             _type_: _description_
         """
         qry = self.load_query('projectFiles')
-        
+
         offset = 0
         limit = 500
         all_files = []
-        
+
         # Initial fetch
         results = self.run_query(qry, {
             "projectId": project_id,
             "limit": limit,
             "offset": offset
         })
-        
+
         files_meta = results['data']['project']['projectFiles']
         total = files_meta['total']
         all_files.extend(files_meta['items'])
-        
+
         if total > limit:
             num_pages = math.ceil(total / limit)
             for page in range(1, num_pages):
@@ -552,7 +552,7 @@ class RiverscapesAPI:
                     "offset": page_offset
                 })
                 all_files.extend(results['data']['project']['projectFiles']['items'])
-                
+
         return all_files
 
     def get_project_types(self) -> Dict[str, RiverscapesProjectType]:
