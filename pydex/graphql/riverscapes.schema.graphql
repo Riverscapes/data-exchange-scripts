@@ -682,6 +682,9 @@ type Mutation {
   deleteSavedSearch(id: ID!): MutationResult
   deleteTransfer(transferId: ID!): MutationResult
 
+  """Admins can delete any user by ID"""
+  deleteUser(id: ID!, options: EntityDeletionOptions): MutationResult
+
   """
   When all files have been uploaded you can call this to start processing the project
   """
@@ -716,7 +719,7 @@ type Mutation {
   updateOrganization(id: ID!, organization: OrganizationInput!): Organization
   updateOrganizationMember(organizationId: ID!, role: OrganizationRoleEnum, userId: ID!): OrganizationUser
 
-  """Updating your user proile"""
+  """Updating your user profile (self-update)"""
   updateProfile(profile: ProfileInput!): Profile
 
   """
@@ -744,6 +747,9 @@ type Mutation {
   Transfers are fairly immutable. You can only change the note and the state
   """
   updateTransfer(note: String, state: TransferStateEnum, transferId: ID!): Transfer
+
+  """Admins can update any user's profile by ID"""
+  updateUser(id: ID!, profile: ProfileInput!): Profile
   zipRebuild(force: Boolean, projectId: ID!): Project
 }
 

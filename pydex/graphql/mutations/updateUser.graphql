@@ -1,0 +1,10 @@
+mutation updateUser(
+  $userId: ID!
+  $profile: ProfileInput!
+) {
+  updateUser(id: $userId, profile: $profile) {
+    id
+    name
+    avatar
+  }
+}
