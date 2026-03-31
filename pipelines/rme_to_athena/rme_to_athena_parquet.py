@@ -38,6 +38,7 @@ from pydex.lib.athena import query_to_dataframe
 DATA_BUCKET_ENV_VAR = "RME_DATA_BUCKET"
 OUTPUT_BUCKET_ENV_VAR = "RME_ATHENA_OUTPUT_BUCKET"
 DEFAULT_DATA_BUCKET = "riverscapes-athena"
+BASE_S3_KEY = "data_exchange/rs_metric_engine2"
 
 DATA_BUCKET = os.getenv(DATA_BUCKET_ENV_VAR, DEFAULT_DATA_BUCKET)
 ATHENA_OUTPUT_BUCKET = os.getenv(OUTPUT_BUCKET_ENV_VAR, DATA_BUCKET)  # fallback to data bucket if not set
@@ -57,7 +58,7 @@ with huc_projects_dex as
     huc_projects_scraped as
         (select substr(huc12, 1, 10) as huc10,
                 raw_rme_pq2.rme_date_created_ts
-         from raw_rme_pq2)
+         from rs_raw.raw_rs_metric_engine2 raw_rme_pq2)
 select distinct project_id, huc, created_on, rme_date_created_ts
 from huc_projects_dex dex
     left join huc_projects_scraped scr on dex.huc = scr.huc10
@@ -314,7 +315,7 @@ def scrape_rme(
             rme_pq_filepath = huc_dir / f'rme_{project.huc}.parquet'
             data_gdf.to_parquet(rme_pq_filepath)
             # do not use os.path.join because this is aws os, not system os
-            s3_key = f'data_exchange/riverscape_metrics/{rme_pq_filepath.name}'
+            s3_key = f'{BASE_S3_KEY}/{rme_pq_filepath.name}'
             upload_to_s3(rme_pq_filepath, data_bucket, s3_key)
 
             if delete_downloads_when_done:
@@ -323,7 +324,7 @@ def scrape_rme(
             prg.update(count)
         except Exception as e:
             log.error(f'Error scraping HUC {project.huc}: {e}')
-            raise
+            # raise
     prg.finish()
 
 
