@@ -32,7 +32,6 @@
       "extensions": [
         "GitHub.codespaces",
         "GitHub.copilot-chat",
-        "GitHub.copilot",
         "GraphQL.vscode-graphql",
         "mhutchie.git-graph",
         "ms-python.debugpy",
