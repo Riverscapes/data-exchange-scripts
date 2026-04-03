@@ -278,9 +278,11 @@ def scrape_rme(
     if projects_to_add_df.empty:
         log.info("Query to identify projects to scrape returned no results.")
         return
+    log.info(f"Query to identify projects to scrape returned {len(projects_to_add_df)} projects.")
     # test a single project
     # projects_to_add_df = pd.DataFrame({'project_id': ['5aeff0f8-5a8e-4db8-8e6c-9e507b20eca0']})
     count = 0
+    errors = 0
     prg = ProgressBar(projects_to_add_df.shape[0], text="Scrape Progress")
     for project_id in projects_to_add_df['project_id']:
         project = rs_api.get_project_full(project_id)
@@ -321,11 +323,14 @@ def scrape_rme(
             if delete_downloads_when_done:
                 delete_folder(download_dir)
             count += 1
-            prg.update(count)
+            prg.update(count+errors)
         except Exception as e:
+            errors += 1
             log.error(f'Error scraping HUC {project.huc}: {e}')
+            prg.update(count+errors)
             # raise
     prg.finish()
+    log.info (f"Scraped {count} projects successfully and {errors} failed.")
 
 
 def main():
