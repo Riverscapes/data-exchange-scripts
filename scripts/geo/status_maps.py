@@ -9,17 +9,18 @@ replaced with a more generic solution that can work with Athena.
 Philip Bailey
 12 July 2025
 """
+
+import argparse
 import os
 import sqlite3
-import argparse
-from typing import List
 from datetime import datetime
+
+import boto3
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import boto3
 
 
-def generate_status_maps(gpkg_path: str, output_image_dir: str) -> List[str]:
+def generate_status_maps(gpkg_path: str, output_image_dir: str) -> list[str]:
     """
     Generate status maps for different project types and save them as PNG images.
     """
@@ -46,7 +47,6 @@ def generate_status_maps(gpkg_path: str, output_image_dir: str) -> List[str]:
         outline_count = curs.fetchone()[0]
 
         for project_type in project_types:
-
             curs.execute("SELECT count(*) FROM vw_projects WHERE tags LIKE '%2025CONUS%' AND project_type_id = ?", (project_type,))
             project_count = curs.fetchone()[0]
 
@@ -54,10 +54,7 @@ def generate_status_maps(gpkg_path: str, output_image_dir: str) -> List[str]:
             gdf_filled = gpd.read_file(gpkg_path, layer="vw_projects")
 
             # --- Optional filter (WHERE clause) ---
-            gdf_filled = gdf_filled[
-                (gdf_filled["project_type_id"] == project_type) &
-                (gdf_filled['tags'].str.contains('2025CONUS', na=False))
-            ]
+            gdf_filled = gdf_filled[(gdf_filled["project_type_id"] == project_type) & (gdf_filled['tags'].str.contains('2025CONUS', na=False))]
 
             # Skip plotting if no data
             if gdf_filled.empty:
@@ -95,7 +92,7 @@ def generate_status_maps(gpkg_path: str, output_image_dir: str) -> List[str]:
     return image_paths
 
 
-def upload_to_s3(image_paths: List[str], s3_bucket: str) -> None:
+def upload_to_s3(image_paths: list[str], s3_bucket: str) -> None:
     """
     Upload generated images to an S3 bucket.
 

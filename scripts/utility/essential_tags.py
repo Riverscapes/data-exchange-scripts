@@ -1,18 +1,17 @@
-"""[summary]
-"""
-import os
-from typing import List
+"""[summary]"""
+
 import json
+import os
+
 import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 
 def add_tag(riverscapes_api: RiverscapesAPI):
-    """Add essential tags to projects from the server.
-
-    """
+    """Add essential tags to projects from the server."""
 
     log = Logger('AddTag')
     log.title('Add Essential Tag to Projects from the server')
@@ -27,15 +26,8 @@ def add_tag(riverscapes_api: RiverscapesAPI):
         results { item { id name } }
       }
     }"""
-    org_res = riverscapes_api.run_query(find_org_qry, {
-        "limit": 10,
-        "offset": 0,
-        "params": {"name": "North Arrow Research"}
-    })
-    org_matches = [
-        r["item"] for r in org_res["data"]["searchOrganizations"]["results"]
-        if r["item"]["name"] == "North Arrow Research"
-    ]
+    org_res = riverscapes_api.run_query(find_org_qry, {"limit": 10, "offset": 0, "params": {"name": "North Arrow Research"}})
+    org_matches = [r["item"] for r in org_res["data"]["searchOrganizations"]["results"] if r["item"]["name"] == "North Arrow Research"]
     if not org_matches:
         raise RuntimeError("Could not find organization named 'North Arrow Research'.")
     org_id = org_matches[0]["id"]
@@ -64,10 +56,7 @@ def add_tag(riverscapes_api: RiverscapesAPI):
 
     # Instead of command-line arguments, we'll use inquirer to ask the user for the stage and tags
     default_dir = os.path.join(os.path.expanduser("~"), 'RSTagging')
-    questions = [
-        inquirer.Text('logdir', message="Where do you want to save the log files?", default=default_dir),
-        inquirer.Text('tags', message="Comma-separated tags", default=tags)
-    ]
+    questions = [inquirer.Text('logdir', message="Where do you want to save the log files?", default=default_dir), inquirer.Text('tags', message="Comma-separated tags", default=tags)]
     answers = inquirer.prompt(questions)
 
     tags = [x.strip() for x in answers['tags'].split(',')]
@@ -88,7 +77,7 @@ def add_tag(riverscapes_api: RiverscapesAPI):
     # -------------------------------------------------------------------------
     # 4) Search & collect candidates (projects missing at least one of the tags)
     # -------------------------------------------------------------------------
-    changeable_projects: List[RiverscapesProject] = []
+    changeable_projects: list[RiverscapesProject] = []
     total = 0
     for project, _stats, search_total, _prg in riverscapes_api.search(
         search_params,
@@ -133,10 +122,13 @@ def add_tag(riverscapes_api: RiverscapesAPI):
                 log.debug(f" - Adding tag: {tag} to project {project.name} with current tags {project.tags}")
 
         try:
-            resp = riverscapes_api.run_query(mutation_script, {
-                "projectId": project.id,
-                "project": {"tags": project.tags},
-            })
+            resp = riverscapes_api.run_query(
+                mutation_script,
+                {
+                    "projectId": project.id,
+                    "project": {"tags": project.tags},
+                },
+            )
             log.info(f"✅ Updated {project.name} ({project.id}) with tags {project.tags}")
             if resp and "errors" in resp:
                 log.error(f"GraphQL error for {project.id}: {resp['errors']}")

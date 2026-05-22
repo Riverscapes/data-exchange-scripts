@@ -1,11 +1,12 @@
 """
 Script to query the PBR GraphQL API for projects using the SearchProjects query.
 """
+
+import json
 import os
 import sys
-import json
 from datetime import datetime
-from typing import Optional
+
 import requests
 
 PBR_GRAPHQL_ENDPOINT = "https://api.pbr.riverscapes.net/"
@@ -73,8 +74,8 @@ query SearchProjects {
 """
 
 
-def fetch_pbr_projects(output_path: Optional[str] = None):
-    """ This function fetches projects from the PBR GraphQL API and saves them to a JSON file.
+def fetch_pbr_projects(output_path: str | None = None):
+    """This function fetches projects from the PBR GraphQL API and saves them to a JSON file.
 
     Args:
         output_path (Optional[str], optional): The path to the output JSON file. Defaults to None.

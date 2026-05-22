@@ -7,10 +7,13 @@ Then use this script to download all the files for those projects.
 Philip Bailey
 15 Oct 2025
 """
-import os
+
 import argparse
+import os
+
 from rsxml import ProgressBar, dotenv
 from rsxml.util import safe_makedirs
+
 from pydex import RiverscapesAPI
 from scripts.utility.load_project_guids_from_csv import load_project_guids_from_csv
 
@@ -34,7 +37,7 @@ def download_project_files_by_csv(rs_api: RiverscapesAPI, csv_folder: str, downl
                 errors += 1
             else:
                 raise e
-        prg.update(i+1)
+        prg.update(i + 1)
 
     prg.finish()
     print(f'Process complete. {downloaded} projects downloaded. {errors} projects errored out.')

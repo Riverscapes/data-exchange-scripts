@@ -5,20 +5,22 @@ creates simplified geometries of dgos, group by huc12 level, and uploads the res
 Philip Bailey
 June 2025
 """
-import shutil
-import csv
-import re
-import os
-import logging
+
 import argparse
+import csv
+import logging
+import os
+import re
+import shutil
+
 import apsw
 import boto3
 import geopandas as gpd
+from rsxml import Logger, ProgressBar, dotenv
 from rsxml.util import safe_makedirs
-from rsxml import dotenv, Logger, ProgressBar
+
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 from pydex.classes.riverscapes_helpers import RiverscapesProject
-from pydex.lib.athena import athena_query
 
 # RegEx for finding RME output GeoPackages
 RME_SCRAPE_GPKG_REGEX = r'.*riverscapes_metrics.gpkg'
@@ -93,11 +95,14 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
                 huc12_tsv = os.path.join(huc_dir, f'rme_{huc12}.tsv')
                 s3_key = os.path.join('rme', 'huc12-geom-cartography', os.path.basename(huc12_tsv))
 
-                curs.execute('''SELECT d.level_path, d.seg_distance, st_astext(CastAutomagic(d.geom)) geom
+                curs.execute(
+                    '''SELECT d.level_path, d.seg_distance, st_astext(CastAutomagic(d.geom)) geom
                              FROM simplified_dgos d 
                              inner join rme.dgos rmed on d.level_path = rmed.level_path and d.seg_distance = rmed.seg_distance
                              inner join rme.dgo_desc dd on rmed.dgoid = dd.dgoid
-                             WHERE dd.huc12 = ?''', [huc12])
+                             WHERE dd.huc12 = ?''',
+                    [huc12],
+                )
                 with open(huc12_tsv, "w", newline='', encoding="utf-8") as f:
                     writer = csv.writer(f, delimiter="\t")
                     writer.writerow(['level_path', 'seg_distance', 'geom'])
@@ -185,7 +190,7 @@ def main():
     parser.add_argument('tolerance', help='Simplification tolerance', type=int, default=11)
     parser.add_argument('--tags', help='Data Exchange tags to search for projects', type=str)
     parser.add_argument('--collection', help='Collection GUID', type=str)
-    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
+    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages', action='store_true', default=False)
     parser.add_argument('--huc_filter', help='HUC filter SQL prefix ("17%")', type=str, default='')
     args = dotenv.parse_args_env(parser)
 
@@ -198,9 +203,11 @@ def main():
     log.setup(log_path=os.path.join(working_folder, 'rme-athena.log'), log_level=logging.DEBUG)
 
     # Data Exchange Search Params
-    search_params = RiverscapesSearchParams({
-        'projectTypeId': 'rs_metric_engine',
-    })
+    search_params = RiverscapesSearchParams(
+        {
+            'projectTypeId': 'rs_metric_engine',
+        }
+    )
 
     if args.collection != '.':
         search_params.collection = args.collection
@@ -209,7 +216,7 @@ def main():
         search_params.tags = args.tags.split(',')
 
     if args.huc_filter != '' and args.huc_filter != '.':
-        search_params.meta = {'HUC':  args.huc_filter}
+        search_params.meta = {'HUC': args.huc_filter}
 
     with RiverscapesAPI(stage=args.stage) as api:
         scrape_rme(api, args.spatialite_path, search_params, download_folder, args.s3_bucket, args.delete, args.tolerance)

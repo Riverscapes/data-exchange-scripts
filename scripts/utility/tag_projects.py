@@ -3,29 +3,24 @@ Scrapes RME and RCAT outout GeoPackages from Data Exchange and extracts statisti
 Produced for the BLM 2024 September analysis of 2024 CONUS RME projects.
 Philip Bailey
 """
-from typing import Tuple
-from collections import Counter
-import sys
+
+import argparse
 import logging
 import os
 import sqlite3
-import argparse
+import sys
+from collections import Counter
+
 import inquirer
-from rsxml import dotenv, Logger, ProgressBar
+from rsxml import Logger, ProgressBar, dotenv
+
 from pydex import RiverscapesAPI
 
-name_lookup = {'RSContext': "RS Context",
-               'ChannelArea': "Channel Area",
-               'TauDEM': "TauDEM",
-               'VBET': "VBET",
-               'BRAT': "BRAT",
-               'anthro': "ANTHRO",
-               'rcat': "RCAT",
-               'rs_metric_engine': "Metric Engine"}
+name_lookup = {'RSContext': "RS Context", 'ChannelArea': "Channel Area", 'TauDEM': "TauDEM", 'VBET': "VBET", 'BRAT': "BRAT", 'anthro': "ANTHRO", 'rcat': "RCAT", 'rs_metric_engine': "Metric Engine"}
 
 
 def clean_tag_string(tags: str) -> list:
-    """ Clean up a tag string
+    """Clean up a tag string
 
     Args:
         tags (str): _description_
@@ -36,9 +31,8 @@ def clean_tag_string(tags: str) -> list:
     return [tag.strip() for tag in tags.split(',')]
 
 
-def tag_projects(rs_api: RiverscapesAPI, engine: str, db_path: str) -> Tuple[bool, str]:
-    """ Update the tags on a batch of projects
-    """
+def tag_projects(rs_api: RiverscapesAPI, engine: str, db_path: str) -> tuple[bool, str]:
+    """Update the tags on a batch of projects"""
 
     log = Logger('Tagging')
 
@@ -71,19 +65,21 @@ def tag_projects(rs_api: RiverscapesAPI, engine: str, db_path: str) -> Tuple[boo
                     ORDER BY b.name
                 """)
             batches = {f'{row[1]} - ID{row[0]} ({row[2]} HUCs)': row[0] for row in curs.fetchall()}
-            batch_answers = inquirer.prompt([inquirer.List("batch", message="Batch?", choices=batches.keys()),
-                                             inquirer.Text("existing-tags", message="Existing tags?", default="2024CONUS")])
+            batch_answers = inquirer.prompt([inquirer.List("batch", message="Batch?", choices=batches.keys()), inquirer.Text("existing-tags", message="Existing tags?", default="2024CONUS")])
             batch_id = batches[batch_answers['batch']]
             log.info(f'Batch {batch_answers['batch']} ({batch_id}) selected')
 
             existing_tags = clean_tag_string(batch_answers['existing-tags'])
             tag_clauses = 'AND' + " AND ".join([f" (tags LIKE ('%{tag}%')) " for tag in existing_tags])
 
-            curs.execute(f'''
+            curs.execute(
+                f'''
                 SELECT project_id
                 FROM batch_hucs bh
                     INNER JOIN rs_projects rp ON bh.huc10 = rp.huc10
-                WHERE (project_type_id = ?) AND (batch_id = ?) {tag_clauses}''', [answers['engine'], batch_id])
+                WHERE (project_type_id = ?) AND (batch_id = ?) {tag_clauses}''',
+                [answers['engine'], batch_id],
+            )
             project_ids = [row[0] for row in curs.fetchall()]
         else:
             huc_answers = inquirer.prompt([inquirer.Text("huc_list", message="HUC list?")])

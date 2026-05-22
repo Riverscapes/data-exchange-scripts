@@ -1,18 +1,20 @@
 '''Query Script to Find and delete projects on the server
-    June 06, 2023
+June 06, 2023
 '''
-from typing import Dict, List
+
 import json
 import os
 import time
+
 import inquirer
-from termcolor import colored
 import requests
 from rsxml import Logger
+from termcolor import colored
+
 from pydex import RiverscapesAPI
 
 
-def string_same(label: str, local_obj: Dict[str, str], remote_obj: Dict[str, str]) -> bool:
+def string_same(label: str, local_obj: dict[str, str], remote_obj: dict[str, str]) -> bool:
     '''Compare two strings and return the difference
 
     Args:
@@ -35,7 +37,7 @@ def string_same(label: str, local_obj: Dict[str, str], remote_obj: Dict[str, str
         return True
 
 
-def json_same(label: str, local_obj: Dict[str, any], remote_obj: Dict[str, any]) -> bool:
+def json_same(label: str, local_obj: dict[str, any], remote_obj: dict[str, any]) -> bool:
     '''Compare two json objects and return the difference
 
     Args:
@@ -45,7 +47,7 @@ def json_same(label: str, local_obj: Dict[str, any], remote_obj: Dict[str, any])
     Returns:
         str: The difference between the two strings
     '''
-    local: List[Dict[str, str]] = local_obj.get(label, [])
+    local: list[dict[str, str]] = local_obj.get(label, [])
     remote = remote_obj.get(label, [])
     # Strip out any keys with a None value
     local = [{k: v for k, v in d.items() if v is not None} for d in local]
@@ -61,7 +63,7 @@ def json_same(label: str, local_obj: Dict[str, any], remote_obj: Dict[str, any])
 
 
 def projectTypeSync(stage: str, dry_run: bool = False):
-    ''' Find and delete projects on the server
+    '''Find and delete projects on the server
 
     Args:
         stage (str): The stage to run the script on
@@ -70,17 +72,20 @@ def projectTypeSync(stage: str, dry_run: bool = False):
     log.title(f"Update Project types on stage: {stage}")
 
     # Create the API object. Note: this only works as a machine user
-    riverscapes_api = RiverscapesAPI(stage=stage, machine_auth={
-        'clientId': os.environ['RS_CLIENT_ID'],
-        'secretId': os.environ['RS_CLIENT_SECRET'],
-    })
+    riverscapes_api = RiverscapesAPI(
+        stage=stage,
+        machine_auth={
+            'clientId': os.environ['RS_CLIENT_ID'],
+            'secretId': os.environ['RS_CLIENT_SECRET'],
+        },
+    )
     this_dir = os.path.dirname(__file__)
 
     def icon_file(machine_name):
         return os.path.join(this_dir, 'logos', 'upload', f"{machine_name}.png")
 
     # Load the projectTypes.json file for comparison
-    with open(os.path.join(this_dir, 'projectTypes.json'), 'r', encoding='utf8') as f:
+    with open(os.path.join(this_dir, 'projectTypes.json'), encoding='utf8') as f:
         project_types_local = json.loads(f.read())
 
     # Only refresh the token if we need to
@@ -179,9 +184,7 @@ def projectTypeSync(stage: str, dry_run: bool = False):
         print(f"  {len(project_sort['missing'])} project types ARE ON REMOTE BUT NOT LOCAL. NO OPERATION HERE.")
         print(f"      {', '.join([pt['machineName'] for pt in project_sort['missing']])}")
         print('\n')
-    questions = [
-        inquirer.Confirm('continue', message=f"This will change [[{stage.upper()}]]. Do you want to continue?")
-    ]
+    questions = [inquirer.Confirm('continue', message=f"This will change [[{stage.upper()}]]. Do you want to continue?")]
     answers = inquirer.prompt(questions)
     if not answers['continue']:
         print('Exiting')
@@ -200,7 +203,7 @@ def projectTypeSync(stage: str, dry_run: bool = False):
                 'url': pt['url'],
                 'meta': pt['meta'],
             },
-            'state': pt['state']
+            'state': pt['state'],
         }
         if dry_run:
             print('Dry run. Skipping: VARS: \n', json.dumps(qry_vars, indent=2))
@@ -221,7 +224,7 @@ def projectTypeSync(stage: str, dry_run: bool = False):
                 'url': pt['url'],
                 'meta': pt['meta'],
             },
-            'state': pt['state']
+            'state': pt['state'],
         }
         if dry_run:
             print('Dry run. Skipping: VARS: \n', json.dumps(qry_vars, indent=2))
@@ -286,12 +289,7 @@ def projectTypeSync(stage: str, dry_run: bool = False):
                     time.sleep(5)
 
         print(f"  Updating project type: {pt['name']}")
-        riverscapes_api.run_query(update_mutation, {
-            'id': pt['machineName'],
-            'projectType': {
-                'logoToken': token
-            }
-        })
+        riverscapes_api.run_query(update_mutation, {'id': pt['machineName'], 'projectType': {'logoToken': token}})
 
     # Shut down the API since we don;t need it anymore
     riverscapes_api.shutdown()
@@ -303,7 +301,7 @@ if __name__ == '__main__':
     questions = [
         # Also get if this is production or staging (default production)
         inquirer.List('stage', message="Which Data Exchange stage?", choices=['production', 'staging'], default='production'),
-        inquirer.Confirm('dryrun', message="Dry run?", default=False)
+        inquirer.Confirm('dryrun', message="Dry run?", default=False),
     ]
     answers = inquirer.prompt(questions)
 

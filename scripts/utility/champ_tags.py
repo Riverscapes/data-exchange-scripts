@@ -6,11 +6,13 @@ linked to the CHaMP Postgres database by verifying GUIDs.
 Philip Bailey
 27 Nov 2025
 """
+
 import time
 
-from rsxml import Logger
 import psycopg2
 import psycopg2.extras
+from rsxml import Logger
+
 from pydex import RiverscapesAPI
 from pydex.classes.riverscapes_helpers import RiverscapesSearchParams
 
@@ -57,10 +59,14 @@ def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, project_ty
 
     # Simplest search just for Topo projects.
     # Script assumes all topo projects should be owned by CHaMP organization.
-    for x, _stats, _total, _prg in api.search(RiverscapesSearchParams({
-        "projectTypeId": project_type,
-    }), page_size=100):
-
+    for x, _stats, _total, _prg in api.search(
+        RiverscapesSearchParams(
+            {
+                "projectTypeId": project_type,
+            }
+        ),
+        page_size=100,
+    ):
         # if x.id != 'cffbf214-8927-4e0d-98cc-a77f012f4204':
         #     continue
 
@@ -133,12 +139,7 @@ def champ_tags(api: RiverscapesAPI, curs: psycopg2.extensions.cursor, project_ty
             print_visit(meta_watershed, meta_site, meta_year, meta_visit, x)
             missing_tags_count += 1
 
-            __update_project_result = api.run_query(update_project_mutation, {
-                'projectId': x.id,
-                'project': {
-                    'tags': final_tags
-                }
-            })
+            __update_project_result = api.run_query(update_project_mutation, {'projectId': x.id, 'project': {'tags': final_tags}})
             # sleep for 3 seconds to avoid hitting rate limits
             time.sleep(3)
             print(f"Updated project {x.id} - {x.name} with new tags.")

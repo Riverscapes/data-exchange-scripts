@@ -1,9 +1,11 @@
 """
 Crappy little script to reproject geojson files
 """
-import os
+
 import json
+import os
 import subprocess
+
 import inquirer
 from rsxml.util import safe_makedirs
 
@@ -50,7 +52,7 @@ def main():
         subprocess.run(cmd, shell=True, check=True)
 
         # Now open the file, parse the json, remove the "crs" property and save it back to the file
-        with open(out_path, "r", encoding='utf8') as f:
+        with open(out_path, encoding='utf8') as f:
             data = f.read()
             json_data = json.loads(data)
             json_data.pop("crs", None)

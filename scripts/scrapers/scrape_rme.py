@@ -9,15 +9,17 @@ feature class using the IGO points as geometries.
 3) Scrapes the metrics from the RME output GeoPackages into a single output GeoPackage
 4) Optionally deletes the downloaded GeoPackages
 """
-from typing import Dict
-import shutil
-import re
-import os
-import sqlite3
-import logging
+
 import argparse
-from rsxml import dotenv, Logger
+import logging
+import os
+import re
+import shutil
+import sqlite3
+
+from rsxml import Logger, dotenv
 from rsxml.util import safe_makedirs
+
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 from pydex.imports import import_geo
 
@@ -62,7 +64,6 @@ def scrape_rme(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, d
             rme_gpkg = download_file(rs_api, project.id, os.path.join(huc_dir, 'rme'), RME_OUTPUT_GPKG_REGEX)
 
             if not os.path.isfile(output_gpkg) or metric_ids == {}:
-
                 # First, there are some fields from the DGO feature class that we want as well
                 metric_col_types['fcode'] = 'INTEGER'
                 metric_col_types['segment_area'] = 'REAL'
@@ -168,7 +169,7 @@ def continue_with_huc(huc10: str, output_gpkg: str) -> bool:
     return False
 
 
-def create_gpkg(output_gpkg: str, metric_cols: Dict[str, str]) -> None:
+def create_gpkg(output_gpkg: str, metric_cols: dict[str, str]) -> None:
     '''
     Creates the output GeoPackage with the IGOs feature class
     uses DGO metrics as fields
@@ -218,7 +219,7 @@ def create_gpkg(output_gpkg: str, metric_cols: Dict[str, str]) -> None:
     print(f'GeoPackage created with the "igos" point layer: {output_gpkg}')
 
 
-def scrape_huc(huc10: str, rme_gpkg: str, metric_ids: Dict[int, str], driver: ogr.Driver, target_layer: ogr.Layer) -> None:
+def scrape_huc(huc10: str, rme_gpkg: str, metric_ids: dict[int, str], driver: ogr.Driver, target_layer: ogr.Layer) -> None:
     '''
     Perform the actual scrape on a single HUC
     Creates new IGO features with DGO metrics as fields
@@ -235,7 +236,6 @@ def scrape_huc(huc10: str, rme_gpkg: str, metric_ids: Dict[int, str], driver: og
 
         # Loop over features in the source layer
         for source_feature in source_layer:
-
             level_path = source_feature.GetField('level_path')
             seg_distance = source_feature.GetField('seg_distance')
 
@@ -251,23 +251,29 @@ def scrape_huc(huc10: str, rme_gpkg: str, metric_ids: Dict[int, str], driver: og
             target_feature.SetField('seg_distance', seg_distance)
 
             # Retrieve the DGO metric values and store them on the IGO feature
-            rme_curs.execute('''
+            rme_curs.execute(
+                '''
                 SELECT dmv.metric_id, dmv.metric_value
                 FROM dgos d INNER JOIN dgo_metric_values dmv ON d.fid = dmv.dgo_id
                 WHERE (dmv.metric_value IS NOT NULL)
                     AND (d.level_path = ?)
-                    AND (d.seg_distance = ?)''', [level_path, seg_distance])
+                    AND (d.seg_distance = ?)''',
+                [level_path, seg_distance],
+            )
 
             for row in rme_curs.fetchall():
                 target_feature.SetField(metric_ids[row[0]], row[1])
 
             # and now the DGO fields
-            rme_curs.execute('''
+            rme_curs.execute(
+                '''
                 SELECT fcode, segment_area, centerline_length
                 FROM dgos
                 WHERE (level_path = ?)
                     AND (seg_distance = ?)
-                LIMIT 1''', [level_path, seg_distance])
+                LIMIT 1''',
+                [level_path, seg_distance],
+            )
             dgo_row = rme_curs.fetchone()
             if dgo_row is not None:
                 target_feature.SetField('fcode', dgo_row[0])
@@ -288,7 +294,7 @@ def main():
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('tags', help='Data Exchange tags to search for projects', type=str)
-    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
+    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages', action='store_true', default=False)
     parser.add_argument('--huc_filter', help='HUC filter begins with (e.g. 14)', type=str, default='')
     args = dotenv.parse_args_env(parser)
 
@@ -302,16 +308,16 @@ def main():
     log.setup(log_path=os.path.join(working_folder, 'rme-scrape.log'), log_level=logging.DEBUG)
 
     # Data Exchange Search Params
-    search_params = RiverscapesSearchParams({
-        'tags': args.tags.split(','),
-        'projectTypeId': 'rs_metric_engine',
-    })
+    search_params = RiverscapesSearchParams(
+        {
+            'tags': args.tags.split(','),
+            'projectTypeId': 'rs_metric_engine',
+        }
+    )
 
     # Optional HUC filter
     if args.huc_filter != '' and args.huc_filter != '.':
-        search_params.meta = {
-            "HUC": args.huc_filter
-        }
+        search_params.meta = {"HUC": args.huc_filter}
 
     with RiverscapesAPI(stage=args.stage) as api:
         scrape_rme(api, search_params, download_folder, output_gpkg, args.delete)

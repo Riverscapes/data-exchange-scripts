@@ -323,14 +323,14 @@ def scrape_rme(
             if delete_downloads_when_done:
                 delete_folder(download_dir)
             count += 1
-            prg.update(count+errors)
+            prg.update(count + errors)
         except Exception as e:
             errors += 1
             log.error(f'Error scraping HUC {project.huc}: {e}')
-            prg.update(count+errors)
+            prg.update(count + errors)
             # raise
     prg.finish()
-    log.info (f"Scraped {count} projects successfully and {errors} failed.")
+    log.info(f"Scraped {count} projects successfully and {errors} failed.")
 
 
 def main():

@@ -1,8 +1,11 @@
 """
 Generated from riverscapes.schema.graphql using generate_python_classes_from_graphql_api.py
 """
-from typing import TypedDict
+
 from enum import Enum
+from typing import TypedDict
+
+DateTime = str
 
 
 class AttributionRoleEnum(str, Enum):
@@ -496,9 +499,7 @@ class SavedSearchInput(TypedDict, total=False):
     visibility: 'ProjectGroupVisibilityEnum'
 
 
-class SearchDateInput(TypedDict, total=False):
-    from: 'DateTime'
-    to: 'DateTime'
+SearchDateInput = TypedDict('SearchDateInput', {'from': 'str', 'to': 'str'}, total=False)
 
 
 class SearchParamsInput(TypedDict, total=False):

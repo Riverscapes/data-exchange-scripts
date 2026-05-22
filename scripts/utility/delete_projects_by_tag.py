@@ -1,17 +1,18 @@
-"""[summary]
-"""
-import os
-from typing import List
+"""[summary]"""
+
 import json
-from termcolor import colored
+import os
+
+import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-import inquirer
-from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+from termcolor import colored
+
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 
 def delete_by_tags(riverscapes_api: RiverscapesAPI):
-    """ Delete all projects with certain tag(s)
+    """Delete all projects with certain tag(s)
 
     To run this file in VSCode choose "Python: Current File (Cybercastor)" from the command palette
 
@@ -27,10 +28,7 @@ def delete_by_tags(riverscapes_api: RiverscapesAPI):
     search_params = RiverscapesSearchParams.load_from_json(os.path.join(os.path.dirname(__file__), '..', '..', 'inputs', 'add_tags_search.json'))
 
     default_dir = os.path.join(os.path.expanduser("~"), 'RSTagging')
-    out_questions = [
-        inquirer.Text('logdir', message="Where do you want to save the log files?", default=default_dir),
-        inquirer.Text('tags', message="Comma-separated tags", default='zzzz,abc')
-    ]
+    out_questions = [inquirer.Text('logdir', message="Where do you want to save the log files?", default=default_dir), inquirer.Text('tags', message="Comma-separated tags", default='zzzz,abc')]
     out_answers = inquirer.prompt(out_questions)
     logdir = out_answers['logdir']
     safe_makedirs(logdir)
@@ -41,7 +39,7 @@ def delete_by_tags(riverscapes_api: RiverscapesAPI):
     # Make the search and collect all the data
     # ================================================================================================================
 
-    deletable_projects: List[RiverscapesProject] = []
+    deletable_projects: list[RiverscapesProject] = []
 
     total = 0
     for project, _stats, _search_total, _prg in riverscapes_api.search(search_params, progress_bar=True):

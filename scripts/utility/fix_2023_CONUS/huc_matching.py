@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import os
 import json
-from json import JSONDecoder
-from typing import Dict, Any, Iterable, List, Optional
+import os
+from collections.abc import Iterable
 from datetime import datetime
+from json import JSONDecoder
+from typing import Any
 
 # --- INPUTS (as given) ---
 SRC_PATH = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs/fix_2023_CONUS_PRODUCTION_2023CONUS.json"
@@ -22,7 +23,7 @@ def safe_makedirs(path: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
 
-def get_meta_value(meta: List[Dict[str, Any]], keys: Iterable[str]) -> Optional[str]:
+def get_meta_value(meta: list[dict[str, Any]], keys: Iterable[str]) -> str | None:
     """Return the first meta value where key matches any in keys (case-sensitive)."""
     if not meta:
         return None
@@ -34,13 +35,13 @@ def get_meta_value(meta: List[Dict[str, Any]], keys: Iterable[str]) -> Optional[
     return None
 
 
-def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[Dict[str, Any]]:
+def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[dict[str, Any]]:
     """
     True streaming JSON array reader:
     Yields each object from a top-level JSON array without loading the entire file.
     """
     dec = JSONDecoder()
-    with open(path, "r", encoding="utf8") as f:
+    with open(path, encoding="utf8") as f:
         buf = ""
         # Seek to '['
         while True:
@@ -93,7 +94,7 @@ def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[D
                     buf += chunk
 
 
-def minimal_project_view(p: Dict[str, Any]) -> Dict[str, Any]:
+def minimal_project_view(p: dict[str, Any]) -> dict[str, Any]:
     """Trim to stable, helpful fields for outputs."""
     return {
         "id": p.get("id"),
@@ -105,10 +106,7 @@ def minimal_project_view(p: Dict[str, Any]) -> Dict[str, Any]:
         "totalSize": p.get("totalSize"),
         "boundsId": (p.get("bounds") or {}).get("id"),
         # Keep a couple of meta pointers that are often helpful
-        "meta": [
-            m for m in (p.get("meta") or [])
-            if m.get("key") in {"HUC", "Hydrologic Unit Code", "Watershed", "Model Version", "Date Created"}
-        ]
+        "meta": [m for m in (p.get("meta") or []) if m.get("key") in {"HUC", "Hydrologic Unit Code", "Watershed", "Model Version", "Date Created"}],
     }
 
 
@@ -116,7 +114,7 @@ def main():
     safe_makedirs(OUT_JSON)
 
     # 1) Read the 2023CONUS file (assumed smaller) and collect projects + HUCs
-    original_projects: List[Dict[str, Any]] = []
+    original_projects: list[dict[str, Any]] = []
     needed_hucs: set[str] = set()
 
     print("Scanning source (2023CONUS) file...")
@@ -125,16 +123,13 @@ def main():
         if not huc:
             # Skip if it has no HUC-like value
             continue
-        original_projects.append({
-            "huc": huc,
-            "project": minimal_project_view(proj)
-        })
+        original_projects.append({"huc": huc, "project": minimal_project_view(proj)})
         needed_hucs.add(huc)
 
     print(f"Collected {len(original_projects)} projects with HUC from 2023CONUS; unique HUCs: {len(needed_hucs)}")
 
     # 2) Stream the large 2025CONUS file once; collect matches by HUC
-    matches_by_huc: Dict[str, List[Dict[str, Any]]] = {}
+    matches_by_huc: dict[str, list[dict[str, Any]]] = {}
     total_scanned = 0
     total_matched = 0
 
@@ -150,16 +145,12 @@ def main():
     print(f"Scanned {total_scanned} projects in 2025CONUS; matched {total_matched} to needed HUCs.")
 
     # 3) Assemble output list: original project -> all matches
-    out: List[Dict[str, Any]] = []
-    match_count_histogram: Dict[int, int] = {}
+    out: list[dict[str, Any]] = []
+    match_count_histogram: dict[int, int] = {}
     for entry in original_projects:
         huc = entry["huc"]
         matches = matches_by_huc.get(huc, [])
-        out.append({
-            "huc": huc,
-            "sourceProject": entry["project"],
-            "matchesIn2025CONUS": matches
-        })
+        out.append({"huc": huc, "sourceProject": entry["project"], "matchesIn2025CONUS": matches})
         c = len(matches)
         match_count_histogram[c] = match_count_histogram.get(c, 0) + 1
 
@@ -187,7 +178,7 @@ def main():
         "uniqueHUCs": len(needed_hucs),
         "targetProjectsScanned": total_scanned,
         "totalMatchesFound": total_matched,
-        "matchCountHistogram": match_count_histogram
+        "matchCountHistogram": match_count_histogram,
     }
     with open(OUT_STATS, "w", encoding="utf8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)

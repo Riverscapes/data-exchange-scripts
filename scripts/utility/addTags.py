@@ -1,16 +1,17 @@
-"""[summary]
-"""
-import os
-from typing import List
+"""[summary]"""
+
 import json
+import os
+
+import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-import inquirer
-from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 
 def add_tag(riverscapes_api: RiverscapesAPI):
-    """ Find and add tags to projects on the Riverscapes Data Exchange
+    """Find and add tags to projects on the Riverscapes Data Exchange
 
     To run this file in VSCode choose "Python: Current File (Cybercastor)" from the command palette
 
@@ -35,10 +36,7 @@ def add_tag(riverscapes_api: RiverscapesAPI):
 
     # Instead of command-line arguments, we'll use inquirer to ask the user for the stage and tags
     default_dir = os.path.join(os.path.expanduser("~"), 'RSTagging')
-    questions = [
-        inquirer.Text('logdir', message="Where do you want to save the log files?", default=default_dir),
-        inquirer.Text('tags', message="Comma-separated tags", default='zzzz,abc')
-    ]
+    questions = [inquirer.Text('logdir', message="Where do you want to save the log files?", default=default_dir), inquirer.Text('tags', message="Comma-separated tags", default='zzzz,abc')]
     answers = inquirer.prompt(questions)
 
     tags = [x.strip() for x in answers['tags'].split(',')]
@@ -48,7 +46,7 @@ def add_tag(riverscapes_api: RiverscapesAPI):
     # Make the search and collect all the data
     # ================================================================================================================
 
-    changeable_projects: List[RiverscapesProject] = []
+    changeable_projects: list[RiverscapesProject] = []
 
     # huc_list = sum([huc for huc in huc_groups.values()], [])
 
@@ -94,10 +92,7 @@ def add_tag(riverscapes_api: RiverscapesAPI):
             if tag not in project.tags:
                 project.tags.append(tag)
         # Now run the mutation
-        riverscapes_api.run_query(mutation_script, {
-            "projectId": project.id,
-            "project": {"tags": project.tags}
-        })
+        riverscapes_api.run_query(mutation_script, {"projectId": project.id, "project": {"tags": project.tags}})
 
     log.info("Done!")
 

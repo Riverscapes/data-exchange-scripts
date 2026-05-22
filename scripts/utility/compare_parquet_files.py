@@ -1,5 +1,7 @@
 """compare parquet files - ingoring column order"""
+
 import hashlib
+
 import pandas as pd
 
 

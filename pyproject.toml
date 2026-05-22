@@ -25,6 +25,7 @@ dependencies = [
   "python-dateutil==2.9.0.post0",
   "requests==2.32.3",
   "rsxml==2.0.6",
+  "ruff>=0.9.0",
   "semver==3.0.4",
   "setuptools==76.0.0",
   "six==1.17.0",
@@ -54,17 +55,36 @@ pydex = ["**/*.graphql", "**/*.json"]
 line-length = 240
 target-version = "py312"
 
-[tool.ruff.format]
-quote-style = "preserve"
+# Paths ruff should never touch
+exclude = [
+    ".git",
+    "__pycache__",
+    "*.egg-info",
+    "help",
+    "wheels",
+]
 
+# ── Lint ─────────────────────────────────────────────────────────────────────
 [tool.ruff.lint]
-# I = isort (import sorting fix)
-# E, F = Flake8 (standard errors)
-# PL = Pylint (replaces Pylint's rules)
-# N = pep8 naming checks
-select = ["I", "E", "F", "PL", "N"]
+
+select = [
+    "E",    # pycodestyle errors   (replaces pycodestyle / autopep8 checks)
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes             (undefined names, unused imports, …)
+    "I",    # isort                (replaces the isort tool)
+    "UP",   # pyupgrade            (modernise Python syntax automatically)
+    "B",    # flake8-bugbear       (likely bugs and design issues)
+    "N",    # pep8-naming          (replaces pylint naming checks)
+    "RUF",  # ruff-specific rules  (redundant noqa, mutable class vars, …)
+]
 
 [tool.ruff.lint.isort]
 # Tells Ruff exactly which imports are "local" to your project
 known-first-party = ["pydex"]
 combine-as-imports = true
+
+# ── Format (replaces autopep8) ────────────────────────────────────────────────
+[tool.ruff.format]
+quote-style = "preserve"
+indent-style = "space"
+line-ending  = "lf"

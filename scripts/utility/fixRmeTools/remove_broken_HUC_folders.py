@@ -2,7 +2,6 @@
 import os
 import re
 import shutil
-from typing import Set, List
 
 # --- Config ---
 BASE_DIR = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/data/rme_bounds_fixed_projects_inserted"
@@ -12,7 +11,7 @@ HUC_REGEX = re.compile(r"^\d{10}$")  # 10-digit HUCs
 DRY_RUN = False  # <<< set to False to actually delete
 
 
-def list_huc_dirs(path: str) -> List[str]:
+def list_huc_dirs(path: str) -> list[str]:
     """Return names of subdirectories that look like 10-digit HUCs."""
     try:
         entries = os.listdir(path)
@@ -32,7 +31,7 @@ def main():
         raise SystemExit(f"Not found: {broken_path}")
 
     # Collect HUCs from both _broken subfolders
-    hucs_to_remove: Set[str] = set()
+    hucs_to_remove: set[str] = set()
     for sub in BROKEN_SUBS:
         subpath = os.path.join(broken_path, sub)
         if not os.path.isdir(subpath):

@@ -1,12 +1,15 @@
 """
 Dumps Riverscapes Data Exchange projects to a SQLite database
 """
+
+import argparse
+import os
 import shutil
 import sys
-import os
 import traceback
-import argparse
+
 from rsxml import Logger, dotenv
+
 from pydex import RiverscapesAPI
 from pydex.lib.dump.dump_riverscapes import dump_riverscapes
 

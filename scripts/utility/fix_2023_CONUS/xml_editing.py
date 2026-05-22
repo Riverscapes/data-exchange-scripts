@@ -25,14 +25,12 @@ What this script does:
 Safe to re-run: uses .bak only if it doesn't exist, and copytree with dirs_exist_ok.
 """
 
-import os
-import re
-import sys
-import shutil
 import copy
+import os
+import shutil
+import sys
 import traceback
 import xml.etree.ElementTree as ET
-from typing import Set
 
 # ---- CONFIG -----------------------------------------------------------------
 
@@ -56,17 +54,18 @@ def pretty_indent(elem: ET.Element) -> None:
         return
 
     def _indent(e, level=0):
-        i = "\n" + level*"  "
+        i = "\n" + level * "  "
         if len(e):
             if not e.text or not e.text.strip():
                 e.text = i + "  "
             for child in e:
-                _indent(child, level+1)
+                _indent(child, level + 1)
             if not e.tail or not e.tail.strip():
                 e.tail = i
         else:
             if level and (not e.tail or not e.tail.strip()):
                 e.tail = i
+
     _indent(elem)
 
 
@@ -104,10 +103,11 @@ def copy_folder_to(folder_src: str, folder_dst_root: str, folder_name: str):
     shutil.copytree(folder_src, dst, dirs_exist_ok=True)
 
 
-def write_list(path: str, items: Set[str]):
+def write_list(path: str, items: set[str]):
     with open(path, "w", encoding="utf-8") as f:
         for x in sorted(items):
             f.write(f"{x}\n")
+
 
 # ---- CORE -------------------------------------------------------------------
 
@@ -215,19 +215,15 @@ def main() -> int:
     logs = {
         "total_item_dirs": 0,
         "processed": 0,
-
         "missing_rscontext": 0,
         "missing_2023": 0,
         "no_bounds_in_rscontext": 0,
-
         "missing_rscontext_folders": set(),
         "missing_2023_folders": set(),
         "no_bounds_folders": set(),
-
         "inserted": 0,
         "replaced": 0,
         "inserted_no_meta": 0,
-
         "errors": 0,
     }
 

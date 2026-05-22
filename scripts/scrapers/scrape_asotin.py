@@ -1,16 +1,18 @@
 import csv
+
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 csv_file = "asotin_projects.csv"
 
-search_params = RiverscapesSearchParams({
-    'tags': ["AsotinIMW"],
-})
+search_params = RiverscapesSearchParams(
+    {
+        'tags': ["AsotinIMW"],
+    }
+)
 
 projects = []
 with RiverscapesAPI(stage='production') as api:
     for project, _stats, search_total, _prg in api.search(search_params, progress_bar=True):
-
         project_type = project.project_type
         visit_id = project.project_meta.get('Visit', None)
         site_name = project.project_meta.get('Site', None)
@@ -20,14 +22,7 @@ with RiverscapesAPI(stage='production') as api:
         if visit_id is None:
             continue
 
-        projects.append({
-            'id': project.id,
-            'type': project_type,
-            'visit_id': visit_id,
-            'site_name': site_name,
-            'watershed': watershed,
-            'year': year
-        })
+        projects.append({'id': project.id, 'type': project_type, 'visit_id': visit_id, 'site_name': site_name, 'watershed': watershed, 'year': year})
 
 print(f'Found {len(projects)} projects with tag AsotinIMW')
 

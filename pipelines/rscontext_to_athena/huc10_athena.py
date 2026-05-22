@@ -1,6 +1,6 @@
 """
 Scrape HUC10 information and load it to Athena.
-DEPRECATED - USE rscontext_to_athena instead. 
+DEPRECATED - USE rscontext_to_athena instead.
 
 Philip Bailey
 5 Oct 2025
@@ -10,35 +10,32 @@ https://alden-report.s3.us-east-1.amazonaws.com/1005001203/wsca_report.html
 
 S3 path for JSON Files s3://riverscapes-athena/data_exchange/rs-context/
 
-Searches for projects in the Data Exchange, downloads specific files, uses geo to bin rasters, 
+Searches for projects in the Data Exchange, downloads specific files, uses geo to bin rasters,
  and uploads the results to an S3 bucket.
 """
+
 from __future__ import annotations
-import sys
-import traceback
+
 import argparse
+import json
 import logging
 import os
 import re
-import json
 import shutil
+import sys
+import traceback
 from pathlib import PurePosixPath
 
 import boto3
-
-from rsxml import dotenv, Logger, ProgressBar
+from rsxml import Logger, ProgressBar, dotenv
 from rsxml.util import safe_makedirs
 
-from pydex.lib.raster import Raster
-from pydex.classes.riverscapes_helpers import RiverscapesProject
 from pydex import RiverscapesAPI, RiverscapesSearchParams
+from pydex.classes.riverscapes_helpers import RiverscapesProject
+from pydex.lib.raster import Raster
 
 # RegEx for finding DEM files
-REGEXES = {
-    "DEM_REGEX": r'.*\/dem\.tif$',
-    "METRICS_REGEX": r'.*rscontext_metrics\.json$',
-    "VEG_REGEX": r'.*\/existing_veg\.tif$'
-}
+REGEXES = {"DEM_REGEX": r'.*\/dem\.tif$', "METRICS_REGEX": r'.*rscontext_metrics\.json$', "VEG_REGEX": r'.*\/existing_veg\.tif$'}
 S3_BUCKET = 'riverscapes-athena'
 S3_BASE_PATH = 'data_exchange/rs-context'
 
@@ -52,6 +49,7 @@ MINOR = 1000
 def join_s3_key(*parts: str) -> str:
     """Build an S3 key with forward slashes regardless of OS."""
     return str(PurePosixPath(*parts))
+
 
 def scrape_rsprojects(rs_api: RiverscapesAPI, search_params: RiverscapesSearchParams, download_dir: str, delete_downloads: bool, skip_overwrite: bool) -> None:
     """
@@ -117,7 +115,7 @@ def scrape_rsprojects(rs_api: RiverscapesAPI, search_params: RiverscapesSearchPa
             metrics_json = os.path.join(huc_dir, 'rscontext_metrics.json')
 
             try:
-                metrics = json.loads(open(metrics_json, 'r', encoding='utf-8').read())
+                metrics = json.loads(open(metrics_json, encoding='utf-8').read())
             except Exception as e:
                 log.warning(f'Could not find or read metrics JSON for project {project.id}: {e}')
                 metrics = {}
@@ -192,8 +190,8 @@ def main():
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('--tags', help='Data Exchange tags to search for projects', type=str)
     parser.add_argument('--collection', help='Collection GUID', type=str)
-    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
-    parser.add_argument('--skip-overwrite', help='Whether or not to skip overwriting existing S3 files',  action='store_true', default=False)
+    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages', action='store_true', default=False)
+    parser.add_argument('--skip-overwrite', help='Whether or not to skip overwriting existing S3 files', action='store_true', default=False)
     parser.add_argument('--huc_filter', help='HUC filter SQL prefix ("17%")', type=str, default='')
     args = dotenv.parse_args_env(parser)
 
@@ -206,9 +204,11 @@ def main():
     log.setup(log_path=os.path.join(working_folder, 'huc10-athena.log'), log_level=logging.DEBUG)
 
     # Data Exchange Search Params
-    search_params = RiverscapesSearchParams({
-        'projectTypeId': 'rscontext',
-    })
+    search_params = RiverscapesSearchParams(
+        {
+            'projectTypeId': 'rscontext',
+        }
+    )
 
     if args.collection != '.':
         search_params.collection = args.collection
@@ -217,7 +217,7 @@ def main():
         search_params.tags = args.tags.split(',')
 
     if args.huc_filter != '' and args.huc_filter != '.':
-        search_params.meta = {'HUC':  args.huc_filter}
+        search_params.meta = {'HUC': args.huc_filter}
 
     try:
         with RiverscapesAPI(stage=args.stage) as api:

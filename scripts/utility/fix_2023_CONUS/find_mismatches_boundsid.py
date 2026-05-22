@@ -18,11 +18,12 @@ Usage:
 If args are omitted, defaults below are used.
 """
 
+import json
 import os
 import sys
-import json
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, Dict, Any, Optional
+from typing import Any
 
 # --- Defaults (adjust as needed) ---
 DEFAULT_IN = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs/fix_2023_CONUS_PRODUCTION_2023CONUS_matches_in_2025CONUS__withMatchesOnly.json"
@@ -33,12 +34,12 @@ DEFAULT_LOG = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs
 PRETTY = False
 
 
-def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[Dict[str, Any]]:
+def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[dict[str, Any]]:
     """
     Stream-read a top-level JSON array; yield one element (dict) at a time.
     """
     dec = json.JSONDecoder()
-    with open(path, "r", encoding="utf8") as f:
+    with open(path, encoding="utf8") as f:
         buf = ""
 
         # Find '['
@@ -91,7 +92,7 @@ def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[D
                     buf += chunk
 
 
-def stream_write_json_array(objs: Iterable[Dict[str, Any]], out_path: str) -> int:
+def stream_write_json_array(objs: Iterable[dict[str, Any]], out_path: str) -> int:
     """
     Stream-write iterable of dicts to a valid JSON array file.
     Returns number of written objects.
@@ -114,7 +115,7 @@ def stream_write_json_array(objs: Iterable[Dict[str, Any]], out_path: str) -> in
     return count
 
 
-def warn(msg: str, log_path: Optional[str]) -> None:
+def warn(msg: str, log_path: str | None) -> None:
     """
     Print warning to stderr and append to a log file (if provided).
     """
@@ -126,7 +127,7 @@ def warn(msg: str, log_path: Optional[str]) -> None:
             lf.write(line + "\n")
 
 
-def mismatch_records(in_path: str, warn_path: Optional[str]) -> Iterable[Dict[str, Any]]:
+def mismatch_records(in_path: str, warn_path: str | None) -> Iterable[dict[str, Any]]:
     """
     Generator that yields a compact record for each boundsId mismatch.
     """
@@ -156,20 +157,7 @@ def mismatch_records(in_path: str, warn_path: Optional[str]) -> Iterable[Dict[st
 
         # Mismatch if different, including cases where one is missing and the other not.
         if sp_bounds != m_bounds:
-            yield {
-                "huc": huc,
-                "source": {
-                    "id": sp_id,
-                    "name": sp_name,
-                    "boundsId": sp_bounds,
-                    "projectType": sp_projectType
-                },
-                "match": {
-                    "id": m_id,
-                    "name": m_name,
-                    "boundsId": m_bounds
-                }
-            }
+            yield {"huc": huc, "source": {"id": sp_id, "name": sp_name, "boundsId": sp_bounds, "projectType": sp_projectType}, "match": {"id": m_id, "name": m_name, "boundsId": m_bounds}}
 
 
 def main():

@@ -7,24 +7,24 @@ Pgilip Bailey
 Jan 2026
 Enhances Lorin's Sep 2025 script rme_to_athena_parquet.py
 """
+
 import argparse
 import logging
 import os
-from pathlib import Path
 import re
 import shutil
 import time
 import warnings
+from pathlib import Path
 
 import apsw
 import boto3
 import geopandas as gpd
 import pandas as pd
-from shapely import wkb
-from semver import Version
-
+from rsxml import Logger, ProgressBar, dotenv
 from rsxml.util import safe_makedirs
-from rsxml import dotenv, Logger, ProgressBar
+from semver import Version
+from shapely import wkb
 
 from pydex import RiverscapesAPI, RiverscapesProject
 from pydex.lib.athena import query_to_dataframe
@@ -123,11 +123,7 @@ def get_matching_file(parent_dir: str, regex_str: str) -> str | None:
     return None
 
 
-def download_rsdynamics_geopackage(
-    rs_api: RiverscapesAPI,
-    project: RiverscapesProject,
-    huc_dir: str
-) -> str:
+def download_rsdynamics_geopackage(rs_api: RiverscapesAPI, project: RiverscapesProject, huc_dir: str) -> str:
     """
     Download the RSDynamics GeoPackage for a project and return its file path.
     """
@@ -206,12 +202,7 @@ def extract_dgo_metrics_to_dataframe(gpkg_path: str, spatialite_path: str) -> pd
 
     t6 = time.time()
     # Pivot the data back to that metric_name becomes columns again. VERY SLOW STEP
-    df_final = df_final.pivot_table(
-        index=['fid', 'landcover', 'epoch_length', 'epoch_name', 'confidence'],
-        columns='metric_name',
-        values='measurement',
-        observed=True
-    ).reset_index()
+    df_final = df_final.pivot_table(index=['fid', 'landcover', 'epoch_length', 'epoch_name', 'confidence'], columns='metric_name', values='measurement', observed=True).reset_index()
     log.debug(f"Pivot data {time.time() - t6:.2f}s")
 
     # Rename the fid column to dgo_id
@@ -273,10 +264,7 @@ def extract_dgos_to_geodataframe(gpkg_path: str, spatialite_path: str) -> gpd.Ge
 
     bbox_df = gdf.geometry.bounds.rename(columns={'minx': 'xmin', 'miny': 'ymin', 'maxx': 'xmax', 'maxy': 'ymax'})
     # Combine into a struct-like dict for each row
-    gdf['dgo_geom_bbox'] = bbox_df.apply(
-        lambda row: {'xmin': float(row.xmin), 'ymin': float(row.ymin), 'xmax': float(row.xmax), 'ymax': float(row.ymax)},
-        axis=1
-    )
+    gdf['dgo_geom_bbox'] = bbox_df.apply(lambda row: {'xmin': float(row.xmin), 'ymin': float(row.ymin), 'xmax': float(row.xmax), 'ymax': float(row.ymax)}, axis=1)
 
     return gdf
 
@@ -293,11 +281,7 @@ def delete_folder(dirpath: str | Path) -> None:
             log.error(f'Error deleting download directory {dirpath}: {e}')
 
 
-def upload_to_s3(
-        file_path: str | Path,
-        s3_bucket: str,
-        s3_key: str
-) -> None:
+def upload_to_s3(file_path: str | Path, s3_bucket: str, s3_key: str) -> None:
     """upload a file to s3
 
     Args:
@@ -420,7 +404,7 @@ def scrape_rd(
 
             if delete_downloads_when_done:
                 delete_folder(download_dir)
-                log.info(f"Deleted downloads")
+                log.info("Deleted downloads")
 
             count += 1
             prg.update(count)
@@ -437,7 +421,7 @@ def main():
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('spatialite_path', help='Path to the mod_spatialite library', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
-    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
+    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages', action='store_true', default=False)
     args = dotenv.parse_args_env(parser)
 
     # Set up some reasonable folders to store things
@@ -457,13 +441,7 @@ def main():
         log.info(f"Data bucket: {DATA_BUCKET} (env {DATA_BUCKET_ENV_VAR}); Athena output bucket: {ATHENA_OUTPUT_BUCKET} (env {OUTPUT_BUCKET_ENV_VAR})")
 
     with RiverscapesAPI(stage=args.stage) as api:
-        scrape_rd(
-            api,
-            args.spatialite_path,
-            download_folder,
-            DATA_BUCKET,
-            args.delete
-        )
+        scrape_rd(api, args.spatialite_path, download_folder, DATA_BUCKET, args.delete)
 
     log.info('Process complete')
 

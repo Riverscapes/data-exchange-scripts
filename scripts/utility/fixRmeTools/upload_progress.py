@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-import os
 import json
+import os
 import re
-from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from statistics import mean
+from typing import Any
 
 # ============================
 # Config
@@ -21,7 +21,7 @@ WRITE_JSON_SUMMARY = True
 JSON_SUMMARY_PATH = os.path.join(BASE_DIR, "_huc_upload_summary.json")
 
 
-def find_huc_dirs(root: str) -> List[str]:
+def find_huc_dirs(root: str) -> list[str]:
     try:
         entries = os.listdir(root)
     except FileNotFoundError:
@@ -34,15 +34,15 @@ def find_huc_dirs(root: str) -> List[str]:
     return out
 
 
-def read_match(path: str) -> Optional[Dict[str, Any]]:
+def read_match(path: str) -> dict[str, Any] | None:
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return None
 
 
-def human_size(n: Optional[int]) -> str:
+def human_size(n: int | None) -> str:
     if n is None:
         return "n/a"
     for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -52,14 +52,14 @@ def human_size(n: Optional[int]) -> str:
     return f"{n:.1f} PB"
 
 
-def file_size(path: str) -> Optional[int]:
+def file_size(path: str) -> int | None:
     try:
         return os.path.getsize(path)
     except Exception:
         return None
 
 
-def collect_status(huc_dir: str) -> Dict[str, Any]:
+def collect_status(huc_dir: str) -> dict[str, Any]:
     huc = os.path.basename(huc_dir)
     match_path = os.path.join(huc_dir, MATCH_FILENAME)
     rme_dir = os.path.join(huc_dir, RME_SUBDIR)
@@ -105,7 +105,7 @@ def main():
         print(f"No HUC folders found in {BASE_DIR}")
         return
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for d in huc_dirs:
         rows.append(collect_status(d))
 
@@ -166,22 +166,25 @@ def main():
     # Optional CSV of per-HUC details
     if WRITE_CSV:
         import csv
+
         with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow([
-                "huc", "project_id", "uploaded", "uploadedAt",
-                "has_match", "has_xml", "has_bounds",
-                "xml_size_bytes", "bounds_size_bytes", "note"
-            ])
+            w.writerow(["huc", "project_id", "uploaded", "uploadedAt", "has_match", "has_xml", "has_bounds", "xml_size_bytes", "bounds_size_bytes", "note"])
             for r in rows:
-                w.writerow([
-                    r["huc"], r.get("project_id", ""),
-                    r["uploaded"], r.get("uploadedAt") or "",
-                    r["has_match"], r["has_xml"], r["has_bounds"],
-                    r["xml_size"] if r["xml_size"] is not None else "",
-                    r["bounds_size"] if r["bounds_size"] is not None else "",
-                    r.get("note", "")
-                ])
+                w.writerow(
+                    [
+                        r["huc"],
+                        r.get("project_id", ""),
+                        r["uploaded"],
+                        r.get("uploadedAt") or "",
+                        r["has_match"],
+                        r["has_xml"],
+                        r["has_bounds"],
+                        r["xml_size"] if r["xml_size"] is not None else "",
+                        r["bounds_size"] if r["bounds_size"] is not None else "",
+                        r.get("note", ""),
+                    ]
+                )
         print(f"\nWrote CSV: {CSV_PATH}")
 
     # Optional compact JSON summary (topline numbers)

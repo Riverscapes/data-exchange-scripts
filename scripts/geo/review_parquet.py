@@ -1,6 +1,7 @@
 """check what's going on"""
 
 import os
+
 import pyarrow.parquet as pq
 
 folder = r"C:\nardata\work\rme_extraction\rme-athena\downloads\1012010302"

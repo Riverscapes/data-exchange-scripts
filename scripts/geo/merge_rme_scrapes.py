@@ -4,18 +4,21 @@ Produced for the BLM 2024 September analysis of 2024 CONUS RME projects.
 
 This script assumes that the `scrape_huc_statistics.py` script has been run on each RME project.
 The scrape_huc_statistics.py script extracts statistics from the RME and RCAT output GeoPackages
-and generates a new 'rme_scrape.sqlite' file in the project. This is then uploaded into the 
-project on the Data Exchange. 
+and generates a new 'rme_scrape.sqlite' file in the project. This is then uploaded into the
+project on the Data Exchange.
 """
-import shutil
-import re
-import os
-import sqlite3
-import logging
+
 import argparse
-from pydex import RiverscapesAPI, RiverscapesSearchParams
-from rsxml import dotenv, Logger
+import logging
+import os
+import re
+import shutil
+import sqlite3
+
+from rsxml import Logger, dotenv
 from rsxml.util import safe_makedirs
+
+from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 # RegEx for finding RME and RCAT output GeoPackages
 RME_SCRAPE_GPKG_REGEX = r'.*rme_scrape\.sqlite'
@@ -30,7 +33,6 @@ def merge_rme_scrapes(rs_api: RiverscapesAPI, search_params: RiverscapesSearchPa
 
     # Create a timedelta object with a difference of 1 day
     for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
-
         # Attempt to retrieve the huc10 from the project metadata if it exists
         huc10 = None
         try:
@@ -134,7 +136,7 @@ def copy_table_between_cursors(src_cursor, dest_cursor, table_name, create_table
 
 
 def create_output_db(output_db: str, delete: bool) -> None:
-    """ 
+    """
     Build the output SQLite database by running the schema file.
     """
     log = Logger('Create Output DB')
@@ -176,7 +178,7 @@ def main():
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('tags', help='Data Exchange tags to search for projects', type=str)
-    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
+    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages', action='store_true', default=False)
     parser.add_argument('--huc_filter', help='HUC filter SQL prefix ("17%")', type=str, default='')
     args = dotenv.parse_args_env(parser)
 
@@ -191,15 +193,15 @@ def main():
     log.setup(log_path=os.path.join(working_folder, 'rme-scrape-merge.log'), log_level=logging.DEBUG)
 
     # Data Exchange Search Params
-    search_params = RiverscapesSearchParams({
-        'tags': args.tags.split(','),
-        'projectTypeId': 'rs_metric_engine',
-    })
+    search_params = RiverscapesSearchParams(
+        {
+            'tags': args.tags.split(','),
+            'projectTypeId': 'rs_metric_engine',
+        }
+    )
 
     if args.huc_filter != '':
-        search_params.meta = {
-            "HUC": args.huc_filter
-        }
+        search_params.meta = {"HUC": args.huc_filter}
 
     with sqlite3.connect(output_db) as output_conn:
         output_conn.execute('PRAGMA foreign_keys = ON')

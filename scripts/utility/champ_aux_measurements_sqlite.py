@@ -1,10 +1,10 @@
 """
-Enrich CHaMP topo projects with aux measurement data by exporting from the SQLite database, 
-transforming to JSON files, and uploading to the project on the API. 
+Enrich CHaMP topo projects with aux measurement data by exporting from the SQLite database,
+transforming to JSON files, and uploading to the project on the API.
 This is meant to be run after the initial upload of topo projects, and will look for any visits
-that have a topo project but are missing aux measurements, then find any measurements in the 
-SQLite database for those visits, export them to JSON files, add them to the project XML, 
-and re-upload the project. The upload will trigger processing on the API to extract the 
+that have a topo project but are missing aux measurements, then find any measurements in the
+SQLite database for those visits, export them to JSON files, add them to the project XML,
+and re-upload the project. The upload will trigger processing on the API to extract the
 measurement data from the JSON files and insert it into the appropriate database tables.
 
 Philip Bailey
@@ -23,30 +23,25 @@ Turns out that this database did not possess Aux measurements for all CHaMP visi
 
 Both these scripts are now deleted, but should be available in the git history.
 """
+
 import argparse
-import os
-import json
-import sqlite3
-import shutil
 import datetime
+import json
+import os
+import shutil
+import sqlite3
+
 import psycopg2
 import psycopg2.extras
-from psycopg2.extensions import cursor as Cursor
-from rsxml import ProgressBar, dotenv, Logger
-from rsxml.project_xml import Project, Dataset, Meta, MetaData
 from new_project_upload import upload_project
+from rsxml import Logger, ProgressBar, dotenv
+from rsxml.project_xml import Dataset, Meta, MetaData, Project
+
 from pydex import RiverscapesAPI
 
 # from scripts.utility.champ_aux_measurements_postgres import COLUMNS_TO_SKIP
 
-TABLES_TO_SKIP = [
-    'sqlite_master',
-    'Visits',
-    'Livestock',
-    'ElectroPassTransectFish',
-    'SlopeAndBearing',
-    'SlopeAndBearingSetup'
-]
+TABLES_TO_SKIP = ['sqlite_master', 'Visits', 'Livestock', 'ElectroPassTransectFish', 'SlopeAndBearing', 'SlopeAndBearingSetup']
 
 
 MEASUREMENT_NAMES = [
@@ -117,11 +112,13 @@ MEASUREMENT_NAMES = [
     'Undercut Bank',
     'Visit Information',
     'Water Chemistry',
-    'Woody Debris Jam'
+    'Woody Debris Jam',
 ]
 
 
-def process_champ_visits(api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_curs: psycopg2.extensions.cursor, download_dir: str, delete_files: bool, project_owner: str, visit_id: int = None, watershed: str = None, year: int = None) -> None:
+def process_champ_visits(
+    api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_curs: psycopg2.extensions.cursor, download_dir: str, delete_files: bool, project_owner: str, visit_id: int = None, watershed: str = None, year: int = None
+) -> None:
 
     log = Logger('CHaMP_Aux_Measurements')
 
@@ -147,7 +144,8 @@ def process_champ_visits(api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_cu
 
     # Get all the visits that have a topo project but still require aux measurements
     # The optional parameters will filter to just specific visits/watersheds/years for debugging
-    pg_curs.execute('''
+    pg_curs.execute(
+        '''
         SELECT v.visit_id, s.name, w.name, v.visit_year, p.guid
         FROM visits v
             inner join sites s on v.site_id = s.site_id
@@ -161,16 +159,11 @@ def process_champ_visits(api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_cu
         AND (%s IS NULL OR w.name = %s)
         AND (%s IS NULL OR v.visit_year = %s)
         ORDER BY w.name, s.name, v.visit_year
-    ''', [visit_id, visit_id, watershed, watershed, year, year])
+    ''',
+        [visit_id, visit_id, watershed, watershed, year, year],
+    )
 
-    visits = {
-        row[0]: {
-            'site_name': row[1],
-            'watershed_name': row[2],
-            'visit_year': row[3],
-            'project_guid': row[4]
-        } for row in pg_curs.fetchall()
-    }
+    visits = {row[0]: {'site_name': row[1], 'watershed_name': row[2], 'visit_year': row[3], 'project_guid': row[4]} for row in pg_curs.fetchall()}
     log.info(f'Found {len(visits)} CHaMP visits with topo projects that require aux measurement upload.')
 
     processed = 0
@@ -235,17 +228,17 @@ def process_champ_visits(api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_cu
                     # for col in COLUMNS_TO_SKIP:
                     #     row_data.pop(col, None)
 
-                    clean_data = {"note": "",
-                                  "MeasurementType": measurement_name,
-                                  "qaDecision": "None",
-                                  "value": row_data,
-                                  "objectType": "Measurement",
-                                  }
+                    clean_data = {
+                        "note": "",
+                        "MeasurementType": measurement_name,
+                        "qaDecision": "None",
+                        "value": row_data,
+                        "objectType": "Measurement",
+                    }
 
                     record_data.append(clean_data)
 
                 if len(record_data) > 0:
-
                     # This is meant to simulate the structure of the data returned from the old API
                     record_data = {"value": record_data}
 
@@ -309,13 +302,7 @@ def process_champ_visits(api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_cu
                         break
 
                 if ds_exists is False:
-                    datasets.append(Dataset(
-                        xml_id=xml_id,
-                        name=measurement_name,
-                        path=os.path.relpath(aux_file, visit_dir),
-                        ds_type='File',
-                        meta_data=MetaData([Meta('measurementType', measurement_name)])
-                    ))
+                    datasets.append(Dataset(xml_id=xml_id, name=measurement_name, path=os.path.relpath(aux_file, visit_dir), ds_type='File', meta_data=MetaData([Meta('measurementType', measurement_name)])))
             project.write()
 
             # Upload the project found in this folder. This will include the new aux measurement JSON files.

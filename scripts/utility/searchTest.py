@@ -1,23 +1,20 @@
-"""[summary]
-"""
-import os
-from typing import List
-import json
-import inquirer
-from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+"""[summary]"""
+
+from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 
 def change_owner(riverscapes_api: RiverscapesAPI):
-    """
-    """
+    """ """
 
-    search_params = RiverscapesSearchParams({
-        "projectTypeId": "vbet",
-        "tags": ["2024CONUS"],
-        "meta": {
-            "HUC": "1604020108",
+    search_params = RiverscapesSearchParams(
+        {
+            "projectTypeId": "vbet",
+            "tags": ["2024CONUS"],
+            "meta": {
+                "HUC": "1604020108",
+            },
         }
-    })
+    )
 
     # Make the search and collect all the data
     # ================================================================================================================

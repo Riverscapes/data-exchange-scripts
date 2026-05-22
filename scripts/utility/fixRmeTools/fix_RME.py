@@ -1,16 +1,15 @@
-from typing import Dict, Any, Optional
-import os
 import json
+import os
 from datetime import datetime
-from typing import List, Tuple
-from rsxml import Logger
-from rsxml.util import safe_makedirs
-from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
-import io
 from json import JSONDecoder
 
+from rsxml import Logger
+from rsxml.util import safe_makedirs
 
-def fix_rme(riverscapes_api: RiverscapesAPI, logdir: str = None) -> Tuple[str, str]:
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
+
+
+def fix_rme(riverscapes_api: RiverscapesAPI, logdir: str = None) -> tuple[str, str]:
     """
     Find all projects with tags 2024CONUS and 2025CONUS and write each set to a log file.
 
@@ -33,30 +32,17 @@ def fix_rme(riverscapes_api: RiverscapesAPI, logdir: str = None) -> Tuple[str, s
         """Build search params for a single tag, across all projects."""
         try:
             return RiverscapesSearchParams(
-                input_obj={
-                    "createdOn": {
-                        "from": "2023-01-01T08:00:00Z",
-                        "to": "2024-01-01T08:00:00Z"
-                    },
-                    "ownedBy": {
-                        "type": "ORGANIZATION",
-                        "id": "b35b8f4f-016d-4c60-bbaa-11c9563fb744"
-                    },
-                    "tags": [
-                        "Cybercastor"
-                    ],
-                    "excludeArchived": False
-                }
+                input_obj={"createdOn": {"from": "2023-01-01T08:00:00Z", "to": "2024-01-01T08:00:00Z"}, "ownedBy": {"type": "ORGANIZATION", "id": "b35b8f4f-016d-4c60-bbaa-11c9563fb744"}, "tags": ["Cybercastor"], "excludeArchived": False}
             )
         except TypeError:
             sp = RiverscapesSearchParams({})
-            setattr(sp, "tags", [tag])
+            sp.tags = [tag]
             return sp
 
     def search_and_write(tag: str) -> str:
         """Run a search for a single tag and write results to a JSON file; return the path."""
         sp = make_search_params(tag)
-        projects: List[RiverscapesProject] = []
+        projects: list[RiverscapesProject] = []
 
         total = 0
         log.info(f"Searching ALL projects with tag: {tag}")
@@ -69,6 +55,7 @@ def fix_rme(riverscapes_api: RiverscapesAPI, logdir: str = None) -> Tuple[str, s
         fpath = os.path.join(logdir, fname)
 
         with open(fpath, "w", encoding="utf8") as fobj:
+
             def _proj_json(p: RiverscapesProject):
                 try:
                     return p.json
@@ -89,7 +76,7 @@ def fix_rme(riverscapes_api: RiverscapesAPI, logdir: str = None) -> Tuple[str, s
     # path_2025 = search_and_write("2025CONUS")
 
     log.info("Done scanning CONUS tags.")
-    return (path_2023)
+    return path_2023
 
 
 # ----------------------------
@@ -103,7 +90,7 @@ def _iter_json_array(path: str):
     using a JSONDecoder with raw_decode to avoid loading the entire file.
     """
     decoder = JSONDecoder()
-    with open(path, "r", encoding="utf8") as f:
+    with open(path, encoding="utf8") as f:
         buf = f.read()
 
     i = 0
@@ -161,7 +148,7 @@ def _bounds_missing(p: dict) -> bool:
     return False
 
 
-def stream_filter_projects_without_bounds(input_path: str, output_path: str, log: Logger | None = None) -> Tuple[int, int]:
+def stream_filter_projects_without_bounds(input_path: str, output_path: str, log: Logger | None = None) -> tuple[int, int]:
     """
     Stream `input_path` (a JSON array of projects) and write only projects with
     missing/empty `bounds` to `output_path`, also as a JSON array — streaming style.
@@ -198,6 +185,7 @@ def stream_filter_projects_without_bounds(input_path: str, output_path: str, log
         log.info(f"Kept {kept}/{total} projects with missing bounds.")
     return kept, total
 
+
 # ---- Invoke the filter for your specific 2024 file ----
 
 
@@ -223,7 +211,7 @@ def filter_2024conus_missing_bounds():
     return output_path
 
 
-def _get_meta_value(meta_list: list, key_name: str) -> Optional[str]:
+def _get_meta_value(meta_list: list, key_name: str) -> str | None:
     """Find meta entry by key (exact match) and return its value as string, else None."""
     if not isinstance(meta_list, list):
         return None
@@ -236,12 +224,13 @@ def _get_meta_value(meta_list: list, key_name: str) -> Optional[str]:
             continue
     return None
 
+
 # ----------------------------
 # NEXT SECTION: HUC Matching
 # ----------------------------
 
 
-def _parse_iso8601(dt_str: str) -> Optional[datetime]:
+def _parse_iso8601(dt_str: str) -> datetime | None:
     """Parse ISO8601-ish datetime safely, return None if invalid."""
     if not dt_str:
         return None
@@ -251,7 +240,7 @@ def _parse_iso8601(dt_str: str) -> Optional[datetime]:
         return None
 
 
-def _pick_most_recent(projects: list) -> Optional[dict]:
+def _pick_most_recent(projects: list) -> dict | None:
     """Given a list of lean project dicts, return the one with the latest updatedOn/createdOn."""
     if not projects:
         return None
@@ -263,7 +252,7 @@ def _pick_most_recent(projects: list) -> Optional[dict]:
     return max(projects, key=sort_key)
 
 
-def _extract_huc(project: dict) -> Optional[str]:
+def _extract_huc(project: dict) -> str | None:
     """
     Extract a canonical HUC string from a project meta.
     Tries 'HUC' then 'Hydrologic Unit Code'. Returns normalized digits-only string if found.
@@ -296,7 +285,7 @@ def _lean_project_record(p: dict) -> dict:
     }
 
 
-def _build_2025_huc_index(path_2025: str, log: Logger | None = None) -> Dict[str, list]:
+def _build_2025_huc_index(path_2025: str, log: Logger | None = None) -> dict[str, list]:
     """
     Stream the 2025CONUS file once and build an index of HUC -> [lean project dict, ...].
     """
@@ -304,7 +293,7 @@ def _build_2025_huc_index(path_2025: str, log: Logger | None = None) -> Dict[str
         log.title("Build 2025 HUC index (streaming)")
         log.info(f"Source: {path_2025}")
 
-    index: Dict[str, list] = {}
+    index: dict[str, list] = {}
     total = 0
     indexed = 0
 
@@ -324,7 +313,7 @@ def _build_2025_huc_index(path_2025: str, log: Logger | None = None) -> Dict[str
 def match_hucs_2024_missing_to_2025(
     path_2024_missing: str = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs/fix_rme_PRODUCTION_2024CONUS_MISSING_BOUNDS.json",
     path_2025_all: str = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs/fix_rme_PRODUCTION_2025CONUS.json",
-) -> Optional[str]:
+) -> str | None:
     """
     For each 2024 (missing-bounds) project, find the **most recent** 2025 project with the same HUC.
     Writes an array of:
@@ -375,7 +364,7 @@ def match_hucs_2024_missing_to_2025(
 
                 record = {
                     "project_2024": proj_2024,  # full original object
-                    "match_2025": match,        # just the most recent one
+                    "match_2025": match,  # just the most recent one
                 }
                 json.dump(record, out_f, ensure_ascii=False)
                 matched_2024 += 1

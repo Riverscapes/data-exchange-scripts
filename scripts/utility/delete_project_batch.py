@@ -15,17 +15,18 @@ WHERE project_id IN (SELECT project_id
 
 """
 
-from typing import List
 import argparse
+
 import inquirer
 from rsxml import dotenv
+
 from pydex import RiverscapesAPI
 from pydex.imports import import_sqlite3
 
 sqlite3 = import_sqlite3()
 
 
-def delete_project_batch(rs_api: RiverscapesAPI, stage: str, db_path: str, project_ids: List[str]) -> None:
+def delete_project_batch(rs_api: RiverscapesAPI, stage: str, db_path: str, project_ids: list[str]) -> None:
     """Delete a batch of projects from the Riverscapes API"""
 
     questions = [

@@ -1,12 +1,14 @@
-import sys
-import os
-import traceback
 import argparse
+import os
+import sys
+import traceback
+from datetime import UTC, datetime
 from time import sleep
-from datetime import datetime, timezone
+
 from rsxml import Logger, dotenv
-from pydex.lib.dump.dump_riverscapes import dump_riverscapes
+
 from pydex import RiverscapesAPI
+from pydex.lib.dump.dump_riverscapes import dump_riverscapes
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -29,7 +31,7 @@ if __name__ == '__main__':
                 sys.stderr.flush()
                 os.fsync(sys.stdout.fileno())
                 os.fsync(sys.stderr.fileno())
-                datetime.now(timezone.utc).astimezone().replace(microsecond=0)
+                datetime.now(UTC).astimezone().replace(microsecond=0)
                 sleep(int(args.sleep) * 60)
 
     except Exception as e:

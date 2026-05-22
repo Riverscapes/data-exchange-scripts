@@ -1,15 +1,15 @@
+import json
 import os
 import re
-import json
 from datetime import datetime
-from dateutil.parser import parse as dateparse
+
 import semver
+from dateutil.parser import parse as dateparse
 from rsxml import Logger
 
 
 def sanitize_version(version: str) -> str:
-    """trailing zeros in versions are not allowed
-    """
+    """trailing zeros in versions are not allowed"""
     return re.sub(r'\b0+([0-9])', r'\1', version.strip())
 
 
@@ -26,8 +26,7 @@ def format_date(date: datetime) -> str:
 
 
 def verify_guid(guid: str):
-    """ Really simple GUID validation. Just checks if it's a 24 character string of hex characters
-    """
+    """Really simple GUID validation. Just checks if it's a 24 character string of hex characters"""
     if not re.match(r'^[a-f0-9-]{36}$', guid):
         return False
     return True
@@ -41,8 +40,8 @@ class RiverscapesProject:
     """
 
     def __init__(self, proj_obj):
-        """ Note that we do not always? check for the existence of the keys in the proj_obj. This is because the API is expected to return a 
-        consistent structure. If it doesn't then we want to know about it. 
+        """Note that we do not always? check for the existence of the keys in the proj_obj. This is because the API is expected to return a
+        consistent structure. If it doesn't then we want to know about it.
 
         For example, you do not NEED to return "id" from your graphql query (even though you always should):
 
@@ -85,8 +84,7 @@ class RiverscapesProject:
 
 
 class RiverscapesProjectType:
-    """_summary_
-    """
+    """_summary_"""
 
     def __init__(self, proj_type_obj):
         """_summary_
@@ -105,40 +103,40 @@ class RiverscapesProjectType:
 
 
 class RiverscapesSearchParams:
-    """ Search params are a bit of a pain to work with. This class will help us validate the input parameters.
-        Example usage
-        ```
-        search_params = {
-          keywords: "",          # [String]. Will search inside name, description, summary, meta data keys, metadata values, id and tags
-          name: "",              # [String]. Will search within the project name only
-          "editableOnly": True,  # [Boolean] Filter to Only items that I can edit as a user
-          "excludeArchived": False # [Boolean] Unless you include this, Archived projects will be excluded
-          "createdOn": {
-              "from": "2024-01-01T00:00:00Z",
-          },                   
-         [SearchDate] # Search by date {from, to}. If both from AND to are provided it will search inside a window.
-                      #                          Otherwise it will search before, or after the date provided in the from or to field respecitvely
-         "updatedOn": {"from": "" },  [SearchDate] # search by date {from, to}
-         collection: "ID" # Filter to projects inside a collection
-         bbox: [minLng, minLat, maxLng, maxLat]
-         "projectTypeId": "vbet",
-         "meta": [
-             {
-                 "key": "Runner",
-                 "value": "Cybercastor",
-             },
-             # {
-             #     "key": "ModelVersion",
-             #     "value": "3.2.0",
-             # }
-         ],
-         "tags": ["tag1", "tag2"],  # AND query for tags
-         "ownedBy": {
-             "id": "USER/ORGID",
-             "type": "USER"  # or "ORGANIZATION"
-         }
-        }
-        ```
+    """Search params are a bit of a pain to work with. This class will help us validate the input parameters.
+    Example usage
+    ```
+    search_params = {
+      keywords: "",          # [String]. Will search inside name, description, summary, meta data keys, metadata values, id and tags
+      name: "",              # [String]. Will search within the project name only
+      "editableOnly": True,  # [Boolean] Filter to Only items that I can edit as a user
+      "excludeArchived": False # [Boolean] Unless you include this, Archived projects will be excluded
+      "createdOn": {
+          "from": "2024-01-01T00:00:00Z",
+      },
+     [SearchDate] # Search by date {from, to}. If both from AND to are provided it will search inside a window.
+                  #                          Otherwise it will search before, or after the date provided in the from or to field respecitvely
+     "updatedOn": {"from": "" },  [SearchDate] # search by date {from, to}
+     collection: "ID" # Filter to projects inside a collection
+     bbox: [minLng, minLat, maxLng, maxLat]
+     "projectTypeId": "vbet",
+     "meta": [
+         {
+             "key": "Runner",
+             "value": "Cybercastor",
+         },
+         # {
+         #     "key": "ModelVersion",
+         #     "value": "3.2.0",
+         # }
+     ],
+     "tags": ["tag1", "tag2"],  # AND query for tags
+     "ownedBy": {
+         "id": "USER/ORGID",
+         "type": "USER"  # or "ORGANIZATION"
+     }
+    }
+    ```
     """
 
     def __init__(self, input_obj):
@@ -198,20 +196,14 @@ class RiverscapesSearchParams:
             "name": self.name,
             "editableOnly": self.editableOnly,
             "excludeArchived": self.excludeArchived,
-            "createdOn": {
-                "from": format_date(self.createdOnFrom) if self.createdOnFrom else None,
-                "to": format_date(self.createdOnTo) if self.createdOnTo else None
-            },
-            "updatedOn": {
-                "from": format_date(self.updatedOnFrom) if self.updatedOnFrom else None,
-                "to": format_date(self.updatedOnTo) if self.updatedOnTo else None
-            },
+            "createdOn": {"from": format_date(self.createdOnFrom) if self.createdOnFrom else None, "to": format_date(self.createdOnTo) if self.createdOnTo else None},
+            "updatedOn": {"from": format_date(self.updatedOnFrom) if self.updatedOnFrom else None, "to": format_date(self.updatedOnTo) if self.updatedOnTo else None},
             "collection": self.collection,
             "bbox": self.bbox,
             "projectTypeId": self.projectTypeId,
             "meta": [{"key": k, "value": v} for k, v in self.meta.items()] if self.meta else None,
             "tags": self.tags,
-            "ownedBy": self.ownedBy
+            "ownedBy": self.ownedBy,
         }
         # Now remove any None values
         sanitized = {k: v for k, v in initial.items() if v is not None}
@@ -226,8 +218,7 @@ class RiverscapesSearchParams:
         return sanitized
 
     def validate(self):
-        """ We can save a lot of grief here by validating the input parameters
-        """
+        """We can save a lot of grief here by validating the input parameters"""
         if self.keywords is not None:
             if not isinstance(self.keywords, str):
                 raise ValueError("keywords must be a string")
@@ -311,7 +302,7 @@ class RiverscapesSearchParams:
         if not os.path.exists(json_path):
             raise Exception(f"Could not find the file: {json_path}. Create this file and put a search inside it")
 
-        with open(json_path, 'r', encoding='utf8') as f:
+        with open(json_path, encoding='utf8') as f:
             search_params = RiverscapesSearchParams(json.load(f))
         log.debug(f"Successfully loaded search parameters from: {json_path}")
         log.debug(f"Search parameters: {json.dumps(search_params.to_gql(), indent=2)}")

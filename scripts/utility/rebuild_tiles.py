@@ -1,21 +1,22 @@
 """
 
-    To run this file in VSCode choose "Python: Current File (Cybercastor)" from the command palette
+To run this file in VSCode choose "Python: Current File (Cybercastor)" from the command palette
 
 """
+
+import json
 import os
 import sys
-from typing import List
-import json
+
+import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-import inquirer
+
 from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 
 def confirm(msg: str = None):
-    """ Just a little confirmation function
-    """
+    """Just a little confirmation function"""
     log = Logger('confirm')
     if msg:
         log.warning(msg)
@@ -28,7 +29,7 @@ def confirm(msg: str = None):
 
 
 def rebuild_web_tiles(riverscapes_api: RiverscapesAPI):
-    """ Rebuild web tiles based on a series of choices
+    """Rebuild web tiles based on a series of choices
 
     Args:
         output_folder ([type]): [description]
@@ -42,22 +43,25 @@ def rebuild_web_tiles(riverscapes_api: RiverscapesAPI):
     # Ask if it's one project or many based on a search
     questions = [
         inquirer.Text('filedir', message="Where do you want to save the log files?", default=default_dir),
-        inquirer.List('oneOrSearch',
-                      message="Would you like to rebuilt tiles for one project or many based on a search?",
-                      default='one',
-                      choices=['one', 'search'],
-                      ),
+        inquirer.List(
+            'oneOrSearch',
+            message="Would you like to rebuilt tiles for one project or many based on a search?",
+            default='one',
+            choices=['one', 'search'],
+        ),
         # Ask if we want the whole project or just specific xpaths
-        inquirer.List('wholeOrXpaths',
-                      message="Would you like to rebuilt tiles for the whole project or just specific xpaths?",
-                      choices=['whole', 'xpaths'],
-                      ),
+        inquirer.List(
+            'wholeOrXpaths',
+            message="Would you like to rebuilt tiles for the whole project or just specific xpaths?",
+            choices=['whole', 'xpaths'],
+        ),
         # Do you want to force the rebuild if there are already tiles there?
-        inquirer.List('force',
-                      message="Would you like to force the rebuild if there are already tiles there?",
-                      default='no',
-                      choices=['yes', 'no'],
-                      )
+        inquirer.List(
+            'force',
+            message="Would you like to force the rebuild if there are already tiles there?",
+            default='no',
+            choices=['yes', 'no'],
+        ),
     ]
     answers = inquirer.prompt(questions)
 
@@ -76,15 +80,19 @@ def rebuild_web_tiles(riverscapes_api: RiverscapesAPI):
 
     if answers['wholeOrXpaths'] == 'xpaths':
         # Ask for a comma-separated list of xpaths
-        mutation_params['rsXPaths'] = inquirer.prompt([
-            inquirer.Text('xpaths', message="What are the xpaths you want to rebuilt?"),
-        ])['xpaths'].split(',')
+        mutation_params['rsXPaths'] = inquirer.prompt(
+            [
+                inquirer.Text('xpaths', message="What are the xpaths you want to rebuilt?"),
+            ]
+        )['xpaths'].split(',')
 
     if answers['oneOrSearch'] == 'one':
         # Ask for the project id
-        project_id = inquirer.prompt([
-            inquirer.Text('projectId', message="What is the project id?"),
-        ])['projectId']
+        project_id = inquirer.prompt(
+            [
+                inquirer.Text('projectId', message="What is the project id?"),
+            ]
+        )['projectId']
         mutation_params['projectId'] = project_id
 
         # Ask the user to confirm using inquirer
@@ -97,7 +105,7 @@ def rebuild_web_tiles(riverscapes_api: RiverscapesAPI):
         search_params = RiverscapesSearchParams({"projectTypeId": "topo"})
         confirm(f"Ready to search for projects using search params: \n {search_params.to_gql()}. \n\n IF THIS IS NOT WHAT YOU WANT, HIT CTRL-C NOW!")
 
-        changeable_projects: List[RiverscapesProject] = []
+        changeable_projects: list[RiverscapesProject] = []
         total = 0
         for project, _stats, search_total, _prg in riverscapes_api.search(search_params, progress_bar=True):
             total = search_total
@@ -124,8 +132,10 @@ if __name__ == '__main__':
     if not os.environ.get('RS_CLIENT_ID') or not os.environ.get('RS_CLIENT_SECRET'):
         raise ValueError("You need to set the RS_CLIENT_ID and RS_CLIENT_SECRET environment variables")
 
-    with RiverscapesAPI(machine_auth={
-        "clientId": os.environ.get('RS_CLIENT_ID'),
-        "secretId": os.environ.get('RS_CLIENT_SECRET'),
-    }) as api:
+    with RiverscapesAPI(
+        machine_auth={
+            "clientId": os.environ.get('RS_CLIENT_ID'),
+            "secretId": os.environ.get('RS_CLIENT_SECRET'),
+        }
+    ) as api:
         rebuild_web_tiles(api)

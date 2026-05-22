@@ -8,6 +8,7 @@ Philip Bailey
 """
 
 import os
+
 import inquirer
 
 
@@ -32,7 +33,7 @@ def load_project_guids_from_csv(csv_folder: str) -> list[str]:
     try:
         csv_path = os.path.join(csv_folder, answers['csv_path'])
         project_ids = []
-        with open(csv_path, 'r', encoding='utf-8') as csvfile:
+        with open(csv_path, encoding='utf-8') as csvfile:
             for line in csvfile:
                 project_id = line.strip()
                 if project_id:

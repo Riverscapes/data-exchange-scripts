@@ -1,23 +1,17 @@
 """purpose:  traverse a directory with geopackages,
 run something on each one, and report what we find
 """
+
 import os
 import sqlite3
+
 import pandas as pd
 from rsxml import ProgressBar
 
 # Configuration
 ROOT_DIR = r"F:\nardata\work\rme_extraction\rme-athena\downloads"
 GPKG_NAME = "riverscapes_metrics.gpkg"
-TABLES = [
-    "dgo_geomorph",
-    "dgo_veg",
-    "dgo_hydro",
-    "dgo_impacts",
-    "dgo_beaver",
-    "dgos",
-    "dgo_desc"
-]
+TABLES = ["dgo_geomorph", "dgo_veg", "dgo_hydro", "dgo_impacts", "dgo_beaver", "dgos", "dgo_desc"]
 OUTPUT_CSV = "gpkg_cardinality_report.csv"
 
 
@@ -101,11 +95,7 @@ def measure_table_cardinality(gpkg_path: str) -> dict:
     dgos_poly_count = count_dgos_polygons(gpkg_path)
     count_values = [v for v in counts.values() if v is not None]
     all_equal = len(set(count_values)) == 1 and len(count_values) == len(TABLES)
-    return {
-        **counts,
-        "dgos_poly_count": dgos_poly_count,
-        "all_equal": all_equal
-    }
+    return {**counts, "dgos_poly_count": dgos_poly_count, "all_equal": all_equal}
 
 
 def find_duplicate_lp_segdist(gpkg_path: str) -> dict:

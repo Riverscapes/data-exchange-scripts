@@ -1,4 +1,4 @@
-"""
+r"""
 Merge projects within a collection into a single collection.
 
 Example file regex list: .*brat\.gpkg|.*brat\.html
@@ -8,43 +8,39 @@ Note:
 - periods in the actual string need to be escaped with a backslash.
 - the pipe character is used to separate the regexes.
 """
-from typing import Dict, Tuple, List
-from datetime import datetime
-import re
-import sys
-import os
-import logging
-import subprocess
-import json
+
 import argparse
+import json
+import logging
+import os
+import re
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
+from datetime import datetime
+
 import inquirer
-from rsxml import dotenv, Logger
-from rsxml.util import safe_makedirs
+from rsxml import Logger, dotenv
 from rsxml.project_xml import (
-    Project,
-    MetaData,
-    Meta,
-    ProjectBounds,
-    Coords,
     BoundingBox,
+    Coords,
+    Meta,
+    MetaData,
+    Project,
+    ProjectBounds,
 )
-from pydex.imports import import_geo
+from rsxml.util import safe_makedirs
+
 from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
+from pydex.imports import import_geo
 from pydex.lib.raster import Raster
+
 gdal, ogr, osr, shapely, np = import_geo()
 
-name_lookup = {'RSContext': "RS Context",
-               'ChannelArea': "Channel Area",
-               'TauDEM': "TauDEM",
-               'VBET': "VBET",
-               'BRAT': "BRAT",
-               'anthro': "ANTHRO",
-               'rcat': "RCAT",
-               'rs_metric_engine': "Metric Engine"}
+name_lookup = {'RSContext': "RS Context", 'ChannelArea': "Channel Area", 'TauDEM': "TauDEM", 'VBET': "VBET", 'BRAT': "BRAT", 'anthro': "ANTHRO", 'rcat': "RCAT", 'rs_metric_engine': "Metric Engine"}
 
 
-def merge_projects(projects_lookup: Dict[str, RiverscapesProject], merged_dir: str, name: str, project_type: str, collection_id: str, rs_stage: str, regex_list: List[str], delete_source: bool = False) -> None:
+def merge_projects(projects_lookup: dict[str, RiverscapesProject], merged_dir: str, name: str, project_type: str, collection_id: str, rs_stage: str, regex_list: list[str], delete_source: bool = False) -> None:
     """
     Merge the projects in the projects_lookup dictionary into a single project
     """
@@ -59,7 +55,6 @@ def merge_projects(projects_lookup: Dict[str, RiverscapesProject], merged_dir: s
 
     first_project_xml = None
     for proj_path, project in projects_lookup.items():
-
         project_xml = os.path.join(proj_path, 'project.rs.xml')
         if project_xml is None:
             log.warning(f'Skipping project with no project.rs.xml file {project["id"]}')
@@ -147,7 +142,7 @@ def replace_log_file(merged_project_xml) -> None:
     tree.write(merged_project_xml)
 
 
-def union_polygons(input_geojson_files, output_geojson_file) -> Tuple[str, str]:
+def union_polygons(input_geojson_files, output_geojson_file) -> tuple[str, str]:
     """
     Combine and union all polygon features from multiple GeoJSON files into a single polygon.
 
@@ -222,7 +217,7 @@ def get_bounds_geojson_file(project_xml_path: str, bounds_files):
         bounds_files.append(abs_path)
 
 
-def get_geopackage_datasets(project_xml_path: str, master_project: Dict, regex_list) -> None:
+def get_geopackage_datasets(project_xml_path: str, master_project: dict, regex_list) -> None:
     """
     Discover all the vector datasets in the project.rs.xml file and incorporate them
     intro the master project dictionary.
@@ -243,7 +238,7 @@ def get_geopackage_datasets(project_xml_path: str, master_project: Dict, regex_l
             log.info(f'Skipping non-regex raster {name} with path {path}')
             continue
 
-        if (gpkg_id not in master_project):
+        if gpkg_id not in master_project:
             master_project[gpkg_id] = {'rel_path': path, 'abs_path': os.path.join(os.path.dirname(project_xml_path), path), 'name': name, 'id': gpkg_id, 'layers': {}}
 
         # find each layer in the geopackage
@@ -257,7 +252,7 @@ def get_geopackage_datasets(project_xml_path: str, master_project: Dict, regex_l
             master_project[gpkg_id]['layers'][fc_name]['occurences'].append({'path': os.path.join(os.path.dirname(project_xml_path), path)})
 
 
-def get_shapefile_datasets(project_xml_path: str, master_project: Dict, regex_list) -> None:
+def get_shapefile_datasets(project_xml_path: str, master_project: dict, regex_list) -> None:
     """
     Discover all the vector datasets in the project.rs.xml file and incorporate them
     intro the master project dictionary.
@@ -275,7 +270,6 @@ def get_shapefile_datasets(project_xml_path: str, master_project: Dict, regex_li
 
     # find each geopackage in the project
     for shapefile in tree.findall('.//Vector'):
-
         # Skip any GeoPackage vector datasets
         if 'geopackage' == parent_map.get(parent_map.get(shapefile, ''), '').tag.lower():
             continue
@@ -288,13 +282,13 @@ def get_shapefile_datasets(project_xml_path: str, master_project: Dict, regex_li
             log.info(f'Skipping non-regex raster {name} with path {path}')
             continue
 
-        if (shp_id not in master_project):
+        if shp_id not in master_project:
             master_project[shp_id] = {'rel_path': path, 'abs_path': os.path.join(os.path.dirname(project_xml_path), path), 'name': name, 'id': shp_id, 'occurences': []}
 
         master_project[shp_id]['occurences'].append({'path': os.path.join(os.path.dirname(project_xml_path), path)})
 
 
-def process_gpk_vectors(master_project: Dict, output_dir: str) -> None:
+def process_gpk_vectors(master_project: dict, output_dir: str) -> None:
     """
     Process the vector datasets in the master project dictionary.  This will
     merge all the vector datasets within each GeoPackage into new GeoPackages
@@ -318,7 +312,6 @@ def process_gpk_vectors(master_project: Dict, output_dir: str) -> None:
             os.remove(output_gpkg)
 
         for feature_class, feature_class_info in gpkg_info['layers'].items():
-
             for input_gpkg in feature_class_info['occurences']:
                 input_gpkg_file = input_gpkg['path']
 
@@ -329,7 +322,7 @@ def process_gpk_vectors(master_project: Dict, output_dir: str) -> None:
                 subprocess.call([cmd], shell=True, cwd=output_gpkg_dir)
 
 
-def process_shp_vectors(master_project: Dict, output_dir: str) -> None:
+def process_shp_vectors(master_project: dict, output_dir: str) -> None:
     """
     Process the vector datasets in the master project dictionary.  This will
     merge all the vector datasets within each ShapeFile into new ShapeFiles
@@ -361,7 +354,7 @@ def process_shp_vectors(master_project: Dict, output_dir: str) -> None:
             subprocess.call([cmd], shell=True, cwd=output_shp_dir)
 
 
-def process_rasters(master_project: Dict, output_dir: str, delete_source: bool = False) -> None:
+def process_rasters(master_project: dict, output_dir: str, delete_source: bool = False) -> None:
     """
     Process the raster datasets in the master project dictionary.  This will
     merge all occurances of each type of raster into a single raster for each type.
@@ -398,7 +391,7 @@ def process_rasters(master_project: Dict, output_dir: str, delete_source: bool =
                     os.remove(raster_path)
 
 
-def get_raster_datasets(project, master_project, regex_list: List[str]) -> None:
+def get_raster_datasets(project, master_project, regex_list: list[str]) -> None:
     """
     Discover all the rasters in the project.rs.xml file and incorporate them
     intro the master project dictionary. If their path matches the regex_list
@@ -470,12 +463,14 @@ def main():
         log.setup(log_path=os.path.join(merged_folder, 'merge-projects.log'), log_level=logging.DEBUG)
 
         # First, find the projects to merge using the Riverscapes API search
-        search_params = RiverscapesSearchParams({
-            'collection':  answers['collection_id'],
-            'projectTypeId': answers['project_type'],
-        })
+        search_params = RiverscapesSearchParams(
+            {
+                'collection': answers['collection_id'],
+                'projectTypeId': answers['project_type'],
+            }
+        )
 
-        projects_lookup: Dict[str, RiverscapesProject] = {}
+        projects_lookup: dict[str, RiverscapesProject] = {}
         for project, _stats, search_total, _prg in api.search(search_params, progress_bar=True):
             if search_total < 2:
                 log.error(f'Insufficient number of projects ({search_total}) found with type {args.project_type} and tags {args.project_tags}. 2 or more needed.')

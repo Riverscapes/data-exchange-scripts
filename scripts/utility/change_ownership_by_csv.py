@@ -9,11 +9,13 @@ a CSV file for changing ownership.
 Philip Bailey
 4 Mar 2026
 """
-from typing import List
-import os
+
 import argparse
+import os
+
 import inquirer
 from rsxml import ProgressBar, dotenv
+
 from pydex import RiverscapesAPI
 
 
@@ -50,14 +52,14 @@ def change_ownership_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str)
                 changed += 1
         except Exception as e:
             raise e
-        prg.update(i+1)
+        prg.update(i + 1)
 
     prg.finish()
 
     print(f'Process complete. {changed} projects processed. {not_found} projects not found.')
 
 
-def load_project_guids_from_csv_file(csv_folder: str) -> List[str]:
+def load_project_guids_from_csv_file(csv_folder: str) -> list[str]:
     """
     Prompt the user to select a CSV file from the specified folder and return a list of project GUIDs
     """
@@ -79,7 +81,7 @@ def load_project_guids_from_csv_file(csv_folder: str) -> List[str]:
     print(f'Selected CSV file: {csv_path}')
 
     project_ids = []
-    with open(csv_path, 'r', encoding='utf-8') as csvfile:
+    with open(csv_path, encoding='utf-8') as csvfile:
         for line in csvfile:
             project_id = line.strip()
             if project_id:

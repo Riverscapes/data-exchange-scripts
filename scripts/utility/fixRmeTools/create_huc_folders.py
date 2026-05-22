@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import os
-import json
 import re
 import shutil
-from typing import Optional, Dict, Any, List, Iterable
+from collections.abc import Iterable
+from typing import Any
+
 from rsxml import Logger
 from rsxml.util import safe_makedirs
+
 from pydex import RiverscapesAPI
 
 # --- Config paths ---
@@ -22,8 +24,9 @@ COMBINED_2025 = [ONLY_BOUNDS_GEOJSON, ONLY_RME_PROJECT_XML]
 
 def iter_json_array(path: str) -> Iterable[dict]:
     from json import JSONDecoder
+
     decoder = JSONDecoder()
-    with open(path, "r", encoding="utf8") as f:
+    with open(path, encoding="utf8") as f:
         buf = f.read()
     i, n = 0, len(buf)
     while i < n and buf[i].isspace():
@@ -46,10 +49,11 @@ def iter_json_array(path: str) -> Iterable[dict]:
         yield obj
         i = end
 
+
 # --- Helpers ---
 
 
-def get_meta_value(meta_list: list, key_name: str) -> Optional[str]:
+def get_meta_value(meta_list: list, key_name: str) -> str | None:
     if not isinstance(meta_list, list):
         return None
     for kv in meta_list:
@@ -59,7 +63,7 @@ def get_meta_value(meta_list: list, key_name: str) -> Optional[str]:
     return None
 
 
-def extract_huc_from_project(project: Dict[str, Any]) -> Optional[str]:
+def extract_huc_from_project(project: dict[str, Any]) -> str | None:
     """
     Prefer 'HUC', fallback 'Hydrologic Unit Code'. Normalize to digits only.
     """
@@ -78,7 +82,7 @@ def ensure_dir(path: str):
         safe_makedirs(path)
 
 
-def find_matching_files(root_dir: str, pattern: str) -> List[str]:
+def find_matching_files(root_dir: str, pattern: str) -> list[str]:
     """Find files under root_dir whose relative path matches `pattern`."""
     regex = re.compile(pattern, re.IGNORECASE)
     matches = []
@@ -104,6 +108,7 @@ def move_files_preserve_subpath(src_root: str, dst_root: str, pattern: str) -> i
         shutil.move(abs_src, abs_dst)
         moved += 1
     return moved
+
 
 # --- Download workflow ---
 
@@ -175,7 +180,7 @@ def process_matches(api: RiverscapesAPI, matches_path: str = MATCHES_PATH, base_
             api.download_files(
                 project_id=match_2025.get("id"),
                 download_dir=rsctx_dir_25,
-                re_filter=COMBINED_2025,   # both bounds + project.rs.xml
+                re_filter=COMBINED_2025,  # both bounds + project.rs.xml
                 force=True,
             )
             downloaded_counts["2025_combined_download"] += 1

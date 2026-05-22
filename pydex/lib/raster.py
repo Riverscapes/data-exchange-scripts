@@ -1,19 +1,19 @@
 from __future__ import annotations
-import math
-from typing import Dict
-from os import path
+
 import json
+import math
+from os import path
 from time import time
+
 from rsxml import Logger
 
 from pydex.imports import import_geo
-
 
 gdal, ogr, osr, shapely, np = import_geo()
 
 
 class Raster:
-    """ A class to handle raster data
+    """A class to handle raster data
 
     NOTE: This class was moved from RSCommons and stripped down to only include the most essential functions
     """
@@ -79,17 +79,15 @@ class Raster:
             raise e
 
     def __enter__(self) -> Raster:
-        """Behaviour on open when using the "with VectorBase():" Syntax
-        """
+        """Behaviour on open when using the "with VectorBase():" Syntax"""
         return self
 
     def __exit__(self, _type, _value, _traceback):
-        """Behaviour on close when using the "with VectorBase():" Syntax
-        """
+        """Behaviour on close when using the "with VectorBase():" Syntax"""
         print('hi')
 
     def getBottom(self):
-        """ Get the bottom of the raster
+        """Get the bottom of the raster
 
         Returns:
             _type_: _description_
@@ -97,7 +95,7 @@ class Raster:
         return self.top + (self.cellHeight * self.rows)
 
     def getRight(self):
-        """ Get the right of the raster
+        """Get the right of the raster
 
         Returns:
             _type_: _description_
@@ -105,7 +103,7 @@ class Raster:
         return self.left + (self.cellWidth * self.cols)
 
     def getWidth(self):
-        """ Get the width of the raster
+        """Get the width of the raster
 
         Returns:
             _type_: _description_
@@ -113,7 +111,7 @@ class Raster:
         return self.getRight() - self.left
 
     def getHeight(self):
-        """ Get the height of the raster
+        """Get the height of the raster
 
         Returns:
             _type_: _description_
@@ -121,20 +119,22 @@ class Raster:
         return self.top - self.getBottom()
 
     def getBoundaryShape(self):
-        """ Get the boundary shape of the raster
+        """Get the boundary shape of the raster
 
         Returns:
             _type_: _description_
         """
-        return shapely.geometry.Polygon([
-            (self.left, self.top),
-            (self.getRight(), self.top),
-            (self.getRight(), self.getBottom()),
-            (self.left, self.getBottom()),
-        ])
+        return shapely.geometry.Polygon(
+            [
+                (self.left, self.top),
+                (self.getRight(), self.top),
+                (self.getRight(), self.getBottom()),
+                (self.left, self.getBottom()),
+            ]
+        )
 
     def boundsContains(self, bounds, pt):
-        """ Check if the bounds contain a point
+        """Check if the bounds contain a point
 
         Args:
             bounds (_type_): _description_
@@ -143,7 +143,7 @@ class Raster:
         Returns:
             _type_: _description_
         """
-        return (bounds[0] < pt.coords[0][0] and bounds[1] < pt.coords[0][1] and bounds[2] > pt.coords[0][0] and bounds[3] > pt.coords[0][1])
+        return bounds[0] < pt.coords[0][0] and bounds[1] < pt.coords[0][1] and bounds[2] > pt.coords[0][0] and bounds[3] > pt.coords[0][1]
 
     def rasterMaskLayer(self, shapefile, fieldname=None):
         """
@@ -176,7 +176,7 @@ class Raster:
         return band.ReadAsArray()
 
     def getPixelVal(self, pt):
-        """ Get the pixel value at a point
+        """Get the pixel value at a point
 
         Args:
             pt (_type_): _description_
@@ -279,8 +279,8 @@ class Raster:
         self.min = np.nanmin(self.array)
         self.max = np.nanmax(self.array)
 
-    def bin_raster_categorical(self, window_size: int = 256) -> Dict[str, int]:
-        """ Bin raster values into categories based on unique values in the raster.
+    def bin_raster_categorical(self, window_size: int = 256) -> dict[str, int]:
+        """Bin raster values into categories based on unique values in the raster.
 
         Args:
             window_size (int, optional): The size of the window to use for binning. Defaults to 256.
@@ -294,7 +294,7 @@ class Raster:
         band = ds.GetRasterBand(1)
         cols, rows = ds.RasterXSize, ds.RasterYSize
 
-        category_counts: Dict[str, int] = {}
+        category_counts: dict[str, int] = {}
         retval = {
             'min': float(self.min),
             'max': float(self.max),
@@ -303,7 +303,7 @@ class Raster:
             'proj': ds.GetProjection(),
             'value_count': 0,
             'hist_type': 'categorical',
-            'bins': []
+            'bins': [],
         }
 
         nodata = band.GetNoDataValue()
@@ -339,7 +339,7 @@ class Raster:
 
         return retval
 
-    def bin_raster(self, bin_size: int = 100, window_size: int = 256) -> Dict[int, int]:
+    def bin_raster(self, bin_size: int = 100, window_size: int = 256) -> dict[int, int]:
         """
         Bin raster values into elevation bins of size `bin_size`.
         The min and max elevation are determined from the raster itself.
@@ -385,7 +385,7 @@ class Raster:
         min_bin_elev = math.floor(min_elev / bin_size) * bin_size
         max_bin_elev = math.ceil(max_elev / bin_size) * bin_size
         bins = np.arange(min_bin_elev, max_bin_elev + bin_size, bin_size)
-        self.log.info(f"Defined {len(bins)-1} bins from {min_bin_elev} to {max_bin_elev}")
+        self.log.info(f"Defined {len(bins) - 1} bins from {min_bin_elev} to {max_bin_elev}")
 
         retval = {
             'min': float(min_elev),
@@ -396,7 +396,7 @@ class Raster:
             'value_count': 0,
             'hist_type': 'continuous',
             'bin_size': bin_size,
-            'bins': {}
+            'bins': {},
         }
 
         # Now do the actual binning
@@ -432,7 +432,7 @@ class Raster:
 
 
 def isclose(a, b, rel_tol=1e-09, abs_tol=0):
-    """ Compare two numbers for closeness
+    """Compare two numbers for closeness
 
     Args:
         a (_type_): _description_

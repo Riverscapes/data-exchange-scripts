@@ -16,17 +16,17 @@ For each folder:
 Defaults to DRY_RUN (no network changes). Set DRY_RUN = False to perform real uploads.
 """
 
-import os
-import re
 import json
-import time
-import requests
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timezone
+import os
 import tempfile
+import time
+from datetime import UTC, datetime
+from typing import Any
 
+import requests
 from rsxml import Logger
 from rsxml.util import safe_makedirs
+
 from pydex import RiverscapesAPI
 
 # ============================
@@ -65,7 +65,7 @@ def atomic_write_json(path: str, obj: Any) -> None:
     os.replace(tmp_name, path)
 
 
-def list_item_dirs(root: str) -> List[str]:
+def list_item_dirs(root: str) -> list[str]:
     """Return immediate subdirectories that aren't helper dirs (skip those starting with '_')."""
     try:
         names = sorted(os.listdir(root))
@@ -81,7 +81,7 @@ def list_item_dirs(root: str) -> List[str]:
     return out
 
 
-def parse_project_id_from_folder_name(name: str) -> Optional[str]:
+def parse_project_id_from_folder_name(name: str) -> str | None:
     """
     Folder format: HUC-projectType-id
     Extract project id by joining parts from the 3rd element onward.
@@ -95,7 +95,7 @@ def parse_project_id_from_folder_name(name: str) -> Optional[str]:
     return "-".join(parts[2:]).strip() or None
 
 
-def collect_upload_files(item_dir: str) -> Tuple[Optional[str], Optional[str]]:
+def collect_upload_files(item_dir: str) -> tuple[str | None, str | None]:
     """
     Only take the two exact filenames from the 2023 subfolder:
       - project.rs.xml (exclude .bak)
@@ -117,7 +117,7 @@ def human_size(num_bytes: int) -> str:
     return f"{num_bytes:.1f} PB"
 
 
-def plan_line(folder: str, project_id: str, files_map: Dict[str, str]) -> str:
+def plan_line(folder: str, project_id: str, files_map: dict[str, str]) -> str:
     sizes = []
     for rel, abs_path in files_map.items():
         try:
@@ -127,20 +127,20 @@ def plan_line(folder: str, project_id: str, files_map: Dict[str, str]) -> str:
     return f"{os.path.basename(folder)} → Project {project_id} | Files: {', '.join(sizes)}"
 
 
-def read_state(path: str) -> Dict[str, Any]:
+def read_state(path: str) -> dict[str, Any]:
     if not os.path.isfile(path):
         return {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {}
 
 
-def mark_uploaded(state_path: str, project_id: str, files_rel: List[str], note: str = "finalized"):
+def mark_uploaded(state_path: str, project_id: str, files_rel: list[str], note: str = "finalized"):
     state = {
         "uploaded": True,
-        "uploadedAt": datetime.now(timezone.utc).isoformat(),
+        "uploadedAt": datetime.now(UTC).isoformat(),
         "projectId": project_id,
         "files": files_rel,
         "note": note,
@@ -152,13 +152,13 @@ def already_uploaded(state_path: str) -> bool:
     s = read_state(state_path)
     return bool(s.get("uploaded") is True)
 
+
 # ============================
 # Upload logic (real path)
 # ============================
 
 
-def do_real_upload(api: RiverscapesAPI, project_id: str, files_abs_by_rel: Dict[str, str], log: Logger,
-                   finalize: bool = True) -> None:
+def do_real_upload(api: RiverscapesAPI, project_id: str, files_abs_by_rel: dict[str, str], log: Logger, finalize: bool = True) -> None:
     """
     Request upload → get presigned URLs → PUT → finalize.
     Mirrors your working approach.
@@ -231,6 +231,7 @@ def do_real_upload(api: RiverscapesAPI, project_id: str, files_abs_by_rel: Dict[
             log.info(f"...Upload status: {s['status']} (sleep {POLL_INTERVAL_SEC}s)")
             time.sleep(POLL_INTERVAL_SEC)
 
+
 # ============================
 # Main
 # ============================
@@ -245,9 +246,9 @@ def main():
         print(f"No item folders found in {BASE_DIR}")
         return
 
-    rows: List[List[str]] = [["folder", "project_id", "xml", "bounds", "status", "note"]]
+    rows: list[list[str]] = [["folder", "project_id", "xml", "bounds", "status", "note"]]
 
-    api_ctx = (RiverscapesAPI(stage="production") if not DRY_RUN else None)
+    api_ctx = RiverscapesAPI(stage="production") if not DRY_RUN else None
     try:
         if api_ctx and hasattr(api_ctx, "__enter__"):
             api_ctx = api_ctx.__enter__()

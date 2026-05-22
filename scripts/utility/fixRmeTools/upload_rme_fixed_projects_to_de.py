@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-import os
 import json
-import time
+import os
 import re
-import requests
-from typing import Dict, Any, List, Optional, Tuple
+import tempfile
+from datetime import UTC, datetime
+from typing import Any
 
+import requests
 from rsxml import Logger
 from rsxml.util import safe_makedirs
+
 from pydex import RiverscapesAPI
-from datetime import datetime, timezone
-import tempfile
 
 # ============================
 # Config
@@ -38,7 +38,7 @@ MARK_AFTER_PUTS_IF_NO_FINALIZE = False
 
 
 def read_json(path: str) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -54,7 +54,7 @@ def atomic_write_json(path: str, obj: Any) -> None:
     os.replace(tmp_name, path)
 
 
-def find_huc_dirs(root: str) -> List[str]:
+def find_huc_dirs(root: str) -> list[str]:
     try:
         entries = os.listdir(root)
     except FileNotFoundError:
@@ -67,7 +67,7 @@ def find_huc_dirs(root: str) -> List[str]:
     return out
 
 
-def extract_project_id(match_obj: Dict[str, Any]) -> Optional[str]:
+def extract_project_id(match_obj: dict[str, Any]) -> str | None:
     """Get project_2024.id"""
     try:
         pid = match_obj.get("project_2024", {}).get("id")
@@ -76,13 +76,12 @@ def extract_project_id(match_obj: Dict[str, Any]) -> Optional[str]:
         return None
 
 
-def collect_upload_files(huc_dir: str) -> Tuple[Optional[str], Optional[str]]:
+def collect_upload_files(huc_dir: str) -> tuple[str | None, str | None]:
     """Return absolute paths to (project.rs.xml, project_bounds.geojson) inside the RME subfolder if they exist."""
     rme_dir = os.path.join(huc_dir, RME_SUBDIR)
     xml_path = os.path.join(rme_dir, "project.rs.xml")
     bounds_path = os.path.join(rme_dir, "project_bounds.geojson")
-    return (xml_path if os.path.isfile(xml_path) else None,
-            bounds_path if os.path.isfile(bounds_path) else None)
+    return (xml_path if os.path.isfile(xml_path) else None, bounds_path if os.path.isfile(bounds_path) else None)
 
 
 def human_size(num_bytes: int) -> str:
@@ -93,7 +92,7 @@ def human_size(num_bytes: int) -> str:
     return f"{num_bytes:.1f} PB"
 
 
-def plan_line(huc: str, project_id: str, files: Dict[str, str]) -> str:
+def plan_line(huc: str, project_id: str, files: dict[str, str]) -> str:
     sizes = []
     for rel, abs_path in files.items():
         try:
@@ -103,8 +102,7 @@ def plan_line(huc: str, project_id: str, files: Dict[str, str]) -> str:
     return f"HUC {huc} → Project {project_id} | Files: {', '.join(sizes)}"
 
 
-def do_real_upload(api: RiverscapesAPI, project_id: str, files_abs_by_rel: Dict[str, str], log: Logger,
-                   finalize: bool = True) -> None:
+def do_real_upload(api: RiverscapesAPI, project_id: str, files_abs_by_rel: dict[str, str], log: Logger, finalize: bool = True) -> None:
     """
     The real upload path (only used when DRY_RUN=False). Closely follows your provided example.
     If finalize=False, we stop after PUTs (useful for step-by-step testing).
@@ -139,10 +137,7 @@ def do_real_upload(api: RiverscapesAPI, project_id: str, files_abs_by_rel: Dict[
     # Step 2: request file upload URLs
     print(project_upload["data"]["requestUploadProject"]["update"] + project_upload["data"]["requestUploadProject"]["create"])
     upload_urls_qry = api.load_query("requestUploadProjectFilesUrl")
-    upload_urls = api.run_query(upload_urls_qry, {
-        "files": project_upload["data"]["requestUploadProject"]["update"] + project_upload["data"]["requestUploadProject"]["create"],
-        "token": token
-    })
+    upload_urls = api.run_query(upload_urls_qry, {"files": project_upload["data"]["requestUploadProject"]["update"] + project_upload["data"]["requestUploadProject"]["create"], "token": token})
     # Step 3: upload each file
     entries = upload_urls["data"]["requestUploadProjectFilesUrl"]
     log.info(f"Received {len(entries)} upload URLs")
@@ -182,16 +177,16 @@ def do_real_upload(api: RiverscapesAPI, project_id: str, files_abs_by_rel: Dict[
     #         time.sleep(POLL_INTERVAL_SEC)
 
 
-def mark_uploaded(match_path: str, match_obj: Dict[str, Any], note: str = "") -> None:
+def mark_uploaded(match_path: str, match_obj: dict[str, Any], note: str = "") -> None:
     """Set uploaded flag (and timestamp/note) in the match JSON (atomic)."""
     match_obj["uploaded"] = True
-    match_obj["uploadedAt"] = datetime.now(timezone.utc).isoformat()
+    match_obj["uploadedAt"] = datetime.now(UTC).isoformat()
     if note:
         match_obj["uploadNote"] = note
     atomic_write_json(match_path, match_obj)
 
 
-def already_uploaded(match_obj: Dict[str, Any]) -> bool:
+def already_uploaded(match_obj: dict[str, Any]) -> bool:
     return bool(match_obj.get("uploaded") is True)
 
 
@@ -205,10 +200,10 @@ def main():
         return
 
     # Optional CSV summary
-    rows: List[List[str]] = [["huc", "project_id", "project_rs_xml", "project_bounds_geojson", "status", "note"]]
+    rows: list[list[str]] = [["huc", "project_id", "project_rs_xml", "project_bounds_geojson", "status", "note"]]
 
     # RiverscapesAPI context ONLY if we’re actually uploading
-    api_ctx = (RiverscapesAPI(stage="production") if not DRY_RUN else None)
+    api_ctx = RiverscapesAPI(stage="production") if not DRY_RUN else None
 
     try:
         if api_ctx and hasattr(api_ctx, "__enter__"):

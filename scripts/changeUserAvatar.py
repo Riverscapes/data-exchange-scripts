@@ -1,10 +1,13 @@
 """Change the avatar for the currently authenticated user on the Riverscapes Data Exchange."""
+
+import json
 import os
 import time
-import json
+
 import questionary
 import requests
 from rsxml import Logger
+
 from pydex import RiverscapesAPI
 
 ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
@@ -52,10 +55,13 @@ def change_user_avatar(riverscapes_api: RiverscapesAPI):
 
     # 2. Request a signed upload URL for the user's avatar
     request_upload_qry = riverscapes_api.load_query('requestUploadImage')
-    upload_resp = riverscapes_api.run_query(request_upload_qry, {
-        'entityId': user_id,
-        'entityType': 'USER',
-    })
+    upload_resp = riverscapes_api.run_query(
+        request_upload_qry,
+        {
+            'entityId': user_id,
+            'entityType': 'USER',
+        },
+    )
 
     if not upload_resp or 'data' not in upload_resp or 'requestUploadImage' not in upload_resp['data']:
         log.error("Failed to obtain a signed upload URL.")
@@ -97,10 +103,7 @@ def change_user_avatar(riverscapes_api: RiverscapesAPI):
             log.info("Image processed. Updating user avatar...")
             # 5. Now that the image is ready, set it as the avatar
             update_user_mut = riverscapes_api.load_mutation('updateUser')
-            riverscapes_api.run_query(update_user_mut, {
-                'userId': user_id,
-                'profile': {'avatarToken': token}
-            })
+            riverscapes_api.run_query(update_user_mut, {'userId': user_id, 'profile': {'avatarToken': token}})
             log.info(f"Avatar updated successfully for user {user_id}!")
             return
         elif status == 'FAILED':

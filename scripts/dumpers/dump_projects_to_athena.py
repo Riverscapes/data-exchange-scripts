@@ -44,14 +44,17 @@ TBLPROPERTIES ('skip.header.line.count'='1',
 MSCK REPAIR TABLE rs_projects;
 ```
 """
-import csv
-from datetime import datetime, timezone
-import os
-import tempfile
-import sqlite3
+
 import argparse
+import csv
+import os
+import sqlite3
+import tempfile
+from datetime import UTC, datetime
+
 import boto3
 from rsxml import dotenv
+
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 from pydex.lib.athena import athena_execute, athena_query_get_parsed
 
@@ -66,7 +69,6 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
     print('Scraping projects to temporary, in-memory SQLite...')
 
     for project, _stats, _searchtotal, _prg in rs_api.search(search_params, progress_bar=True, page_size=100):
-
         # Attempt to retrieve the huc10 and model version from the project metadata if it exists
         huc10 = next((project.project_meta[k] for k in ['HUC10', 'huc10', 'HUC', 'huc'] if k in project.project_meta), None)
         model_version = next((project.project_meta[k] for k in ['modelVersion', 'model_version', 'Model Version'] if k in project.project_meta), None)
@@ -83,7 +85,8 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
 
         # Insert project data
         # The pipe separating tags is vital. It must correspond wtith the Athena table definition.
-        curs.execute('''
+        curs.execute(
+            '''
             INSERT INTO rs_projects (
                 project_id,
                 name,
@@ -98,21 +101,23 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
                 owned_by_id,
                 owned_by_name,
                 owned_by_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
-            project.id,
-            project.name.replace(',', ' '),
-            '|'.join(project.tags) if project.tags else None,
-            huc10,
-            model_version,
-            model_version_int,
-            1 if project.archived else 0,
-            project.project_type,
-            int(project.created_date.timestamp() * 1000),
-            project.created_date.strftime('%Y-%m-%d %H:%M:%S'),
-            project.json['ownedBy']['id'],
-            project.json['ownedBy']['name'].replace(',', ''),
-            project.json['ownedBy']['__typename']
-        ))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (
+                project.id,
+                project.name.replace(',', ' '),
+                '|'.join(project.tags) if project.tags else None,
+                huc10,
+                model_version,
+                model_version_int,
+                1 if project.archived else 0,
+                project.project_type,
+                int(project.created_date.timestamp() * 1000),
+                project.created_date.strftime('%Y-%m-%d %H:%M:%S'),
+                project.json['ownedBy']['id'],
+                project.json['ownedBy']['name'].replace(',', ''),
+                project.json['ownedBy']['__typename'],
+            ),
+        )
 
     curs.execute('SELECT COUNT(*) FROM rs_projects')
     total_projects = curs.fetchone()[0]
@@ -121,7 +126,7 @@ def scrape_projects_to_sqlite(rs_api: RiverscapesAPI, curs: sqlite3.Cursor, sear
 
 
 def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
-    """ Write the contents of the rs_projects table to a temporary CSV file and upload it to S3"""
+    """Write the contents of the rs_projects table to a temporary CSV file and upload it to S3"""
 
     print('Uploading SQLite data to S3...')
     s3 = boto3.client('s3')
@@ -187,10 +192,10 @@ def get_max_existing_athena_date(s3_bucket: str) -> datetime | None:
         data = rows[0]['max_created_on']
         try:
             date_timestamp = int(data)
-            return datetime.fromtimestamp(date_timestamp / 1000, tz=timezone.utc)
+            return datetime.fromtimestamp(date_timestamp / 1000, tz=UTC)
         except ValueError:
             try:
-                return datetime.strptime(data, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+                return datetime.strptime(data, '%Y-%m-%d %H:%M:%S').replace(tzinfo=UTC)
             except Exception:
                 pass
     return None
@@ -246,7 +251,6 @@ def main():
         curs.execute('CREATE INDEX idx_created_on ON rs_projects (created_on)')
 
         with RiverscapesAPI(stage=args.stage) as api:
-
             total_projects = scrape_projects_to_sqlite(api, curs, search_params)
             if total_projects == 0:
                 print('No projects found with the specified tags. Exiting...')

@@ -1,17 +1,19 @@
+import json
 import os
 import time
-import json
+
+import inquirer
+import requests
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-import requests
-import inquirer
+
 from pydex import RiverscapesAPI
 
 PROJECT_ID = '81d118ac-4f2d-42b8-bfc9-3149aebed2c5'  # This is a real project on the STAGING server
 
 
 def upload_project_files(riverscapes_api: RiverscapesAPI):
-    """ A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
+    """A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
     files we wish to change as well as the project.rs.xml file which describes the project and its files.
 
     For this project we're going to upload an overwrite a real project on the STAGING server
@@ -35,10 +37,7 @@ def upload_project_files(riverscapes_api: RiverscapesAPI):
     # Create the directory recursively if it doesn't exist
     safe_makedirs(download_dir)
     # Download the project.rs.xml and project_bounds.geojson files to the download_dir
-    riverscapes_api.download_files(PROJECT_ID,
-                                   download_dir=download_dir,
-                                   re_filter=[r'project\.rs\.xml', r'project_bounds\.geojson'],
-                                   force=True)
+    riverscapes_api.download_files(PROJECT_ID, download_dir=download_dir, re_filter=[r'project\.rs\.xml', r'project_bounds\.geojson'], force=True)
 
     log.info(f'Downloaded project.rs.xml and project_bounds.json to {download_dir}')
 
@@ -57,15 +56,11 @@ def upload_project_files(riverscapes_api: RiverscapesAPI):
         # The server will just assume they're new and treat these files as updates.
         # NOTE: THIS IS NOT APPROPRIATE IF YOU WANT TO AVOID OVERWRITING FILES THAT HAVEN'T CHANGED
         'etags': ['XXXXXXXXXXXXXXXXXXXXXXXXXXXX', 'XXXXXXXXXXXXXXXXXXXXXXXXXXXX'],  # We don't have etags since we just downloaded the files
-        'sizes': [os.path.getsize(os.path.join(download_dir, 'project.rs.xml')),
-                  os.path.getsize(os.path.join(download_dir, 'project_bounds.geojson'))],
+        'sizes': [os.path.getsize(os.path.join(download_dir, 'project.rs.xml')), os.path.getsize(os.path.join(download_dir, 'project_bounds.geojson'))],
         # NOTE: VERY IMPORTANT: If you're updating an existing project you must set noDelete to True
         'noDelete': True,
         # Owner must be explicitly set to the same owner as the existing project.
-        'owner': {
-            'id': existing_project.json['ownedBy']['id'],
-            'type': existing_project.json['ownedBy']['__typename'].upper()
-        },
+        'owner': {'id': existing_project.json['ownedBy']['id'], 'type': existing_project.json['ownedBy']['__typename'].upper()},
         # Visibility and tags must also be explicitly set so we use the values from the existing project we just looked up
         'visibility': existing_project.json['visibility'],
         'tags': existing_project.json.get('tags', []),  # Tags are optional
@@ -77,10 +72,7 @@ def upload_project_files(riverscapes_api: RiverscapesAPI):
     # Step 2: Now we need to request the urls for the upload so we can start working on them
     # ================================================================================================================
     upload_urls_qry = riverscapes_api.load_query('requestUploadProjectFilesUrl')
-    upload_urls = riverscapes_api.run_query(upload_urls_qry, {
-        'files': project_upload['data']['requestUploadProject']['update'],
-        'token': token
-    })
+    upload_urls = riverscapes_api.run_query(upload_urls_qry, {'files': project_upload['data']['requestUploadProject']['update'], 'token': token})
 
     # Step 3: Now upload each file to the provided url
     # ================================================================================================================
@@ -101,9 +93,7 @@ def upload_project_files(riverscapes_api: RiverscapesAPI):
     # Step 4: Now that all files are uploaded we need to finalize the upload
     # ================================================================================================================
     finalize_upload_qry = riverscapes_api.load_mutation('finalizeProjectUpload')
-    __finalize_upload = riverscapes_api.run_query(finalize_upload_qry, {
-        'token': token
-    })
+    __finalize_upload = riverscapes_api.run_query(finalize_upload_qry, {'token': token})
 
     # Step 5: Poll the upload status until it's done. This is optional so if you're immediately moving on to a different
     # project you can skip this step. Only useful if you need to know when the project is actually available online.

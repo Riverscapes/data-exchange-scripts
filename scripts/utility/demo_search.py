@@ -1,4 +1,4 @@
-""" This script demonstrates how to search for projects on the server
+"""This script demonstrates how to search for projects on the server
 
 NOTE: We set max_results=1234 on all these queries for demo purposes. You probably don't want to do that in production
 
@@ -6,18 +6,21 @@ NOTE: We set max_results=1234 on all these queries for demo purposes. You probab
 
 
 """
-import os
+
 import json
+import os
 import time
+
 from rsxml import Logger
 from termcolor import colored
+
 from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 log = Logger('Search Projects')
 
 
 def simple_search(api: RiverscapesAPI):
-    """ Simple search examples
+    """Simple search examples
 
     Args:
         api (RiverscapesAPI): _description_
@@ -28,11 +31,15 @@ def simple_search(api: RiverscapesAPI):
     # Really useful when you want summaries of the data. Average query time is < 100ms
     # ====================================================================================================
     log.title("Quick search count")
-    search_count, stats = api.search_count(RiverscapesSearchParams({
-        "meta": {
-            "Runner": "Cybercastor",
-        }
-    }))
+    search_count, stats = api.search_count(
+        RiverscapesSearchParams(
+            {
+                "meta": {
+                    "Runner": "Cybercastor",
+                }
+            }
+        )
+    )
     log.info(f"Found {search_count:,} projects")
     log.info(json.dumps(stats, indent=2))
 
@@ -40,31 +47,35 @@ def simple_search(api: RiverscapesAPI):
     # NOTE: RiverscapesSearchParams will throw errors for common mistakes and anything it doesn't recognize as valid
     # ====================================================================================================
     log.title("All possible search parameters")
-    search_count = [x for x, _stats, _total, _prg in api.search(RiverscapesSearchParams({
-        "projectTypeId": "vbet",  # Only return projects of this type
-        "keywords": "my search terms",  # This will give a warning since keyword searches are not that useful in programmatic searches
-        "name": "my project name",
-        "editableOnly": True,  # Only return projects that I can edit
-        "createdOn": {
-            "from": "2024-01-02",  # Any datetime string parseable by python (Optional)
-            "to": "2024-01-03"  # Any datetime string parseable by python (Optional)
-        },
-        "updatedOn": {
-            "from": "2024-01-03T01:04:56Z",  # Any datetime string parseable by python (Optional)
-            "to": "2024-01-04T03:04:56Z"  # Any datetime string parseable by python (Optional)
-        },
-        "collection": "00000000-0000-0000-0000-000000000000",  # Only return projects that are in this collection (by id)
-        "ownedBy": {
-            "id": "00000000-0000-0000-0000-000000000000",  # Only return projects that are owned by this user (by id)
-            "type": "USER"  # "USER" or "ORGANIZATION"
-        },
-        "tags": ["tag1", "tag2"],  # Only return projects that have these tags
-        "bbox": [-125.40936477595693, 45.38966396117303, -116.21237724715607, 49.470853578429626],  # A bounding box to limit the search
-        "meta": {
-            "Runner": "Cybercastor",
-            "HUC": "17060304"
-        }
-    }))]
+    search_count = [
+        x
+        for x, _stats, _total, _prg in api.search(
+            RiverscapesSearchParams(
+                {
+                    "projectTypeId": "vbet",  # Only return projects of this type
+                    "keywords": "my search terms",  # This will give a warning since keyword searches are not that useful in programmatic searches
+                    "name": "my project name",
+                    "editableOnly": True,  # Only return projects that I can edit
+                    "createdOn": {
+                        "from": "2024-01-02",  # Any datetime string parseable by python (Optional)
+                        "to": "2024-01-03",  # Any datetime string parseable by python (Optional)
+                    },
+                    "updatedOn": {
+                        "from": "2024-01-03T01:04:56Z",  # Any datetime string parseable by python (Optional)
+                        "to": "2024-01-04T03:04:56Z",  # Any datetime string parseable by python (Optional)
+                    },
+                    "collection": "00000000-0000-0000-0000-000000000000",  # Only return projects that are in this collection (by id)
+                    "ownedBy": {
+                        "id": "00000000-0000-0000-0000-000000000000",  # Only return projects that are owned by this user (by id)
+                        "type": "USER",  # "USER" or "ORGANIZATION"
+                    },
+                    "tags": ["tag1", "tag2"],  # Only return projects that have these tags
+                    "bbox": [-125.40936477595693, 45.38966396117303, -116.21237724715607, 49.470853578429626],  # A bounding box to limit the search
+                    "meta": {"Runner": "Cybercastor", "HUC": "17060304"},
+                }
+            )
+        )
+    ]
 
     # EXAMPLE: You can also load search parameters from a json file if you want to keep it out of .git or if it changes frequently
     # ====================================================================================================
@@ -86,30 +97,34 @@ def simple_search(api: RiverscapesAPI):
     # or query the metadata of each project to filter it down further.
     # ====================================================================================================
     log.title("Collect all projects together first")
-    search_params = RiverscapesSearchParams({
-        "projectTypeId": "vbet",
-        "meta": {
-            "Runner": "Cybercastor",
+    search_params = RiverscapesSearchParams(
+        {
+            "projectTypeId": "vbet",
+            "meta": {
+                "Runner": "Cybercastor",
+            },
         }
-    })
+    )
     searched_project_ids = [p.id for p, _stats, _total, _prg in api.search(search_params, progress_bar=True, max_results=1234)]
     log.debug(f"Found {len(searched_project_ids)} projects")
 
     # EXAMPLE Collect all the metadata for each project by id
     # ====================================================================================================
     log.title("Collect all the metadata for each project by id")
-    search_params = RiverscapesSearchParams({
-        "projectTypeId": "vbet",
-        # Used https://geojson.io to get a rough bbox to limit this query roughing to washington state (which makes the query cheaper)
-        "bbox": [-125.40936477595693, 45.38966396117303, -116.21237724715607, 49.470853578429626]
-    })
+    search_params = RiverscapesSearchParams(
+        {
+            "projectTypeId": "vbet",
+            # Used https://geojson.io to get a rough bbox to limit this query roughing to washington state (which makes the query cheaper)
+            "bbox": [-125.40936477595693, 45.38966396117303, -116.21237724715607, 49.470853578429626],
+        }
+    )
     searched_project_meta = {p.id: p.project_meta for p, _stats, _total, _prg in api.search(search_params, progress_bar=True, max_results=1234)}
 
     log.info(f"Found {len(searched_project_meta)} projects")
 
 
 def retrieve_project(api: RiverscapesAPI):
-    """ Simple retrieve project examples
+    """Simple retrieve project examples
 
     Args:
         api (RiverscapesAPI): _description_
@@ -148,11 +163,13 @@ def simple_search_with_cache(api: RiverscapesAPI):
         api (RiverscapesAPI): _description_
     """
     log.title("Simple search with file-based cache")
-    search_params = RiverscapesSearchParams({
-        "projectTypeId": "vbet",
-        # Used https://geojson.io to get a rough bbox to limit this query roughing to washington state (which makes the query cheaper)
-        "bbox": [-125.40936477595693, 45.38966396117303, -116.21237724715607, 49.470853578429626]
-    })
+    search_params = RiverscapesSearchParams(
+        {
+            "projectTypeId": "vbet",
+            # Used https://geojson.io to get a rough bbox to limit this query roughing to washington state (which makes the query cheaper)
+            "bbox": [-125.40936477595693, 45.38966396117303, -116.21237724715607, 49.470853578429626],
+        }
+    )
 
     # I the file creation date is younger than 6 hours then use it
     cache_filename = 'my_awesome_search_results.json'
@@ -161,7 +178,7 @@ def simple_search_with_cache(api: RiverscapesAPI):
     if os.path.exists(cache_filename) and (os.path.getmtime(cache_filename) - time.time()) < allowed_age:
         # Load the data from the file
         log.info(f"Using cached data from {cache_filename}")
-        with open(cache_filename, 'r', encoding='utf8') as f:
+        with open(cache_filename, encoding='utf8') as f:
             data = json.load(f)
     else:
         log.info("Querying the server for fresh data")
@@ -175,7 +192,7 @@ def simple_search_with_cache(api: RiverscapesAPI):
 
 
 def stream_to_file(api: RiverscapesAPI):
-    """ 
+    """
 
     Sometimes pulling the whole database and storing it in memory will crash your computer.
     In these cases you can use the search function to write the results to a file and then read from that file later.
@@ -187,14 +204,15 @@ def stream_to_file(api: RiverscapesAPI):
     """
     log.title("File based search")
     # Set yp your search params
-    search_params = RiverscapesSearchParams({
-        # "createdOn": {
-        #     "from": "2024-01-01T00:04:56Z",
-        # }
-    })
+    search_params = RiverscapesSearchParams(
+        {
+            # "createdOn": {
+            #     "from": "2024-01-01T00:04:56Z",
+            # }
+        }
+    )
 
-    with open('SEARCH_FULL_RECORDS.json', 'w', encoding='utf8') as f_json, \
-            open('SEARCH_ONELINE_SUMMARY.csv', 'w', encoding='utf8') as f_csv:
+    with open('SEARCH_FULL_RECORDS.json', 'w', encoding='utf8') as f_json, open('SEARCH_ONELINE_SUMMARY.csv', 'w', encoding='utf8') as f_csv:
         f_json.write('[\n')
         f_csv.write("id, project_type, huc, model_version, created_date\n")
         counter = 0
@@ -210,7 +228,7 @@ def stream_to_file(api: RiverscapesAPI):
 
 
 def find_duplicates(api: RiverscapesAPI):
-    """ Finding duplicate projects
+    """Finding duplicate projects
 
     Args:
         api (RiverscapesAPI): _description_
@@ -225,11 +243,13 @@ def find_duplicates(api: RiverscapesAPI):
     # Here's a more complex search example: Search for projects that can be deleted because they have a newer version
     # ====================================================================================================
     # Get all the projects that match the search criteria
-    search_params = RiverscapesSearchParams({
-        "createdOn": {
-            "from": "2024-01-01T00:00:00Z",
+    search_params = RiverscapesSearchParams(
+        {
+            "createdOn": {
+                "from": "2024-01-01T00:00:00Z",
+            }
         }
-    })
+    )
 
     # Collect the metadata for each project (of type RiverscapesProject) into a dictionary with HUC as the key This will look like:
     # {
@@ -273,7 +293,6 @@ def find_duplicates(api: RiverscapesAPI):
 
 
 if __name__ == '__main__':
-
     # Instantiating the API (Method 1)
     # ====================================================================================================
 

@@ -1,10 +1,11 @@
-"""[summary]
-"""
-import sys
-import os
-import traceback
+"""[summary]"""
+
 import argparse
+import os
 import sqlite3
+import sys
+import traceback
+
 from rsxml import Logger, dotenv
 
 
@@ -36,20 +37,13 @@ def dump_views(sqlite_db_path):
     curs.execute("SELECT * FROM gpkg_contents WHERE table_name = 'Huc10_conus';")
     gpkg_contents_row = curs.fetchone()
     # Now insert a new row into gpkg_contents with a new name corresponding to the view above
-    curs.execute('''
+    curs.execute(
+        '''
     INSERT INTO gpkg_contents (table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     ''',
-                 ('vw_exchange_projects',
-                  gpkg_contents_row[1],
-                  gpkg_contents_row[2],
-                  gpkg_contents_row[3],
-                  gpkg_contents_row[4],
-                  gpkg_contents_row[5],
-                  gpkg_contents_row[6],
-                  gpkg_contents_row[7],
-                  gpkg_contents_row[8],
-                  gpkg_contents_row[9]))
+        ('vw_exchange_projects', gpkg_contents_row[1], gpkg_contents_row[2], gpkg_contents_row[3], gpkg_contents_row[4], gpkg_contents_row[5], gpkg_contents_row[6], gpkg_contents_row[7], gpkg_contents_row[8], gpkg_contents_row[9]),
+    )
 
     conn.commit()
 
@@ -88,16 +82,13 @@ def make_gpkgrows(conn, table_name: str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        'output_db_path', help='The final resting place of the SQLITE DB', type=str)
-    parser.add_argument('--verbose', help='(optional) a little extra logging ',
-                        action='store_true', default=False)
+    parser.add_argument('output_db_path', help='The final resting place of the SQLITE DB', type=str)
+    parser.add_argument('--verbose', help='(optional) a little extra logging ', action='store_true', default=False)
     args = dotenv.parse_args_env(parser)
 
     # Initiate the log file
     logmain = Logger("SQLite Riverscapes Dump")
-    logmain.setup(logPath=os.path.join(args.output_db_path,
-                                       "dump_sqlite.log"), verbose=args.verbose)
+    logmain.setup(logPath=os.path.join(args.output_db_path, "dump_sqlite.log"), verbose=args.verbose)
 
     try:
         dump_views(args.output_db_path)

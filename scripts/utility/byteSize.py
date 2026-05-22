@@ -1,4 +1,4 @@
-""" This script demonstrates how to search for projects on the server
+"""This script demonstrates how to search for projects on the server
 
 NOTE: We set max_results=1234 on all these queries for demo purposes. You probably don't want to do that in production
 
@@ -6,16 +6,19 @@ NOTE: We set max_results=1234 on all these queries for demo purposes. You probab
 
 
 """
-import os
+
 import json
+import os
+
 from rsxml import Logger
+
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 log = Logger('Search Projects')
 
 
 def total_bytes_calc(api: RiverscapesAPI):
-    """ Figure out the byteSize of all projects and some stats about them
+    """Figure out the byteSize of all projects and some stats about them
 
     Args:
         api (RiverscapesAPI): _description_
@@ -34,7 +37,6 @@ def total_bytes_calc(api: RiverscapesAPI):
 
     # Note how we keep the page size low here because byte size can be a little more expensive to calculate
     for project, _stats, _total, _prg in api.search(RiverscapesSearchParams({"projectTypeId": "vbet"}), progress_bar=True, page_size=100):
-
         size = project.json['totalSize']
         total_bytes += size
         owner = project.json['ownedBy']['name']
@@ -52,7 +54,7 @@ def total_bytes_calc(api: RiverscapesAPI):
     log.info(f"Total projects: {total_projects}")
     log.info(f"Biggest project: {biggest_project:,}")
     log.info(f"Smallest project: {smallest_project:,}")
-    log.info(f"Average project size: {total_bytes/total_projects:,}")
+    log.info(f"Average project size: {total_bytes / total_projects:,}")
     for owner, bsize in bytes_owner.items():
         log.info(f"{owner}: {bsize:,}")
 
@@ -60,7 +62,6 @@ def total_bytes_calc(api: RiverscapesAPI):
 
 
 if __name__ == '__main__':
-
     with RiverscapesAPI() as riverscapes_api:
         total_bytes_calc(riverscapes_api)
 

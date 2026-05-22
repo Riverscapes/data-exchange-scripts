@@ -1,11 +1,13 @@
 """Script to create a project XML file for the VBET synthesis GeoPackage."""
-import os
-import json
+
 import argparse
+import json
+import os
 import sqlite3
 from datetime import datetime
+
 from rsxml import dotenv
-from rsxml.project_xml import Project, ProjectBounds, Coords, BoundingBox, Realization, MetaData, Geopackage, GeopackageLayer, GeoPackageDatasetTypes
+from rsxml.project_xml import BoundingBox, Coords, Geopackage, GeoPackageDatasetTypes, GeopackageLayer, MetaData, Project, ProjectBounds, Realization
 
 
 def create_project_file(gpkg_path: str, author: str) -> None:
@@ -26,24 +28,11 @@ def create_project_file(gpkg_path: str, author: str) -> None:
         curs.execute('select min_x, min_y, max_x, max_y, srs_id from gpkg_contents WHERE table_name = ?', ['vbet_igos'])
         coords = curs.fetchone()
         centroid = Coords((coords[0] + coords[2]) / 2, (coords[1] + coords[3]) / 2)
-        polygon = [
-            [coords[0], coords[1]],
-            [coords[0], coords[3]],
-            [coords[2], coords[3]],
-            [coords[2], coords[1]],
-            [coords[0], coords[1]]
-        ]
+        polygon = [[coords[0], coords[1]], [coords[0], coords[3]], [coords[2], coords[3]], [coords[2], coords[1]], [coords[0], coords[1]]]
         bbox = BoundingBox(coords[0], coords[1], coords[2], coords[3])
         meta.add_meta('SRS ID', coords[4])
 
-        geojson = {'type': 'FeatureCollection', 'features': [{
-            'type': 'Feature',
-            'properties': {},
-            'geometry': {
-                'type': 'Polygon',
-                'coordinates': [polygon]
-            }
-        }]}
+        geojson = {'type': 'FeatureCollection', 'features': [{'type': 'Feature', 'properties': {}, 'geometry': {'type': 'Polygon', 'coordinates': [polygon]}}]}
 
     # Create the GeoJSON file
     geojson_path = os.path.join(os.path.dirname(gpkg_path), 'project_bounds.geojson')
@@ -69,7 +58,8 @@ def create_project_file(gpkg_path: str, author: str) -> None:
                 xml_id='vbet_synthesis_realization_01',
                 name='Realization',
                 product_version='0.0.1',
-                date_created=datetime(2023, 9, 12), datasets=[
+                date_created=datetime(2023, 9, 12),
+                datasets=[
                     Geopackage(
                         xml_id='vbet_synth_geopackage',
                         name='Synthesis GeoPackage',
@@ -78,16 +68,17 @@ def create_project_file(gpkg_path: str, author: str) -> None:
                         ' There are two additional non-spatial tables: projects that contains a list of all the VBET projects scraped. HUCs is another list of all the 10 digit HUCs in CONUS.'
                         ' These latter two tables are used to track processing and to ensure that all HUCs are accounted for. There is also a spatial view that joins the IGOs to the HUCs. This can be used for quick visualization of the data.',
                         layers=[
-                            GeopackageLayer(lyr_name='vw_huc_summary_stats',
-                                            name='HUC summary statistics',
-                                            ds_type=GeoPackageDatasetTypes.VECTOR,
-                                            description='Min, Max and Mean values for each VBET metric for each HUC',
-                                            )
-                        ]
+                            GeopackageLayer(
+                                lyr_name='vw_huc_summary_stats',
+                                name='HUC summary statistics',
+                                ds_type=GeoPackageDatasetTypes.VECTOR,
+                                description='Min, Max and Mean values for each VBET metric for each HUC',
+                            )
+                        ],
                     )
-                ]
+                ],
             )
-        ]
+        ],
     )
 
     # Write it to disk

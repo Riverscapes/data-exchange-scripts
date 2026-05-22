@@ -109,7 +109,7 @@ def scrape_rscontext_project(s3, rs_api: RiverscapesAPI, project: RiverscapesPro
             raise FileNotFoundError(f'Could not find vegetation file for project {project.id}')
         metrics_json_path = huc_dir / 'rscontext_metrics.json'
         try:
-            metrics = json.loads(open(metrics_json_path, 'r', encoding='utf-8').read())
+            metrics = json.loads(open(metrics_json_path, encoding='utf-8').read())
         except Exception as e:
             log.warning(f'Could not find or read metrics JSON for project {project.id}: {e}')
             metrics = {}

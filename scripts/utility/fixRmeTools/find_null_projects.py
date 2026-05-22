@@ -12,29 +12,31 @@ Outputs (written next to the input file by default):
   - <basename>__summary.txt                 # human-readable aggregations
 """
 
-import os
 import json
-from collections import Counter, defaultdict
+import os
+from collections import Counter
+from collections.abc import Generator
 from datetime import datetime
-from typing import Any, Dict, Generator, Optional
+from typing import Any
 
 # ---- Config -----------------------------------------------------------------
 MATCHES_PATH = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs/fix_rme_PRODUCTION_2024CONUS_MISSING_BOUNDS_HUC_MATCHES.json"
 
 # If you prefer to force outputs somewhere else, set this to a directory path.
 # By default we write next to the input file, using its basename.
-OUTPUT_DIR: Optional[str] = None
+OUTPUT_DIR: str | None = None
 
 # ---- Helpers ----------------------------------------------------------------
 
 
-def iter_json_array(path: str) -> Generator[Dict[str, Any], None, None]:
+def iter_json_array(path: str) -> Generator[dict[str, Any], None, None]:
     """
     Memory-friendly reader for a top-level JSON array where each element is a JSON object.
     """
     from json import JSONDecoder
+
     dec = JSONDecoder()
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         s = f.read()
     i, n = 0, len(s)
 
@@ -58,7 +60,7 @@ def iter_json_array(path: str) -> Generator[Dict[str, Any], None, None]:
         i = j
 
 
-def get_meta_value(meta_list: Any, key: str, default: Optional[str] = None) -> Optional[str]:
+def get_meta_value(meta_list: Any, key: str, default: str | None = None) -> str | None:
     if not isinstance(meta_list, list):
         return default
     for m in meta_list:
@@ -69,6 +71,7 @@ def get_meta_value(meta_list: Any, key: str, default: Optional[str] = None) -> O
 
 def safe_makedirs(path: str) -> None:
     os.makedirs(path, exist_ok=True)
+
 
 # ---- Main -------------------------------------------------------------------
 
@@ -115,16 +118,18 @@ def main():
             by_project_type[ptype] += 1
             by_huc[huc] += 1
 
-            details.append({
-                "project_2024_id": pid,
-                "project_2024_name": proj2024.get("name"),
-                "owner": owner,
-                "project_type": ptype,
-                "huc": huc,
-                "tags": proj2024.get("tags", []),
-                "createdOn": proj2024.get("createdOn"),
-                "updatedOn": proj2024.get("updatedOn"),
-            })
+            details.append(
+                {
+                    "project_2024_id": pid,
+                    "project_2024_name": proj2024.get("name"),
+                    "owner": owner,
+                    "project_type": ptype,
+                    "huc": huc,
+                    "tags": proj2024.get("tags", []),
+                    "createdOn": proj2024.get("createdOn"),
+                    "updatedOn": proj2024.get("updatedOn"),
+                }
+            )
 
     # Write outputs
     with open(out_ids_path, "w", encoding="utf-8") as f:

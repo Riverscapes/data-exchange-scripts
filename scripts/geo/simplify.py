@@ -18,10 +18,10 @@
 # gdf.to_file("/Users/philipbailey/GISData/watershed_boundaries/simplification_experiment/simplified_layer2.gpkg", driver="GPKG")
 
 
-import shapely
 import geopandas as gpd
+import shapely
 
-print ("'simplify_coverage' requires shapely>=2.1 and GEOS>=3.12.")
+print("'simplify_coverage' requires shapely>=2.1 and GEOS>=3.12.")
 print(f"Shapely: {shapely.__version__}")
 print(f"Geopandas: {gpd.__version__}")
 
@@ -43,8 +43,7 @@ gdf_out = gdf[["TNMID", "HUC10", "geometry"]]
 gdf_out.to_crs(epsg=4326)
 
 # Save the result
-out_file=r"C:\nardata\work\huc_wbd_nhd_align\final\simplified_hu10.gpkg"
+out_file = r"C:\nardata\work\huc_wbd_nhd_align\final\simplified_hu10.gpkg"
 out_layer = 'wbdhu10_conus_rs_simplified_8km'
 gdf_out.to_file(out_file, layer=out_layer, driver="GPKG")
 print(f"wrote {out_layer} to {out_file}.")
-

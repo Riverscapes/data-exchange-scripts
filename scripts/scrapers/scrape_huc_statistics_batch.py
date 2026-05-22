@@ -3,13 +3,16 @@ Scrapes RME and RCAT outout GeoPackages from Data Exchange and extracts statisti
 Produced for the BLM 2024 September analysis of 2024 CONUS RME projects.
 Philip Bailey
 """
-import sys
+
+import argparse
+import logging
 import os
 import sqlite3
-import logging
-import argparse
-from rsxml import dotenv, Logger
+import sys
+
+from rsxml import Logger, dotenv
 from rsxml.util import safe_makedirs
+
 from pydex import RiverscapesAPI
 from pydex.scrape_huc_statistics import create_output_db, scrape_hucs_batch
 
@@ -61,10 +64,7 @@ def main():
                 AND min(rcat_project_id) IS NOT NULL
                 {huc_filter}
             ''')
-        projects = {row[0]: {
-            'rme': row[1],
-            'rcat': row[2]
-        } for row in curs.fetchall()}
+        projects = {row[0]: {'rme': row[1], 'rcat': row[2]} for row in curs.fetchall()}
 
     if len(projects) == 0:
         log.info('No projects found in Data Exchange dump with both RCAT and RME')

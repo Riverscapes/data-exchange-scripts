@@ -7,19 +7,20 @@ This script connects to an Athena database, retrieves project data,
 Philip Bailey
 12 July 2025
 """
-import os
-import argparse
-from typing import List
-from datetime import datetime
-import geopandas as gpd
-import pandas as pd
-import matplotlib.pyplot as plt
-import boto3
-from pyathena import connect
-from shapely import wkt, wkb
-from shapely.validation import explain_validity
 
-def generate_map(gdf_outline: gpd.GeoDataFrame, projects_gdf: gpd.GeoDataFrame, title:str, output_img_path):
+import argparse
+import os
+from datetime import datetime
+
+import boto3
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import pandas as pd
+from pyathena import connect
+from shapely import wkb, wkt
+
+
+def generate_map(gdf_outline: gpd.GeoDataFrame, projects_gdf: gpd.GeoDataFrame, title: str, output_img_path):
     # Plot the fillpremed and unfilled polygons
     __fig, ax = plt.subplots(figsize=(10, 10))
     gdf_outline.plot(ax=ax, facecolor="#BBCD3F", edgecolor="#828F2C", linewidth=0.15, alpha=0.5)
@@ -37,7 +38,7 @@ def generate_map(gdf_outline: gpd.GeoDataFrame, projects_gdf: gpd.GeoDataFrame, 
     return
 
 
-def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_gpkgs: bool) -> List[str]:
+def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_gpkgs: bool) -> list[str]:
     """
     Generate status maps for different project types and save them as PNG images.
     """
@@ -65,7 +66,6 @@ def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_g
     image_paths = []
     project_types = pd.read_sql('select distinct project_type_id from conus_projects', conn)
     for project_type in project_types['project_type_id']:
-
         project_count = pd.read_sql(f"SELECT count(distinct huc) FROM conus_projects WHERE project_type_id = '{project_type}'", con=conn)
         project_count = project_count.iloc[0, 0]
 
@@ -73,7 +73,9 @@ def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_g
         projects_df = pd.read_sql(
             f"""SELECT h.huc10, h.geometry
                 FROM conus_projects p INNER JOIN wbdhu10_conus_rs_simplified h ON p.huc = h.huc10
-                WHERE p.project_type_id = '{project_type}'""", con=conn)
+                WHERE p.project_type_id = '{project_type}'""",
+            con=conn,
+        )
         projects_df['geometry'] = projects_df['geometry'].apply(safe_load_geom)
         projects_gdf = gpd.GeoDataFrame(projects_df, geometry='geometry', crs='EPSG:4326')
         describe_gdf(projects_gdf, f"projects for {project_type}")
@@ -112,6 +114,7 @@ def safe_load_geom(geom_val):
             return None
     return None
 
+
 def safe_load_wkt(wkt_str: str):
     """Convert a WKT string to a Shapely geometry object, handling empty or invalid strings gracefully."""
 
@@ -123,7 +126,7 @@ def safe_load_wkt(wkt_str: str):
     return None
 
 
-def upload_to_s3(image_paths: List[str], s3_bucket: str) -> None:
+def upload_to_s3(image_paths: list[str], s3_bucket: str) -> None:
     """
     Upload generated images to an S3 bucket.: param image_paths: List of paths to images to upload.: param s3_bucket: Name of the S3 bucket.: param s3_key_prefix: Optional prefix for the S3 keys.
     """
@@ -159,6 +162,7 @@ def describe_gdf(gdf: gpd.GeoDataFrame, name="GeoDataFrame"):
     bounds = gdf.total_bounds
     print(f"Bounds: {bounds}")
     import numpy as np
+
     if not all(np.isfinite(bounds)):
         print("Warning: Non-finite values in bounds!")
     if bounds[0] == bounds[2] or bounds[1] == bounds[3]:
@@ -168,6 +172,7 @@ def describe_gdf(gdf: gpd.GeoDataFrame, name="GeoDataFrame"):
     if invalid_count > 0:
         print("First few invalid geometries and reasons:")
         from shapely.validation import explain_validity
+
         for idx, geom in gdf[gdf['geometry'].apply(lambda g: g is not None and not g.is_valid)].head(5).iterrows():
             print(f"  Index {idx}: {explain_validity(geom['geometry'])}")
 

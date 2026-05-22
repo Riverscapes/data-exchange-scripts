@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import os
-import json
 import re
 import shutil
-from typing import Optional, Dict, Any, List, Iterable
+from collections.abc import Iterable
+
 from rsxml import Logger
 from rsxml.util import safe_makedirs
+
 from pydex import RiverscapesAPI
 
 # --- Config paths (UPDATED to your new context) ---
@@ -28,8 +29,9 @@ COMBINED_2025 = [ONLY_BOUNDS_GEOJSON, ONLY_RME_PROJECT_XML]
 
 def iter_json_array(path: str) -> Iterable[dict]:
     from json import JSONDecoder
+
     decoder = JSONDecoder()
-    with open(path, "r", encoding="utf8") as f:
+    with open(path, encoding="utf8") as f:
         buf = f.read()
     i, n = 0, len(buf)
     while i < n and buf[i].isspace():
@@ -52,6 +54,7 @@ def iter_json_array(path: str) -> Iterable[dict]:
         yield obj
         i = end
 
+
 # --- Helpers (same behavior as your working script) ---
 
 
@@ -60,7 +63,7 @@ def ensure_dir(path: str):
         safe_makedirs(path)
 
 
-def find_matching_files(root_dir: str, pattern: str) -> List[str]:
+def find_matching_files(root_dir: str, pattern: str) -> list[str]:
     """Find files under root_dir whose relative path matches `pattern` (case-insensitive)."""
     regex = re.compile(pattern, re.IGNORECASE)
     matches = []
@@ -99,12 +102,13 @@ def slug_component(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9\-_]", "_", s)
 
 
-def build_item_dirname(huc: str, src_type: Optional[str], src_id: Optional[str]) -> str:
+def build_item_dirname(huc: str, src_type: str | None, src_id: str | None) -> str:
     """
     Folder name: HUC-projectType-id (based on the *source* object).
     Example: 1202000302-taudem-d91d4c7f-cebb-4288-a433-926c2fab05b1
     """
     return f"{slug_component(huc)}-{slug_component((src_type or 'unknown').lower())}-{slug_component(src_id or 'noid')}"
+
 
 # --- Main workflow that adheres to your new requirements ---
 
@@ -180,7 +184,7 @@ def process_mismatches(api: RiverscapesAPI, mismatches_path: str = MISMATCHES_PA
             api.download_files(
                 project_id=src_id,
                 download_dir=dir_2023,
-                re_filter=[PROJECT_XML],   # only project.rs.xml from the 2023/source project
+                re_filter=[PROJECT_XML],  # only project.rs.xml from the 2023/source project
                 force=True,
             )
             metrics["source_2023_xml_downloaded"] += 1
@@ -190,7 +194,7 @@ def process_mismatches(api: RiverscapesAPI, mismatches_path: str = MISMATCHES_PA
             api.download_files(
                 project_id=mch_id,
                 download_dir=dir_rsctx,
-                re_filter=COMBINED_2025,   # project_bounds.geojson + project.rs.xml
+                re_filter=COMBINED_2025,  # project_bounds.geojson + project.rs.xml
                 force=True,
             )
             metrics["rscontext_combined_downloads"] += 1

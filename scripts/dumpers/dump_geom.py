@@ -1,20 +1,23 @@
-"""[summary]
-"""
-import sys
-import os
-import traceback
+"""[summary]"""
+
 import argparse
+import os
 import sqlite3
+import sys
+import traceback
+
 # import json
 from datetime import date
+
 # import requests
 # from cybercastor import CybercastorAPI
 from rsxml import Logger, dotenv
+
 # from rsxml import safe_makedirs
 
 
 def dump_geom(sqlite_db_path: str, geom_template_db: str):
-    """ DUmp all projects to a DB
+    """DUmp all projects to a DB
 
     Args:
         output_folder ([type]): [description]

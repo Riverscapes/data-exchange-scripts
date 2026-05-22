@@ -11,11 +11,12 @@ Usage:
 If you omit args, defaults are baked in below.
 """
 
+import json
 import os
 import sys
-import json
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, Dict, Any
+from typing import Any
 
 # --- Defaults (update as needed) ---
 DEFAULT_IN = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs/fix_2023_CONUS_PRODUCTION_2025CONUS.json"
@@ -25,13 +26,13 @@ DEFAULT_OUT = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs
 PRETTY = False
 
 
-def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[Dict[str, Any]]:
+def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[dict[str, Any]]:
     """
     Stream a top-level JSON array, yielding one object at a time.
     Avoids loading the entire file into memory.
     """
     dec = json.JSONDecoder()
-    with open(path, "r", encoding="utf8") as f:
+    with open(path, encoding="utf8") as f:
         buf = ""
 
         # Read until we encounter '[' (start of array)
@@ -84,7 +85,7 @@ def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[D
                     buf += chunk
 
 
-def stream_write_json_array(objs: Iterable[Dict[str, Any]], out_path: str) -> int:
+def stream_write_json_array(objs: Iterable[dict[str, Any]], out_path: str) -> int:
     """
     Stream-write an iterable of objects to a valid JSON array file.
     Returns the count of written objects.
@@ -107,7 +108,7 @@ def stream_write_json_array(objs: Iterable[Dict[str, Any]], out_path: str) -> in
     return count
 
 
-def is_rscontext(project: Dict[str, Any]) -> bool:
+def is_rscontext(project: dict[str, Any]) -> bool:
     pt = (project.get("projectType") or {}).get("id")
     return isinstance(pt, str) and pt.strip().lower() == "rscontext"
 

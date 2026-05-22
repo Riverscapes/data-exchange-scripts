@@ -5,14 +5,14 @@ Remove the ESSENTIAL tag from all projects owned by 'North Arrow Research'.
 - Logs a JSON backup of affected projects (including original tags) before mutation.
 """
 
-import os
 import json
-from typing import List, Tuple
+import os
+
+import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-import inquirer
-from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
 
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 ORG_NAME = "North Arrow Research"
 TAG_TO_REMOVE = "ESSENTIAL"
@@ -27,15 +27,8 @@ def _resolve_org_id(api: RiverscapesAPI, org_name: str) -> str:
         results { item { id name } }
       }
     }"""
-    res = api.run_query(find_org_qry, {
-        "limit": 10,
-        "offset": 0,
-        "params": {"name": org_name}
-    })
-    matches = [
-        r["item"] for r in res["data"]["searchOrganizations"]["results"]
-        if r["item"]["name"] == org_name
-    ]
+    res = api.run_query(find_org_qry, {"limit": 10, "offset": 0, "params": {"name": org_name}})
+    matches = [r["item"] for r in res["data"]["searchOrganizations"]["results"] if r["item"]["name"] == org_name]
     if not matches:
         raise RuntimeError(f"Could not find organization named '{org_name}'.")
     return matches[0]["id"]
@@ -58,13 +51,12 @@ def build_search_params(org_id: str) -> RiverscapesSearchParams:
         return sp
 
 
-def get_projects(api: RiverscapesAPI, search_params: RiverscapesSearchParams, tag: str
-                     ) -> Tuple[List[RiverscapesProject], int]:
+def get_projects(api: RiverscapesAPI, search_params: RiverscapesSearchParams, tag: str) -> tuple[list[RiverscapesProject], int]:
     """
     Iterate search results and collect projects that currently contain the tag.
     Returns (targets, total_found_in_search_scope)
     """
-    targets: List[RiverscapesProject] = []
+    targets: list[RiverscapesProject] = []
     total_in_scope = 0
     for proj, _stats, search_total, _prg in api.search(
         search_params,
@@ -94,9 +86,7 @@ def remove_tag_from_projects(api: RiverscapesAPI):
 
     # 4) Write backup log (original tags preserved)
     safe_makedirs(LOG_DIR)
-    backup_path = os.path.join(
-        LOG_DIR, f"remove_tag_backup_{api.stage}_{TAG_TO_REMOVE}.json"
-    )
+    backup_path = os.path.join(LOG_DIR, f"remove_tag_backup_{api.stage}_{TAG_TO_REMOVE}.json")
     with open(backup_path, "w", encoding="utf8") as f:
         f.write(json.dumps([p.json for p in targets], indent=2))
     log.warning(f"Backup of {len(targets)} candidate projects written to: {backup_path}")
@@ -108,13 +98,7 @@ def remove_tag_from_projects(api: RiverscapesAPI):
         return
 
     # 5) Confirm before mutating
-    answers = inquirer.prompt([
-        inquirer.Confirm(
-            'confirm',
-            message=f"Remove '{TAG_TO_REMOVE}' from {len(targets)} project(s)?",
-            default=False
-        )
-    ])
+    answers = inquirer.prompt([inquirer.Confirm('confirm', message=f"Remove '{TAG_TO_REMOVE}' from {len(targets)} project(s)?", default=False)])
     if not answers or not answers.get('confirm'):
         log.info("Aborted by user.")
         return
@@ -131,10 +115,13 @@ def remove_tag_from_projects(api: RiverscapesAPI):
         log.debug(f"Removing '{TAG_TO_REMOVE}' from: {p.name} ({p.id})")
 
         try:
-            resp = api.run_query(mutation_script, {
-                "projectId": p.id,
-                "project": {"tags": new_tags},
-            })
+            resp = api.run_query(
+                mutation_script,
+                {
+                    "projectId": p.id,
+                    "project": {"tags": new_tags},
+                },
+            )
             # Optional: check for GraphQL errors shape if your client surfaces it
             if resp and isinstance(resp, dict) and "errors" in resp and resp["errors"]:
                 errors += 1

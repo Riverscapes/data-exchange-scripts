@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-import os
 import json
-from typing import Any, Dict, Optional
+import os
+from typing import Any
 
 # --- Config ---
 MATCHES_PATH = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/logs/fix_rme_PRODUCTION_2024CONUS_MISSING_BOUNDS_HUC_MATCHES.json"
 HUC_BASE_DIR = "/Users/jagmeetdhillon/Desktop/Software/data-exchange-scripts/data/rme_bounds_fixed"
-OUT_FILENAME = "rme_rscontext_match.json"   # name for the written file in each HUC folder
-OVERWRITE = True                            # set False to skip if file exists
+OUT_FILENAME = "rme_rscontext_match.json"  # name for the written file in each HUC folder
+OVERWRITE = True  # set False to skip if file exists
 
-def get_meta_value(meta_list, key) -> Optional[str]:
+
+def get_meta_value(meta_list, key) -> str | None:
     if not isinstance(meta_list, list):
         return None
     for kv in meta_list:
@@ -21,7 +22,7 @@ def get_meta_value(meta_list, key) -> Optional[str]:
     return None
 
 
-def get_huc_from_project(project: Dict[str, Any]) -> Optional[str]:
+def get_huc_from_project(project: dict[str, Any]) -> str | None:
     if not isinstance(project, dict):
         return None
     meta = project.get("meta") or []
@@ -35,7 +36,7 @@ def get_huc_from_project(project: Dict[str, Any]) -> Optional[str]:
 
 def main():
     # Load the top-level JSON array
-    with open(MATCHES_PATH, "r", encoding="utf-8") as f:
+    with open(MATCHES_PATH, encoding="utf-8") as f:
         data = json.load(f)
 
     if not isinstance(data, list):

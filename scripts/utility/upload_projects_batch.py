@@ -5,13 +5,14 @@ Data Exchange
 Philip Bailey
 16 Jan 2025
 """
-from typing import List
+
 import os
 import subprocess
+
 import inquirer
 
 
-def find_project_files(base_folder: str) -> List[str]:
+def find_project_files(base_folder: str) -> list[str]:
     """
     Recursively find riverscapes project files
     """

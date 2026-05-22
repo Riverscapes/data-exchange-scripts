@@ -13,20 +13,23 @@ You are advise to try it against the STAGING server first to make sure it does w
 Philip Bailey (based on Matt's project_upload.py script)
 2 Oct 2025
 """
+
+import argparse
+import json
 import os
 import time
-import json
-import argparse
+
 import inquirer
-from rsxml import Logger
 import requests
-from pydex import RiverscapesAPI, __version__
+from rsxml import Logger
+
+from pydex import RiverscapesAPI
 
 FILES_TO_SKIP = ['.DS_Store', 'thumbs.db', 'desktop.ini']
 
 
 def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: str, visibility: str, tags: list):
-    """ Upload all projects found in subfolders of the specified parent folder.
+    """Upload all projects found in subfolders of the specified parent folder.
 
     Each subfolder is expected to contain a project.rs.xml file and any associated data files.
 
@@ -70,7 +73,7 @@ def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: 
 
 
 def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, project_id: str, owner: str, visibility: str, tags: list = None, no_wait: bool = False):
-    """ A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
+    """A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
     files we wish to change as well as the project.rs.xml file which describes the project and its files.
 
     For this project we're going to upload an overwrite a real project on the STAGING server
@@ -88,14 +91,13 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
     log.title('Upload Riverscapes Files')
 
     # Find all files recursively inside this project folder
-    if (not os.path.isfile(project_xml_path) and not os.path.isdir(project_xml_path)):
+    if not os.path.isfile(project_xml_path) and not os.path.isdir(project_xml_path):
         log.error(f'Project XML path does not exist: {project_xml_path}. Must be either the project.rs.xml file or the project folder.')
         return
     project_folder = os.path.dirname(project_xml_path) if os.path.isfile(project_xml_path) else project_xml_path
     all_project_files = []
     for root, _dirs, files in os.walk(project_folder):
         for filename in files:
-
             if filename in FILES_TO_SKIP:
                 continue
 
@@ -122,13 +124,10 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
         # NOTE: VERY IMPORTANT: If you're updating an existing project you must set noDelete to True
         'noDelete': True,
         # Owner must be explicitly set to the same owner as the existing project.
-        'owner': {
-            'id': owner,
-            'type': 'ORGANIZATION'
-        },
+        'owner': {'id': owner, 'type': 'ORGANIZATION'},
         # # Visibility and tags must also be explicitly set so we use the values from the existing project we just looked up
         'visibility': visibility,
-        'tags': tags
+        'tags': tags,
     }
 
     project_upload_qry = riverscapes_api.load_query('requestUploadProject')
@@ -143,10 +142,7 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
     # ================================================================================================================
     upload_urls_qry = riverscapes_api.load_query('requestUploadProjectFilesUrl')
     combined_files = project_upload['data']['requestUploadProject']['create'] + project_upload['data']['requestUploadProject']['update']
-    upload_urls = riverscapes_api.run_query(upload_urls_qry, {
-        'files': combined_files,
-        'token': token
-    })
+    upload_urls = riverscapes_api.run_query(upload_urls_qry, {'files': combined_files, 'token': token})
     log.info(f"Received upload urls for {len(upload_urls['data']['requestUploadProjectFilesUrl'])} files")
 
     # Step 3: Now upload each file to the provided url
@@ -182,9 +178,7 @@ def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, proje
     # Step 4: Now that all files are uploaded we need to finalize the upload
     # ================================================================================================================
     finalize_upload_qry = riverscapes_api.load_mutation('finalizeProjectUpload')
-    __finalize_upload = riverscapes_api.run_query(finalize_upload_qry, {
-        'token': token
-    })
+    __finalize_upload = riverscapes_api.run_query(finalize_upload_qry, {'token': token})
 
     if bool(no_wait) is False:
         # Step 5: Poll the upload status until it's done. This is optional so if you're immediately moving on to a different

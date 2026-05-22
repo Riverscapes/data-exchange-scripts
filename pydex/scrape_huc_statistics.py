@@ -3,14 +3,16 @@ Scrapes RME GeoPackage from Data Exchange and extracts statistics for a single H
 Produced for the BLM 2024 September analysis of 2024 CONUS RME projects.
 Philip Bailey
 """
-from typing import Dict
-import shutil
-import re
-import os
+
 import copy
+import os
+import re
+import shutil
 import sqlite3
 import uuid
+
 from rsxml import Logger
+
 from pydex import RiverscapesAPI
 
 # Metric summary methods used in dictionary below
@@ -34,24 +36,24 @@ RCAT_OUTPUT_GPKG_REGEX = r'.*rcat\.gpkg'
 # 3. The type of summary to use
 # 4. The key to use in the output dictionary
 rme_metric_defs = (
-    ('rme_igo_prim_channel_gradient',	4,	LENGTH_WEIGHTED_AVG,		'channel_gradient'),
-    ('rme_igo_valley_bottom_gradient',	5,	LENGTH_WEIGHTED_AVG,		'valley_gradient'),
-    ('nhd_dgo_streamlength',	16,	SUM_METRIC,		'channel_length'),
-    ('vbet_dgo_lowlying_area',	19,	SUM_METRIC,		'low_lying_area'),
-    ('vbet_dgo_elevated_area',	20,	SUM_METRIC, 'elevated_area'),
-    ('vbet_dgo_channel_area',	21,	SUM_METRIC,		'channel_area'),
-    ('vbet_igo_integrated_width',	23, LENGTH_WEIGHTED_AVG,		'valley_width'),
+    ('rme_igo_prim_channel_gradient', 4, LENGTH_WEIGHTED_AVG, 'channel_gradient'),
+    ('rme_igo_valley_bottom_gradient', 5, LENGTH_WEIGHTED_AVG, 'valley_gradient'),
+    ('nhd_dgo_streamlength', 16, SUM_METRIC, 'channel_length'),
+    ('vbet_dgo_lowlying_area', 19, SUM_METRIC, 'low_lying_area'),
+    ('vbet_dgo_elevated_area', 20, SUM_METRIC, 'elevated_area'),
+    ('vbet_dgo_channel_area', 21, SUM_METRIC, 'channel_area'),
+    ('vbet_igo_integrated_width', 23, LENGTH_WEIGHTED_AVG, 'valley_width'),
     # ('conf_igo_confinement_ratio',	31,	LENGTH_WEIGHTED_AVG,	'confinement'),
     # ('conf_igo_constriction_ratio', 32,	LENGTH_WEIGHTED_AVG,		'constriction'),
-    ('anthro_igo_road_dens',	35,	MULTIPLIED_BY_LENGTH,		'road_length'),
-    ('anthro_igo_rail_dens',	36,	MULTIPLIED_BY_LENGTH,		'rail_length'),
-    ('anthro_igo_land_use_intens',	37,	AREA_WEIGHTED_AVG,		'land_use_intensity'),
-    ('rcat_igo_fldpln_access',	38,	MULTIPLIED_BY_AREA,		'accessible_floodplain_area'),
-    ('rcat_igo_prop_riparian',	39,	MULTIPLIED_BY_AREA,		'riparian_area'),
-    ('rcat_igo_riparian_veg_departure',	40,	AREA_WEIGHTED_AVG,		'riparian_departure'),
-    ('rcat_igo_riparian_ag_conversion',	41,	MULTIPLIED_BY_AREA,		'riparian_ag_conv_area'),
-    ('rcat_igo_riparian_develop',	42, MULTIPLIED_BY_AREA,		'riparian_developed_area'),
-    ('rcat_lui_zero_count',	37,	SUM_AREA_ZERO_COUNT,		'lui_zero_area')
+    ('anthro_igo_road_dens', 35, MULTIPLIED_BY_LENGTH, 'road_length'),
+    ('anthro_igo_rail_dens', 36, MULTIPLIED_BY_LENGTH, 'rail_length'),
+    ('anthro_igo_land_use_intens', 37, AREA_WEIGHTED_AVG, 'land_use_intensity'),
+    ('rcat_igo_fldpln_access', 38, MULTIPLIED_BY_AREA, 'accessible_floodplain_area'),
+    ('rcat_igo_prop_riparian', 39, MULTIPLIED_BY_AREA, 'riparian_area'),
+    ('rcat_igo_riparian_veg_departure', 40, AREA_WEIGHTED_AVG, 'riparian_departure'),
+    ('rcat_igo_riparian_ag_conversion', 41, MULTIPLIED_BY_AREA, 'riparian_ag_conv_area'),
+    ('rcat_igo_riparian_develop', 42, MULTIPLIED_BY_AREA, 'riparian_developed_area'),
+    ('rcat_lui_zero_count', 37, SUM_AREA_ZERO_COUNT, 'lui_zero_area'),
     # ('brat_igo_capacity',	43,	SUM_METRIC,		'beaver_dam_capacity')
 )
 
@@ -85,9 +87,7 @@ def scrape_huc_statistics(huc: str, rme_gpkg: str, output_db: str) -> None:
         rme_curs = rme_conn.cursor()
 
         for __state_name, state_data in states.items():
-
             for __flow_name, flow_data in flows.items():
-
                 # Without an owner filter we get statistics for all owners for a certain FCode
                 data = copy.deepcopy(data_template)
                 data['state_id'] = state_data['id']
@@ -99,7 +99,6 @@ def scrape_huc_statistics(huc: str, rme_gpkg: str, output_db: str) -> None:
                     huc_metrics.append(data)
 
                 for __owner_name, owner_data in owners.items():
-
                     data = copy.deepcopy(data_template)
                     data['state_id'] = state_data['id']
                     data['owner_id'] = owner_data['id']
@@ -123,8 +122,7 @@ def scrape_huc_statistics(huc: str, rme_gpkg: str, output_db: str) -> None:
 
 
 def secondary_metrics(curs: sqlite3.Cursor) -> None:
-    """ After the metrics have been scraped, calculate the secondary metrics with simple SQL updates
-    """
+    """After the metrics have been scraped, calculate the secondary metrics with simple SQL updates"""
 
     curs.execute('UPDATE metrics SET hist_riparian_area = riparian_area / (1 - riparian_departure)')
     curs.execute('UPDATE metrics SET relative_flow_length = channel_length / riverscape_length')
@@ -136,7 +134,7 @@ def secondary_metrics(curs: sqlite3.Cursor) -> None:
     # curs.execute('UPDATE metrics SET beaver_dam_density = beaver_dam_capacity / riverscape_length')
 
 
-def get_data_template(output_db: str) -> Dict[str, float]:
+def get_data_template(output_db: str) -> dict[str, float]:
     """
     Get the data template from the destination cursor
     """
@@ -194,7 +192,7 @@ def copy_table_between_cursors(src_cursor, dest_cursor, table_name):
     dest_cursor.executemany(insert_sql, row_tuples)
 
 
-def scrape_rme_statistics(curs: sqlite3.Cursor, state: Dict[str, str], flow: Dict[str, str], owner: Dict[str, str], output: Dict[str, float]) -> None:
+def scrape_rme_statistics(curs: sqlite3.Cursor, state: dict[str, str], flow: dict[str, str], owner: dict[str, str], output: dict[str, float]) -> None:
     """
     Scrape statistics from the RME output. The owner and flow filters are optional.
     The output of this function is to insert several RME statistics into the "data" dictionary.
@@ -225,7 +223,7 @@ def scrape_rme_statistics(curs: sqlite3.Cursor, state: Dict[str, str], flow: Dic
         output[output_key] = get_rme_metric_summary(curs, state, flow, owner, metric_id, summary_method)
 
 
-def get_rme_metric_summary(curs: sqlite3.Cursor, state: Dict[str, str], flow: Dict[str, str], owner: Dict[str, str], metric_id: int, summary_method: str) -> float:
+def get_rme_metric_summary(curs: sqlite3.Cursor, state: dict[str, str], flow: dict[str, str], owner: dict[str, str], metric_id: int, summary_method: str) -> float:
     """
     For a given metric (by metric_id) this method generates several summary metrics:
         - Length weighted average
@@ -263,7 +261,7 @@ def get_rme_metric_summary(curs: sqlite3.Cursor, state: Dict[str, str], flow: Di
     return row[summary_method]
 
 
-def add_where_clauses(base_sql: str, state: Dict[str, str], flow: Dict[str, str], owner: Dict[str, str]) -> str:
+def add_where_clauses(base_sql: str, state: dict[str, str], flow: dict[str, str], owner: dict[str, str]) -> str:
     """
     Add WHERE clauses to the SQL query based on the state, owner and flow.
     Note that owner is the only filter than can be None!
@@ -303,7 +301,7 @@ def get_matching_file(parent_dir: str, regex: str) -> str:
     return None
 
 
-def load_filters(output_db: str, table_name: str) -> Dict[str, Dict[str, str]]:
+def load_filters(output_db: str, table_name: str) -> dict[str, dict[str, str]]:
     '''
     Load the filters from the output database for a particular table.
     This is used for both ownerships and flows lookups
@@ -317,7 +315,7 @@ def load_filters(output_db: str, table_name: str) -> Dict[str, Dict[str, str]]:
 
 def continue_with_huc(huc: str, output_db: str) -> bool:
     '''
-    Check if the HUC already exists in the output GeoPackage. 
+    Check if the HUC already exists in the output GeoPackage.
     This is used to determine if the HUC has already been scraped and whether it
     can be skipped.
     '''
@@ -334,7 +332,7 @@ def continue_with_huc(huc: str, output_db: str) -> bool:
 
 
 def create_output_db(output_db: str, delete: bool = False) -> None:
-    """ 
+    """
     Build the output SQLite database by running the schema file.
     """
     log = Logger('Create Output DB')
@@ -374,7 +372,7 @@ def dict_factory(cursor, row):
     return d
 
 
-def scrape_hucs_batch(rs_api: RiverscapesAPI,  projects: Dict[str, str], download_dir: str, output_db: str, delete_downloads: bool) -> None:
+def scrape_hucs_batch(rs_api: RiverscapesAPI, projects: dict[str, str], download_dir: str, output_db: str, delete_downloads: bool) -> None:
     """
     Loop over all the projects, download the RME and RCAT output GeoPackages, and scrape the statistics
     """

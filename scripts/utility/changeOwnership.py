@@ -1,16 +1,17 @@
-"""[summary]
-"""
-import os
-from typing import List
+"""[summary]"""
+
 import json
+import os
+
 import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-from pydex import RiverscapesAPI, RiverscapesSearchParams, RiverscapesProject
+
+from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 
 def change_owner(riverscapes_api: RiverscapesAPI):
-    """ Change the ownership of projects based on a search of Riverscapes Data Exchange
+    """Change the ownership of projects based on a search of Riverscapes Data Exchange
 
     To run this file in VSCode choose "Python: Current File (Cybercastor)" from the command palette
 
@@ -37,7 +38,7 @@ def change_owner(riverscapes_api: RiverscapesAPI):
     # Make the search and collect all the data
     # ================================================================================================================
 
-    changeable_projects: List[RiverscapesProject] = []
+    changeable_projects: list[RiverscapesProject] = []
     total = 0
     for project, _stats, search_total, _prg in riverscapes_api.search(search_params, progress_bar=True):
         total = search_total
@@ -67,13 +68,7 @@ def change_owner(riverscapes_api: RiverscapesAPI):
     mutation_script = riverscapes_api.load_mutation('changeProjectOwner')
     for project in changeable_projects:
         log.info(f"Change Owner of project: {project.name} with id: {project.id}")
-        riverscapes_api.run_query(mutation_script, {
-            "projectId": project.id,
-            "owner": {
-                "id": new_org_id,
-                "type": "ORGANIZATION"
-            }
-        })
+        riverscapes_api.run_query(mutation_script, {"projectId": project.id, "owner": {"id": new_org_id, "type": "ORGANIZATION"}})
 
     # Shut down the API since we don;t need it anymore
     riverscapes_api.shutdown()

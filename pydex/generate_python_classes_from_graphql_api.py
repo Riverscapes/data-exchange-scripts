@@ -2,12 +2,12 @@
 Generate Python TypedDict definitions from a GraphQL schema.
 
 This script reads the project's 'graphql.config.json' to locate the schema file,
-parses it, and generates Python `TypedDict` classes for all InputObjects. and enums. 
+parses it, and generates Python `TypedDict` classes for all InputObjects. and enums.
 This allows for type-safe construction of GraphQL mutation payloads.
 
-Quickly built with copilot/gemini 3 pro (preview) 2026-01-27 by Lorin 
-NOTE: If we want to go deeper, there are established libraries for this: 
-* ariadne https://github.com/mirumee/ariadne-codegen/ 
+Quickly built with copilot/gemini 3 pro (preview) 2026-01-27 by Lorin
+NOTE: If we want to go deeper, there are established libraries for this:
+* ariadne https://github.com/mirumee/ariadne-codegen/
 * https://github.com/sauldom102/gql_schema_codegen
 e.g. Could add types, could make Total=True if all fields are required
 """
@@ -45,13 +45,7 @@ def get_python_type(type_node: TypeNode) -> str:
 
     if isinstance(type_node, NamedTypeNode):
         name = type_node.name.value
-        mapping = {
-            'String': 'str',
-            'ID': 'str',
-            'Boolean': 'bool',
-            'Int': 'int',
-            'Float': 'float'
-        }
+        mapping = {'String': 'str', 'ID': 'str', 'Boolean': 'bool', 'Int': 'int', 'Float': 'float'}
         # Use quotes for forward references to other classes
         return mapping.get(name, f"'{name}'")
 
@@ -73,7 +67,7 @@ def generate_types(schema_path: Path, output_path: Path) -> None:
     print(f"Reading schema from: {schema_path}")
     print(f"Writing types to:    {output_path}")
 
-    with open(schema_path, 'r', encoding='utf-8') as f:
+    with open(schema_path, encoding='utf-8') as f:
         schema_content = f.read()
 
     doc = parse(schema_content)
@@ -133,10 +127,8 @@ if __name__ == "__main__":
     default_schema = Path("pydex/graphql/riverscapes.schema.graphql")
     default_output = Path("pydex/generated_types.py")
 
-    parser.add_argument('--schema', type=Path, default=default_schema,
-                        help='Path to riverscapes.schema.graphql')
-    parser.add_argument('--output', type=Path, default=default_output,
-                        help='Path to output .py file')
+    parser.add_argument('--schema', type=Path, default=default_schema, help='Path to riverscapes.schema.graphql')
+    parser.add_argument('--output', type=Path, default=default_output, help='Path to output .py file')
 
     args = parser.parse_args()
     generate_types(args.schema, args.output)

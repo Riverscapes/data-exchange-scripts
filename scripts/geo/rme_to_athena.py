@@ -5,16 +5,19 @@ scrapes the DGO metrics from the GeoPackages, and uploads the results to an S3 b
 Philip Bailey
 June 2025
 """
-import shutil
-import csv
-import re
-import os
-import logging
+
 import argparse
+import csv
+import logging
+import os
+import re
+import shutil
+
 import apsw
 import boto3
+from rsxml import Logger, ProgressBar, dotenv
 from rsxml.util import safe_makedirs
-from rsxml import dotenv, Logger, ProgressBar
+
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 from pydex.classes.riverscapes_helpers import RiverscapesProject
 from pydex.lib.athena import athena_query
@@ -82,7 +85,8 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
             curs = conn.cursor()
             curs.setrowtrace(dict_row_factory)
 
-            curs.execute('''
+            curs.execute(
+                '''
                 SELECT
                     ? as rme_version,
                     ? as rme_version_int,
@@ -122,7 +126,9 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
                         HAVING GeometryType(dgo_geom) = 'POLYGON'
                     ) dgos ON dgo_desc.dgoid = dgos.dgoid
                     INNER JOIN igos ON dgos.level_path = igos.level_path AND dgos.seg_distance = igos.seg_distance
-            ''', [str(project.model_version), model_version_int, project_created_date_ts])
+            ''',
+                [str(project.model_version), model_version_int, project_created_date_ts],
+            )
 
             with open(rme_tsv, "w", newline='', encoding="utf-8") as f:
                 writer = csv.writer(f, delimiter="\t")
@@ -215,7 +221,7 @@ def main():
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('--tags', help='Data Exchange tags to search for projects', type=str)
     parser.add_argument('--collection', help='Collection GUID', type=str)
-    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages',  action='store_true', default=False)
+    parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages', action='store_true', default=False)
     parser.add_argument('--huc_filter', help='HUC filter SQL prefix ("17%")', type=str, default='')
     args = dotenv.parse_args_env(parser)
 
@@ -228,9 +234,11 @@ def main():
     log.setup(log_path=os.path.join(working_folder, 'rme-athena.log'), log_level=logging.DEBUG)
 
     # Data Exchange Search Params
-    search_params = RiverscapesSearchParams({
-        'projectTypeId': 'rs_metric_engine',
-    })
+    search_params = RiverscapesSearchParams(
+        {
+            'projectTypeId': 'rs_metric_engine',
+        }
+    )
 
     if args.collection != '.':
         search_params.collection = args.collection
@@ -239,7 +247,7 @@ def main():
         search_params.tags = args.tags.split(',')
 
     if args.huc_filter != '' and args.huc_filter != '.':
-        search_params.meta = {'HUC':  args.huc_filter}
+        search_params.meta = {'HUC': args.huc_filter}
 
     with RiverscapesAPI(stage=args.stage) as api:
         scrape_rme(api, args.spatialite_path, search_params, download_folder, args.s3_bucket, args.delete)

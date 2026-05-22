@@ -3,16 +3,16 @@
 2. process it, generating new file
 3. upload that to a different prefix in s3
 """
+
 import logging
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
-import geopandas as gpd
 import boto3
-from tqdm import tqdm  # trying this instead of ProgressBar, I've heard good things
-
-from rsxml import Logger
+import geopandas as gpd
 from rme_to_athena_parquet import upload_to_s3
+from rsxml import Logger
+from tqdm import tqdm  # trying this instead of ProgressBar, I've heard good things
 
 DEFAULT_DATA_BUCKET = "riverscapes-athena"
 DATA_ROOT = Path(r"F:\nardata\work\rme_extraction")

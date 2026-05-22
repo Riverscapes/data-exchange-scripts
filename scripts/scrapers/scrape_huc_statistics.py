@@ -3,11 +3,14 @@ Scrapes RME GeoPackage from Data Exchange and extracts statistics for a single H
 Produced for the BLM 2024 September analysis of 2024 CONUS RME projects.
 Philip Bailey
 """
-import sys
-import os
+
 import argparse
+import os
+import sys
+
 from rsxml import Logger, dotenv
-from pydex.scrape_huc_statistics import scrape_huc_statistics, create_output_db
+
+from pydex.scrape_huc_statistics import create_output_db, scrape_huc_statistics
 
 
 def main():

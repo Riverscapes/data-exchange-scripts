@@ -1,14 +1,16 @@
 import os
+
+import inquirer
 from rsxml import Logger
 from rsxml.util import safe_makedirs
-import inquirer
+
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 
 
 def download_files(riverscapes_api: RiverscapesAPI):
-    """ Download files from a riverscapes project search (not all files, just the ones that match our regex filters)
+    """Download files from a riverscapes project search (not all files, just the ones that match our regex filters)
 
-        To run this file in VSCode choose "Python: Current File (Cybercastor)" from the command palette
+    To run this file in VSCode choose "Python: Current File (Cybercastor)" from the command palette
 
     """
     log = Logger('Download Riverscapes Files')
@@ -35,7 +37,6 @@ def download_files(riverscapes_api: RiverscapesAPI):
     # ================================================================================================================
 
     for project, _stats, _total, _prg in riverscapes_api.search(search_params):
-
         # Since we're searching for a huc we can pretty reliably assume that we're only going to get one project
         dlhuc = project.project_meta['HUC']
         if not dlhuc or len(dlhuc.strip()) < 1:

@@ -18,11 +18,11 @@ NEW:
 - Replaces existing <ProjectBounds> in rme if present
 """
 
+import copy
 import os
 import re
-import sys
 import shutil
-import copy
+import sys
 import traceback
 import xml.etree.ElementTree as ET
 
@@ -49,17 +49,18 @@ def pretty_indent(elem: ET.Element) -> None:
         return
 
     def _indent(e, level=0):
-        i = "\n" + level*"  "
+        i = "\n" + level * "  "
         if len(e):
             if not e.text or not e.text.strip():
                 e.text = i + "  "
             for child in e:
-                _indent(child, level+1)
+                _indent(child, level + 1)
             if not e.tail or not e.tail.strip():
                 e.tail = i
         else:
             if level and (not e.tail or not e.tail.strip()):
                 e.tail = i
+
     _indent(elem)
 
 
@@ -102,6 +103,7 @@ def write_list(path: str, items):
     with open(path, "w", encoding="utf-8") as f:
         for x in sorted(items):
             f.write(f"{x}\n")
+
 
 # ---- CORE -------------------------------------------------------------------
 
@@ -203,15 +205,12 @@ def main() -> int:
     logs = {
         "total_huc_dirs": 0,
         "processed": 0,
-
         "missing_rscontext": 0,
         "missing_rme": 0,
         "no_bounds_in_rscontext": 0,
-
         "missing_rscontext_hucs": set(),
         "missing_rme_hucs": set(),
         "no_bounds_hucs": set(),
-
         "inserted": 0,
         "replaced": 0,
         "inserted_no_meta": 0,

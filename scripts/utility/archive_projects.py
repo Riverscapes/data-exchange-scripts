@@ -9,10 +9,13 @@ a CSV file for archiving.
 Philip Bailey
 15 July 2025
 """
-import os
+
 import argparse
+import os
+
 import inquirer
 from rsxml import ProgressBar, dotenv
+
 from pydex import RiverscapesAPI
 
 
@@ -37,7 +40,7 @@ def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str)
     csv_path = os.path.join(csv_folder, answers['csv_path'])
     print(f'Archiving projects from {stage} using CSV file: {csv_path}')
     project_ids = []
-    with open(csv_path, 'r', encoding='utf-8') as csvfile:
+    with open(csv_path, encoding='utf-8') as csvfile:
         for line in csvfile:
             project_id = line.strip()
             if project_id:
@@ -66,7 +69,7 @@ def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str)
                 not_found += 1
             else:
                 raise e
-        prg.update(i+1)
+        prg.update(i + 1)
 
     prg.finish()
     print(f'Process complete. {archived} projects archived. {not_found} projects not found.')
