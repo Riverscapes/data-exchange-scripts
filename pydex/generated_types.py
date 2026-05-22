@@ -5,8 +5,6 @@ Generated from riverscapes.schema.graphql using generate_python_classes_from_gra
 from enum import Enum
 from typing import TypedDict
 
-DateTime = str
-
 
 class AttributionRoleEnum(str, Enum):
     ANALYST = 'ANALYST'
@@ -309,13 +307,13 @@ class CollectionInput(TypedDict, total=False):
 class DBObjNotificationsInput(TypedDict, total=False):
     createdById: str
     createdByName: str
-    createdOn: 'DateTime'
+    createdOn: str
     id: str
     name: str
     summary: str
     updatedById: str
     updatedByName: str
-    updatedOn: 'DateTime'
+    updatedOn: str
 
 
 class DatasetInput(TypedDict, total=False):
@@ -366,12 +364,12 @@ class FileDownloadMetaInput(TypedDict, total=False):
     contentType: str
     localPath: str
     md5: str
-    size: 'BigInt'
+    size: int
 
 
 class LinkInput(TypedDict, total=False):
     alt: str
-    href: 'URL'
+    href: str
     text: str
 
 
@@ -396,7 +394,7 @@ class OrganizationInput(TypedDict, total=False):
     logoToken: str
     meta: list['MetaDataInput']
     name: str
-    preferences: 'JSONObject'
+    preferences: dict
     social: 'SocialLinksInput'
     summary: str
 
@@ -415,7 +413,7 @@ class ProfileInput(TypedDict, total=False):
     location: str
     meta: list['MetaDataInput']
     name: str
-    preferences: 'JSONObject'
+    preferences: dict
     socialLinks: 'SocialLinksInput'
     summary: str
 
@@ -441,7 +439,7 @@ class ProjectInput(TypedDict, total=False):
     qaqc: list['QAQCEventInput']
     summary: str
     tags: list[str]
-    totalSize: 'BigInt'
+    totalSize: int
     visibility: 'ProjectVisibilityEnum'
 
 
@@ -471,11 +469,11 @@ class ProjectTypeInput(TypedDict, total=False):
     meta: list['MetaDataInput']
     name: str
     summary: str
-    url: 'URL'
+    url: str
 
 
 class QAQCEventInput(TypedDict, total=False):
-    datePerformed: 'DateTime'
+    datePerformed: str
     description: str
     meta: list['MetaDataInput']
     name: str
@@ -499,7 +497,14 @@ class SavedSearchInput(TypedDict, total=False):
     visibility: 'ProjectGroupVisibilityEnum'
 
 
-SearchDateInput = TypedDict('SearchDateInput', {'from': 'str', 'to': 'str'}, total=False)
+SearchDateInput = TypedDict(
+    'SearchDateInput',
+    {
+        'from': 'str',
+        'to': 'str',
+    },
+    total=False,
+)
 
 
 class SearchParamsInput(TypedDict, total=False):
@@ -521,7 +526,7 @@ class SocialLinksInput(TypedDict, total=False):
     linkedIn: str
     tiktok: str
     twitter: str
-    website: 'URL'
+    website: str
 
 
 class TransferEntityItemsInput(TypedDict, total=False):
@@ -540,4 +545,4 @@ class TransferInput(TypedDict, total=False):
 class UserAffiliationInput(TypedDict, total=False):
     affiliationRole: str
     name: str
-    url: 'URL'
+    url: str

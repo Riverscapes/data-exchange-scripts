@@ -12,6 +12,7 @@ NOTE: If we want to go deeper, there are established libraries for this:
 e.g. Could add types, could make Total=True if all fields are required
 """
 
+import keyword
 import argparse
 from pathlib import Path
 
@@ -24,6 +25,21 @@ from graphql import (
     TypeNode,
     parse,
 )
+
+
+# Mapping from GraphQL scalar types to Python types
+SCALAR_MAPPING = {
+    'String': 'str',
+    'ID': 'str',
+    'Boolean': 'bool',
+    'Int': 'int',
+    'Float': 'float',
+    # Custom scalars
+    'DateTime': 'str',
+    'BigInt': 'int',
+    'URL': 'str',
+    'JSONObject': 'dict',
+}
 
 
 def get_python_type(type_node: TypeNode) -> str:
@@ -45,9 +61,8 @@ def get_python_type(type_node: TypeNode) -> str:
 
     if isinstance(type_node, NamedTypeNode):
         name = type_node.name.value
-        mapping = {'String': 'str', 'ID': 'str', 'Boolean': 'bool', 'Int': 'int', 'Float': 'float'}
-        # Use quotes for forward references to other classes
-        return mapping.get(name, f"'{name}'")
+        # Use quotes for forward references to other generated classes
+        return SCALAR_MAPPING.get(name, f"'{name}'")
 
     return "Any"
 
@@ -77,8 +92,8 @@ def generate_types(schema_path: Path, output_path: Path) -> None:
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(f'"""\nGenerated from {schema_path.name} using {Path(__file__).name}\n"""\n')
-        f.write("from typing import TypedDict\n")
-        f.write("from enum import Enum\n\n\n")
+        f.write("from enum import Enum\n")
+        f.write("from typing import TypedDict\n\n\n")
 
         enum_count = 0
         input_count = 0
@@ -106,17 +121,38 @@ def generate_types(schema_path: Path, output_path: Path) -> None:
             if isinstance(definition, InputObjectTypeDefinitionNode):
                 input_count += 1
                 name = definition.name.value
-                f.write(f"class {name}(TypedDict, total=False):\n")
 
                 if not definition.fields:
+                    f.write(f"class {name}(TypedDict, total=False):\n")
                     f.write("    pass\n\n")
                     continue
 
-                for field in definition.fields:
-                    field_name = field.name.value
-                    python_type = get_python_type(field.type)
-                    f.write(f"    {field_name}: {python_type}\n")
-                f.write("\n")
+                # Check if any field name is a Python keyword (e.g. 'from')
+                # If so, use the functional TypedDict form which allows keyword keys
+                field_names = [field.name.value for field in definition.fields]
+                has_keyword_field = any(keyword.iskeyword(fn) for fn in field_names)
+
+                if has_keyword_field:
+                    fields_str = ', '.join(
+                        f"'{fn}': '{get_python_type(field.type)}'" if fn == get_python_type(field.type)
+                        else f"'{fn}': {get_python_type(field.type)!r}"
+                        for fn, field in zip(field_names, definition.fields)
+                    )
+                    # Build a proper dict literal for the functional form
+                    field_items = []
+                    for field in definition.fields:
+                        fn = field.name.value
+                        pt = get_python_type(field.type)
+                        field_items.append(f"    '{fn}': {pt!r}")
+                    fields_body = ',\n'.join(field_items)
+                    f.write(f"{name} = TypedDict('{name}', {{\n{fields_body},\n}}, total=False)\n\n")
+                else:
+                    f.write(f"class {name}(TypedDict, total=False):\n")
+                    for field in definition.fields:
+                        field_name = field.name.value
+                        python_type = get_python_type(field.type)
+                        f.write(f"    {field_name}: {python_type}\n")
+                    f.write("\n")
 
     print(f"Successfully generated {enum_count} Enums and {input_count} Input Types.")
 
