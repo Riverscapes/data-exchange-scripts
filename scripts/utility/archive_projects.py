@@ -18,6 +18,7 @@ from pydex import RiverscapesAPI
 
 def archive_projects_by_csv(rs_api: RiverscapesAPI, stage: str, csv_folder: str) -> None:
     """Archive projects from the Riverscapes API using a CSV file of project IDs"""
+    raise NotImplementedError('This is not how we archive projects going forward. This script is deprecated.')
 
     if not os.path.exists(csv_folder):
         print(f'The folder {csv_folder} does not exist. Please provide a valid folder with CSV files.')

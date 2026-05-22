@@ -2,8 +2,9 @@ mutation archiveProject(
   $projectId: ID!
   $project: ProjectInput!
 ) {
-  updateProject(project: $project, projectId: $projectId) {
-    id
-    name
-  }
+  # DEPPRECATED: This is not how we archive projects going forward
+  # updateProject(project: $project, projectId: $projectId) {
+  #   id
+  #   name
+  # }
 }
