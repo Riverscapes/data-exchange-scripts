@@ -20,6 +20,7 @@ Usage:
 import argparse
 import os
 
+import questionary
 from osgeo import gdal, ogr
 
 gdal.UseExceptions()
@@ -299,14 +300,36 @@ def make_cog(
 
 def main():
     parser = argparse.ArgumentParser(description='Convert a GeoTIFF to COG with internalized RAT and color table')
-    parser.add_argument('src', help='Source GeoTIFF')
-    parser.add_argument('dst', help='Output COG GeoTIFF')
+    parser.add_argument('src', nargs='?', default=None, help='Source GeoTIFF (prompted if omitted)')
+    parser.add_argument('dst', nargs='?', default=None, help='Output COG GeoTIFF (prompted if omitted)')
     parser.add_argument('--compress', default='DEFLATE', choices=['DEFLATE', 'LZW', 'ZSTD'], help='Compression (default: DEFLATE)')
     parser.add_argument('--blocksize', type=int, default=512, help='Tile block size in pixels (default: 512)')
     parser.add_argument('--bigtiff', default='IF_SAFER', choices=['YES', 'NO', 'IF_NEEDED', 'IF_SAFER'], help='BIGTIFF mode (default: IF_SAFER)')
     parser.add_argument('--resampling', default='NEAREST', choices=['NEAREST', 'AVERAGE', 'BILINEAR', 'CUBIC'], help='Resampling for overviews (default: NEAREST)')
 
     args = parser.parse_args()
+
+    if not args.src:
+        args.src = questionary.path(
+            'Source GeoTIFF path:',
+            only_directories=False,
+        ).ask()
+        if not args.src:
+            return
+
+    if not args.dst:
+        src_dir = os.path.dirname(os.path.abspath(args.src))
+        src_base = os.path.basename(args.src)
+        # Insert .cog before the first extension: MYRASTER.tiff → MYRASTER.cog.tiff
+        name, ext = os.path.splitext(src_base)
+        default_dst = os.path.join(src_dir, f'{name}.cog{ext}')
+        args.dst = questionary.path(
+            'Output COG GeoTIFF path:',
+            only_directories=False,
+            default=default_dst,
+        ).ask()
+        if not args.dst:
+            return
 
     make_cog(
         src_path=args.src,
