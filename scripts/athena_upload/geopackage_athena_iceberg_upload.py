@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 import boto3
 import botocore.exceptions
@@ -67,6 +68,18 @@ CHUNK_SIZE: int = 100_000
 
 _DEST_ATHENA = "Athena on S3 (Parquet/Iceberg via Glue)"
 _DEST_S3TABLES = "S3 Tables (Iceberg REST catalog)"
+
+
+def _normalize_user_path(raw_path: str) -> Path:
+    """Return a normalized Path from user input.
+
+    Handles Windows "Copy as path" values that include surrounding quotes.
+    """
+    cleaned = raw_path.strip()
+    if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in {'"', "'"}:
+        cleaned = cleaned[1:-1]
+    return Path(cleaned).expanduser()
+
 
 # ---------------------------------------------------------------------------
 # AWS credentials check
@@ -148,9 +161,9 @@ def sanitize_table_name(name: str) -> str:
     import re
 
     sanitized = name.lower()
-    sanitized = re.sub(r"[\s\-\.]+", "_", sanitized)   # spaces / hyphens / dots → _
-    sanitized = re.sub(r"[^a-z0-9_]", "", sanitized)    # strip everything else
-    sanitized = sanitized.lstrip("_")                    # must start with letter/digit
+    sanitized = re.sub(r"[\s\-\.]+", "_", sanitized)  # spaces / hyphens / dots → _
+    sanitized = re.sub(r"[^a-z0-9_]", "", sanitized)  # strip everything else
+    sanitized = sanitized.lstrip("_")  # must start with letter/digit
     return sanitized[:255] or "table"
 
 
@@ -193,28 +206,29 @@ def ask_table_name(default: str, label: str = "Table name:") -> str:
 # ---------------------------------------------------------------------------
 
 
-def ask_gpkg_path() -> str:
+def ask_gpkg_path() -> Path:
     """Prompt the user for the path to a GeoPackage file.
 
     Returns
     -------
-    str
+    Path
         Absolute (or as-entered) path to the GeoPackage file.
     """
-    path = questionary.path(
+    raw_path = questionary.path(
         "Path to GeoPackage file:",
         only_directories=False,
     ).ask()
-    if not path:
+    if not raw_path:
         Logger("ask_gpkg_path").error("No path provided.")
         sys.exit(1)
-    if not os.path.isfile(path):
+    path = _normalize_user_path(raw_path)
+    if not path.is_file():
         Logger("ask_gpkg_path").error(f"File not found: {path}")
         sys.exit(1)
     return path
 
 
-def ask_layer(gpkg_path: str) -> str:
+def ask_layer(gpkg_path: Path) -> str:
     """List all layers in *gpkg_path* and let the user pick one.
 
     Uses ``pyogrio.list_layers`` (NOT fiona) so that fiona is not required.
@@ -235,7 +249,7 @@ def ask_layer(gpkg_path: str) -> str:
     if not layer_names:
         log.error("No layers found in GeoPackage.")
         sys.exit(1)
-    log.info(f"Found {len(layer_names)} layer(s) in {os.path.basename(gpkg_path)}")
+    log.info(f"Found {len(layer_names)} layer(s) in {gpkg_path.name}")
     chosen = questionary.select("Select layer to upload:", choices=layer_names).ask()
     if not chosen:
         log.error("No layer selected.")
@@ -953,7 +967,7 @@ def main() -> None:
         layer_name = ask_layer(gpkg_path)
 
         # ── Step 2: Read layer & display schema ──────────────────────────────
-        log.info(f"Reading layer '{layer_name}' from {os.path.basename(gpkg_path)} …")
+        log.info(f"Reading layer '{layer_name}' from {gpkg_path.name} …")
         gdf = gpd.read_file(gpkg_path, layer=layer_name)
         log.info(f"  {len(gdf):,} features loaded.")
 

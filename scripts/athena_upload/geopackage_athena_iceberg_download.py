@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import boto3
@@ -83,6 +84,17 @@ _ICEBERG_TYPE_MAP: list[tuple[type, str]] = [
     (TimestamptzType, "datetime64[ns, UTC]"),
     (BinaryType, "bytes"),
 ]
+
+
+def _normalize_user_path(raw_path: str) -> Path:
+    """Return a normalized Path from user input.
+
+    Handles Windows "Copy as path" values that include surrounding quotes.
+    """
+    cleaned = raw_path.strip()
+    if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in {"\"", "'"}:
+        cleaned = cleaned[1:-1]
+    return Path(cleaned).expanduser()
 
 
 def _iceberg_type_to_pandas(iceberg_type, col_name: str) -> str:
@@ -234,11 +246,12 @@ def ask_bounds() -> tuple[BaseGeometry | None, str | None]:
     if not want_bounds:
         return None, None
 
-    geojson_path = questionary.path("Path to GeoJSON bounds file:").ask()
-    if not geojson_path:
+    geojson_input = questionary.path("Path to GeoJSON bounds file:").ask()
+    if not geojson_input:
         log.error("No GeoJSON path provided.")
         sys.exit(1)
-    if not os.path.isfile(geojson_path):
+    geojson_path = _normalize_user_path(geojson_input)
+    if not geojson_path.is_file():
         log.error(f"File not found: {geojson_path}")
         sys.exit(1)
 
@@ -261,7 +274,7 @@ def ask_bounds() -> tuple[BaseGeometry | None, str | None]:
 
 def download_and_save(
     iceberg_table: IcebergTable,
-    gpkg_path: str,
+    gpkg_path: Path,
     layer_name: str,
     bounds_geom: BaseGeometry | None,
     bounds_crs_wkt: str | None,
@@ -313,10 +326,7 @@ def download_and_save(
     log.info(f"Downloading {total_files} Parquet file(s) …")
     arrow_table = iceberg_table.scan().to_arrow()
     total_rows = arrow_table.num_rows
-    log.info(
-        f"Downloaded: {total_rows:,} rows × {arrow_table.num_columns} cols "
-        f"({arrow_table.nbytes / 1024 / 1024:.1f} MB in memory)"
-    )
+    log.info(f"Downloaded: {total_rows:,} rows x {arrow_table.num_columns} cols ({arrow_table.nbytes / 1024 / 1024:.1f} MB in memory)")
 
     if total_rows == 0:
         log.warning("Table is empty — nothing to write.")
@@ -346,9 +356,8 @@ def download_and_save(
     # First chunk uses "w" for a brand-new file, or "a" to append to an
     # existing one.  Every subsequent chunk always appends so we don't
     # overwrite earlier chunks.
-    initial_mode = "a" if os.path.exists(gpkg_path) else "w"
+    initial_mode = "a" if gpkg_path.exists() else "w"
     rows_written = 0
-    n_chunks = (total_rows + chunk_size - 1) // chunk_size
 
     progbar = ProgressBar(total_rows, text=f"Processing & writing → {layer_name}")
     for chunk_idx, offset in enumerate(range(0, total_rows, chunk_size)):
@@ -376,7 +385,7 @@ def download_and_save(
         log.warning("No features remain after filtering — GeoPackage layer not written.")
         return
 
-    file_size_mb = os.path.getsize(gpkg_path) / 1024 / 1024
+    file_size_mb = gpkg_path.stat().st_size / 1024 / 1024
     log.info(f"Saved {rows_written:,} features to layer '{layer_name}' in {gpkg_path} ({file_size_mb:.1f} MB).")
 
 
@@ -462,10 +471,11 @@ def run_athena_workflow() -> None:
     display_download_schema(iceberg_table)
 
     # ── Output path & layer name ──────────────────────────────────────────────
-    gpkg_path = questionary.path("Output GeoPackage file path:", only_directories=False).ask()
-    if not gpkg_path:
+    gpkg_input = questionary.path("Output GeoPackage file path:", only_directories=False).ask()
+    if not gpkg_input:
         log.error("Output path is required.")
         sys.exit(1)
+    gpkg_path = _normalize_user_path(gpkg_input)
 
     layer_name = questionary.text("Layer name in GeoPackage:", default=table_name).ask()
     if not layer_name:
@@ -632,10 +642,11 @@ def run_s3tables_workflow() -> None:
     display_download_schema(iceberg_table)
 
     # ── Output path & layer name ──────────────────────────────────────────────
-    gpkg_path = questionary.path("Output GeoPackage file path:", only_directories=False).ask()
-    if not gpkg_path:
+    gpkg_input = questionary.path("Output GeoPackage file path:", only_directories=False).ask()
+    if not gpkg_input:
         log.error("Output path is required.")
         sys.exit(1)
+    gpkg_path = _normalize_user_path(gpkg_input)
 
     layer_name = questionary.text("Layer name in GeoPackage:", default=table_name).ask()
     if not layer_name:
