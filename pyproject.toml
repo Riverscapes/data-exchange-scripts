@@ -37,6 +37,9 @@ dependencies = [
   "pyiceberg[pyarrow]>=0.7.0",
   "pyproj>=3.6",
   "tqdm>=4.67.1",
+  "questionary>=2.0.0",
+  "rich>=13.0",
+  "pyogrio>=0.7",
 ]
 
 [project.optional-dependencies]
