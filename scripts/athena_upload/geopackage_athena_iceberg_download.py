@@ -40,6 +40,7 @@ from pyiceberg.types import (
 from rich.console import Console
 from rich.table import Table as RichTable
 from rsxml.logging.logger import Logger
+from rsxml.logging.progress_bar import ProgressBar
 from shapely.ops import transform
 
 if TYPE_CHECKING:
@@ -61,6 +62,7 @@ If you use SSO, run  aws sso login  and then re-run this script.
 """
 
 AWS_REGION: str = os.environ.get("AWS_REGION", "us-west-2")
+DOWNLOAD_CHUNK_SIZE: int = 50_000
 
 _SRC_ATHENA = "Athena on S3 (Parquet/Iceberg via Glue)"
 _SRC_S3TABLES = "S3 Tables (Iceberg REST catalog)"
@@ -263,20 +265,20 @@ def download_and_save(
     layer_name: str,
     bounds_geom: BaseGeometry | None,
     bounds_crs_wkt: str | None,
+    chunk_size: int = DOWNLOAD_CHUNK_SIZE,
 ) -> None:
     """Download an Iceberg table and save it as a GeoPackage layer.
 
     Steps performed:
 
-    1. Scan the Iceberg table and download to an Arrow table.
-    2. Convert to a pandas DataFrame.
-    3. Reconstruct geometry from the ``geom_wkb`` column via
-       :func:`geopandas.GeoSeries.from_wkb`.
-    4. Build a :class:`geopandas.GeoDataFrame` with the table's ``geo.crs_wkt``
-       property (falls back to EPSG:4326 when absent).
-    5. Optionally filter rows whose geometry intersects *bounds_geom* (after
-       reprojecting the bounds to the table CRS).
-    6. Write (or append) to *gpkg_path* at the layer *layer_name*.
+    1. **Plan the scan** — calls ``plan_files()`` to count Parquet files and
+       estimate the total download size before any data is transferred.
+    2. **Download** — ``scan().to_arrow()`` fetches all Parquet files from S3
+       into an in-memory Arrow table.
+    3. **Process in chunks** — the Arrow table is sliced into batches of
+       *chunk_size* rows; each batch is decoded (WKB → Shapely), optionally
+       filtered against *bounds_geom*, and appended to the GeoPackage layer.
+       A single progress bar tracks all three sub-steps together.
 
     Parameters
     ----------
@@ -292,52 +294,90 @@ def download_and_save(
     bounds_crs_wkt:
         WKT CRS string matching the CRS of *bounds_geom*.  Required when
         *bounds_geom* is not ``None``.
+    chunk_size:
+        Number of rows to decode and write per iteration.
     """
     log = Logger("download_and_save")
 
-    # ── 1. Download ──────────────────────────────────────────────────────────
-    log.info("Downloading data from Iceberg table …")
+    # ── 1. Plan scan ─────────────────────────────────────────────────────────
+    log.info("Planning scan …")
+    tasks = list(iceberg_table.scan().plan_files())
+    total_files = len(tasks)
+    total_s3_mb = sum(t.file.file_size_in_bytes or 0 for t in tasks) / 1024 / 1024
+    if total_files == 0:
+        log.warning("Table has no data files — nothing to download.")
+        return
+    log.info(f"  {total_files} Parquet file(s), ~{total_s3_mb:.1f} MB on S3")
+
+    # ── 2. Download ──────────────────────────────────────────────────────────
+    log.info(f"Downloading {total_files} Parquet file(s) …")
     arrow_table = iceberg_table.scan().to_arrow()
-    log.info(f"Downloaded {arrow_table.num_rows:,} rows x {arrow_table.num_columns} columns ({arrow_table.nbytes / 1024 / 1024:.1f} MB).")
+    total_rows = arrow_table.num_rows
+    log.info(
+        f"Downloaded: {total_rows:,} rows × {arrow_table.num_columns} cols "
+        f"({arrow_table.nbytes / 1024 / 1024:.1f} MB in memory)"
+    )
 
-    # ── 2. Convert to pandas ─────────────────────────────────────────────────
-    df = arrow_table.to_pandas()
+    if total_rows == 0:
+        log.warning("Table is empty — nothing to write.")
+        return
 
-    # ── 3. Reconstruct geometry ──────────────────────────────────────────────
-    if "geom_wkb" not in df.columns:
+    # ── 3. Recover CRS ───────────────────────────────────────────────────────
+    crs_wkt = iceberg_table.properties.get("geo.crs_wkt", "EPSG:4326")
+    table_crs = pyproj.CRS(crs_wkt)
+    log.info(f"CRS: {table_crs.to_string()}")
+
+    if "geom_wkb" not in arrow_table.schema.names:
         log.error("Column 'geom_wkb' not found in downloaded table — cannot reconstruct geometry.")
         sys.exit(1)
 
-    geometry = gpd.GeoSeries.from_wkb(df["geom_wkb"])
-    df = df.drop(columns=["geom_wkb"])
-
-    # ── 4. Build GeoDataFrame ─────────────────────────────────────────────────
-    crs_wkt = iceberg_table.properties.get("geo.crs_wkt", "EPSG:4326")
-    gdf = gpd.GeoDataFrame(df, geometry=geometry, crs=crs_wkt)
-    log.info(f"CRS: {gdf.crs}")
-
-    # ── 5. Optional bounds filter ─────────────────────────────────────────────
+    # ── 4. Pre-reproject bounds once, before the chunk loop ──────────────────
+    bounds_geom_reprojected = None
     if bounds_geom is not None and bounds_crs_wkt is not None:
         project = pyproj.Transformer.from_crs(
             pyproj.CRS(bounds_crs_wkt),
-            gdf.crs,
+            table_crs,
             always_xy=True,
         ).transform
-        bounds_reprojected = transform(project, bounds_geom)
-        before = len(gdf)
-        gdf = gdf[gdf.geometry.intersects(bounds_reprojected)].copy()
-        log.info(f"Bounds filter: {before:,} → {len(gdf):,} rows.")
+        bounds_geom_reprojected = transform(project, bounds_geom)
+        log.info("Bounds reprojected to table CRS.")
 
-    if gdf.empty:
-        log.warning("No features remain after filtering — GeoPackage will not be written.")
+    # ── 5. Process in chunks: decode WKB → filter → write ────────────────────
+    # First chunk uses "w" for a brand-new file, or "a" to append to an
+    # existing one.  Every subsequent chunk always appends so we don't
+    # overwrite earlier chunks.
+    initial_mode = "a" if os.path.exists(gpkg_path) else "w"
+    rows_written = 0
+    n_chunks = (total_rows + chunk_size - 1) // chunk_size
+
+    progbar = ProgressBar(total_rows, text=f"Processing & writing → {layer_name}")
+    for chunk_idx, offset in enumerate(range(0, total_rows, chunk_size)):
+        length = min(chunk_size, total_rows - offset)
+        slice_ = arrow_table.slice(offset, length)
+        df = slice_.to_pandas()
+
+        geometry = gpd.GeoSeries.from_wkb(df["geom_wkb"])
+        df = df.drop(columns=["geom_wkb"])
+        gdf_chunk = gpd.GeoDataFrame(df, geometry=geometry, crs=table_crs)
+
+        if bounds_geom_reprojected is not None:
+            gdf_chunk = gdf_chunk[gdf_chunk.geometry.intersects(bounds_geom_reprojected)].copy()
+
+        if not gdf_chunk.empty:
+            write_mode = initial_mode if chunk_idx == 0 else "a"
+            gdf_chunk.to_file(gpkg_path, layer=layer_name, driver="GPKG", mode=write_mode)
+            rows_written += len(gdf_chunk)
+
+        progbar.update(min(offset + length, total_rows))
+
+    progbar.finish()
+
+    if rows_written == 0:
+        log.warning("No features remain after filtering — GeoPackage layer not written.")
         return
 
-    # ── 6. Save to GeoPackage ─────────────────────────────────────────────────
-    mode = "a" if os.path.exists(gpkg_path) else "w"
-    gdf.to_file(gpkg_path, layer=layer_name, driver="GPKG", mode=mode)
-
     file_size_mb = os.path.getsize(gpkg_path) / 1024 / 1024
-    log.info(f"Saved {len(gdf):,} features to layer '{layer_name}' in {gpkg_path} ({file_size_mb:.1f} MB).")
+    log.info(f"Saved {rows_written:,} features to layer '{layer_name}' in {gpkg_path} ({file_size_mb:.1f} MB).")
 
 
 # ---------------------------------------------------------------------------
