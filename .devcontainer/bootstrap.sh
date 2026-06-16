@@ -18,3 +18,10 @@ curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/a
 unzip -q /tmp/awscliv2.zip -d /tmp
 sudo /tmp/aws/install
 rm -rf /tmp/awscliv2.zip /tmp/aws
+
+# If AWS_SSO_CONFIG exists then drop it into a file for us. This gives us the necessary AWS SSO configuration.
+# So all you should need to do is type `aws sso login` when you need to run aws commands
+if [ -n "$AWS_SSO_CONFIG" ]; then
+  mkdir -p ~/.aws && printf "%s\n" "$AWS_SSO_CONFIG" > ~/.aws/config
+  printf "AWS SSO configuration written to ~/.aws/config\n"
+fi
