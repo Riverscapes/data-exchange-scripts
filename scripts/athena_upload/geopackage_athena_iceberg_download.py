@@ -457,7 +457,7 @@ def run_athena_workflow() -> None:
     table_names = list_tables_glue(catalog, glue_db)
 
     if not table_names:
-        log.error(f"No tables found in database '{glue_db}'.")
+        log.error(f"No Iceberg tables found in database '{glue_db}'.")
         sys.exit(1)
 
     table_name = questionary.select("Select table to download:", choices=table_names).ask()
