@@ -16,9 +16,12 @@ every choice interactively via ``questionary`` prompts.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
+from datetime import UTC
 from pathlib import Path
+from typing import Any, Literal
 
 import boto3
 import botocore.exceptions
@@ -201,6 +204,32 @@ def ask_table_name(default: str, label: str = "Table name:") -> str:
         return sanitized
 
 
+def ask_existing_table_action(table_ref: str) -> Literal["cancel", "append", "recreate"]:
+    """Ask how to handle an existing table.
+
+    Cancel is the default to avoid accidental appends.
+    """
+    log = Logger("ask_existing_table_action")
+    choices = [
+        "Cancel upload (default)",
+        "Append to existing table",
+        "Delete and recreate table",
+    ]
+    choice = questionary.select(
+        f"Table '{table_ref}' already exists. What do you want to do?",
+        choices=choices,
+        default=choices[0],
+    ).ask()
+    if choice is None or choice == choices[0]:
+        log.info("Existing-table action: cancel")
+        return "cancel"
+    if choice == choices[1]:
+        log.info("Existing-table action: append")
+        return "append"
+    log.warning(f"Existing-table action: recreate '{table_ref}'")
+    return "recreate"
+
+
 # ---------------------------------------------------------------------------
 # Step 1 - GeoPackage path & layer selection
 # ---------------------------------------------------------------------------
@@ -255,6 +284,106 @@ def ask_layer(gpkg_path: Path) -> str:
         log.error("No layer selected.")
         sys.exit(1)
     return chosen
+
+
+def _pick_layer_definition(layer_defs: dict[str, Any], selected_layer: str) -> dict[str, Any] | None:
+    """Select the layer definition record that should map to the selected input layer."""
+    layers = layer_defs.get("layers", [])
+    if not isinstance(layers, list) or not layers:
+        return None
+
+    selected_norm = selected_layer.strip().lower()
+
+    exact_id = [layer for layer in layers if isinstance(layer, dict) and str(layer.get("layer_id", "")).strip().lower() == selected_norm]
+    if len(exact_id) == 1:
+        return exact_id[0]
+
+    exact_name = [layer for layer in layers if isinstance(layer, dict) and str(layer.get("layer_name", "")).strip().lower() == selected_norm]
+    if len(exact_name) == 1:
+        return exact_name[0]
+
+    if len(layers) == 1 and isinstance(layers[0], dict):
+        return layers[0]
+
+    choices: list[str] = []
+    by_label: dict[str, dict[str, Any]] = {}
+    for layer in layers:
+        if not isinstance(layer, dict):
+            continue
+        lid = str(layer.get("layer_id", ""))
+        lname = str(layer.get("layer_name", ""))
+        label = f"{lid} | {lname}" if lname else lid
+        if label:
+            choices.append(label)
+            by_label[label] = layer
+
+    if not choices:
+        return None
+
+    chosen = questionary.select(
+        "Select layer from layer_definitions.json:",
+        choices=choices,
+    ).ask()
+    if not chosen:
+        return None
+    return by_label.get(chosen)
+
+
+def ask_layer_metadata(gpkg_path: Path, selected_layer: str) -> tuple[dict[str, str], str, str | None]:
+    """Optionally load column descriptions from layer_definitions.json.
+
+    Returns:
+        (column_comments, layer_description, layer_defs_path_str)
+    """
+    log = Logger("ask_layer_metadata")
+
+    use_defs = questionary.confirm(
+        "Load column comments from layer_definitions.json?",
+        default=True,
+    ).ask()
+    if not use_defs:
+        return {}, "", None
+
+    default_path = gpkg_path.parent / "layer_definitions.json"
+    raw_path = questionary.path(
+        "Path to layer_definitions.json:",
+        default=str(default_path),
+        only_directories=False,
+    ).ask()
+    if not raw_path:
+        log.warning("No layer_definitions.json path provided. Continuing without column comments.")
+        return {}, "", None
+
+    defs_path = _normalize_user_path(raw_path)
+    if not defs_path.is_file():
+        log.warning(f"layer_definitions.json not found: {defs_path}. Continuing without column comments.")
+        return {}, "", None
+
+    try:
+        with defs_path.open("r", encoding="utf-8") as f:
+            layer_defs = json.load(f)
+    except Exception as exc:
+        log.warning(f"Could not parse {defs_path}: {exc}. Continuing without column comments.")
+        return {}, "", None
+
+    selected = _pick_layer_definition(layer_defs, selected_layer)
+    if not selected:
+        log.warning("No matching layer found in layer_definitions.json. Continuing without column comments.")
+        return {}, "", None
+
+    comments: dict[str, str] = {}
+    for col in selected.get("columns", []):
+        if not isinstance(col, dict):
+            continue
+        name = str(col.get("name", "")).strip().lower()
+        description = str(col.get("description", "")).strip()
+        if name and description:
+            comments[name] = description
+
+    layer_description = str(selected.get("description", "")).strip()
+    layer_id = str(selected.get("layer_id", "")).strip() or "(unknown layer_id)"
+    log.info(f"Loaded {len(comments)} column comments from {defs_path.name} for layer '{layer_id}'.")
+    return comments, layer_description, str(defs_path)
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +547,7 @@ def _dtype_to_iceberg(dtype_str: str):
     return StringType()
 
 
-def derive_iceberg_schema(gdf: gpd.GeoDataFrame) -> Schema:
+def derive_iceberg_schema(gdf: gpd.GeoDataFrame, column_comments: dict[str, str] | None = None) -> Schema:
     """Auto-derive a PyIceberg ``Schema`` from a GeoDataFrame's column dtypes.
 
     The geometry column is replaced by ``geom_wkb`` (``BinaryType``).
@@ -437,6 +566,7 @@ def derive_iceberg_schema(gdf: gpd.GeoDataFrame) -> Schema:
         PyIceberg schema ready for table creation or validation.
     """
     geom_col = gdf.geometry.name
+    comments = column_comments or {}
     fields: list[NestedField] = []
     field_id = 1
 
@@ -444,12 +574,95 @@ def derive_iceberg_schema(gdf: gpd.GeoDataFrame) -> Schema:
         if col == geom_col:
             continue
         iceberg_type = _dtype_to_iceberg(str(gdf[col].dtype))
-        fields.append(NestedField(field_id=field_id, name=col, field_type=iceberg_type, required=False))
+        fields.append(
+            NestedField(
+                field_id=field_id,
+                name=col,
+                field_type=iceberg_type,
+                required=False,
+                doc=comments.get(col, ""),
+            )
+        )
         field_id += 1
 
     # Geometry column always last
-    fields.append(NestedField(field_id=field_id, name="geom_wkb", field_type=BinaryType(), required=False))
+    fields.append(
+        NestedField(
+            field_id=field_id,
+            name="geom_wkb",
+            field_type=BinaryType(),
+            required=False,
+            doc=comments.get("geom_wkb", "Geometry encoded as WKB."),
+        )
+    )
     return Schema(*fields)
+
+
+def update_glue_column_comments(database: str, table_name: str, column_comments: dict[str, str], layer_description: str = "") -> None:
+    """Patch Glue column comments for Athena tables after create/load.
+
+    This keeps Glue Catalog comments aligned with layer_definitions.json even for
+    existing Iceberg tables.
+    """
+    if not column_comments and not layer_description:
+        return
+
+    log = Logger("update_glue_column_comments")
+    glue = boto3.client("glue", region_name=AWS_REGION)
+
+    try:
+        response = glue.get_table(DatabaseName=database, Name=table_name)
+    except Exception as exc:
+        log.warning(f"Could not fetch Glue metadata for {database}.{table_name}: {exc}")
+        return
+
+    tbl = response.get("Table", {})
+    sd = tbl.get("StorageDescriptor", {})
+    cols = sd.get("Columns", [])
+    if not cols:
+        return
+
+    changed = False
+    for col in cols:
+        col_name = str(col.get("Name", "")).lower()
+        new_comment = column_comments.get(col_name)
+        if new_comment and col.get("Comment") != new_comment:
+            col["Comment"] = new_comment
+            changed = True
+
+    if not changed and not layer_description:
+        return
+
+    new_sd = dict(sd)
+    new_sd["Columns"] = cols
+
+    table_input: dict[str, Any] = {
+        "Name": tbl.get("Name"),
+        "Retention": tbl.get("Retention", 0),
+        "StorageDescriptor": new_sd,
+        "PartitionKeys": tbl.get("PartitionKeys", []),
+        "TableType": tbl.get("TableType", "EXTERNAL_TABLE"),
+        "Parameters": tbl.get("Parameters", {}),
+    }
+    owner = tbl.get("Owner")
+    if owner:
+        table_input["Owner"] = owner
+
+    if tbl.get("Description") or layer_description:
+        table_input["Description"] = layer_description or tbl.get("Description", "")
+
+    view_original = tbl.get("ViewOriginalText")
+    if view_original:
+        table_input["ViewOriginalText"] = view_original
+    view_expanded = tbl.get("ViewExpandedText")
+    if view_expanded:
+        table_input["ViewExpandedText"] = view_expanded
+
+    try:
+        glue.update_table(DatabaseName=database, TableInput=table_input)
+        log.info(f"Updated Glue column comments for {database}.{table_name}.")
+    except Exception as exc:
+        log.warning(f"Could not update Glue column comments for {database}.{table_name}: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -481,14 +694,18 @@ def prepare_arrow_table(gdf: gpd.GeoDataFrame, schema: Schema, target_crs: str) 
     schema_names = {f.name.lower() for f in schema.fields}
 
     # Expose the GeoPackage FID as a regular column if present in schema
-    named_idx = [n for n in gdf.index.names if n and n.lower() in schema_names]
+    named_idx = [n for n in gdf.index.names if n and isinstance(n, str) and n.lower() in schema_names]
     if named_idx:
         gdf = gdf.reset_index(level=named_idx)
     elif "fid" in schema_names and "fid" not in gdf.columns:
         gdf = gdf.reset_index().rename(columns={"index": "fid"})
 
-    log.info(f"Reprojecting to {target_crs} …")
-    gdf = gdf.to_crs(target_crs)
+    current = gdf.crs
+    if current and current == pyproj.CRS(target_crs):
+        log.info(f"CRS already {target_crs}, skipping reprojection.")
+    else:
+        log.info(f"Reprojecting to {target_crs} …")
+        gdf = gdf.to_crs(target_crs)
 
     # Encode geometry as WKB and drop the Shapely geometry column
     geom_col_name = gdf.geometry.name
@@ -576,7 +793,14 @@ def ensure_namespace_glue(catalog, database: str) -> bool:
         return False
 
 
-def get_or_create_table_glue(catalog, database: str, table_name: str, schema: Schema, s3_location: str, crs_wkt: str) -> tuple[IcebergTable, bool]:
+def get_or_create_table_glue(
+    catalog,
+    database: str,
+    table_name: str,
+    schema: Schema,
+    s3_location: str,
+    crs_wkt: str,
+) -> tuple[IcebergTable | None, bool, Literal["create", "append", "recreate", "cancel"]]:
     """Load the Iceberg table from Glue if it exists, or create it.
 
     Parameters
@@ -596,29 +820,94 @@ def get_or_create_table_glue(catalog, database: str, table_name: str, schema: Sc
 
     Returns
     -------
-    tuple[IcebergTable, bool]
+    tuple[IcebergTable | None, bool, Literal["create", "append", "recreate", "cancel"]]
         The Iceberg table and a flag that is ``True`` if the table was newly created.
+        Returns ``(None, False, "cancel")`` when the user cancels.
     """
     log = Logger("get_or_create_table_glue")
     try:
         tbl = catalog.load_table((database, table_name))
-        log.info(f"Loaded existing table '{database}.{table_name}'.")
-        return tbl, False
+        table_ref = f"{database}.{table_name}"
+        action = ask_existing_table_action(table_ref)
+        if action == "cancel":
+            log.info("Upload cancelled by user.")
+            return None, False, "cancel"
+        if action == "append":
+            log.info(f"Using existing table '{table_ref}' for append.")
+            return tbl, False, "append"
+
+        catalog.drop_table((database, table_name))
+        log.warning(f"Dropped existing table '{table_ref}'.")
+        create_action: Literal["create", "append", "recreate", "cancel"] = "recreate"
     except pyiceberg.exceptions.NoSuchTableError:
-        tbl = catalog.create_table(
-            identifier=(database, table_name),
-            schema=schema,
-            location=s3_location,
-            properties={
-                "geo.crs_wkt": crs_wkt,
-                "write.format.default": "parquet",
-            },
-        )
-        log.info(f"Created table '{database}.{table_name}' at {s3_location}.")
-        return tbl, True
+        create_action = "create"
+
+    tbl = catalog.create_table(
+        identifier=(database, table_name),
+        schema=schema,
+        location=s3_location,
+        properties={
+            "geo.crs_wkt": crs_wkt,
+            "write.format.default": "parquet",
+        },
+    )
+    log.info(f"Created table '{database}.{table_name}' at {s3_location}.")
+    return tbl, True, create_action
 
 
-def run_athena_workflow(gdf: gpd.GeoDataFrame, schema: Schema, layer_name: str, target_crs: str) -> None:
+def _write_run_log(
+    gpkg_path: Path,
+    layer_name: str,
+    target_crs: str,
+    destination: str,
+    table_ref: str,
+    s3_location: str,
+    row_count: int,
+    table_action: str,
+    layer_defs_path: str | None,
+) -> None:
+    """Write a JSON run log next to the GeoPackage so this upload can be understood and reproduced."""
+    from datetime import datetime
+
+    log = Logger("_write_run_log")
+    record = {
+        "run_at": datetime.now(UTC).isoformat(),
+        "gpkg_path": str(gpkg_path.resolve()),
+        "layer_name": layer_name,
+        "target_crs": target_crs,
+        "destination": destination,
+        "table": table_ref,
+        "s3_location": s3_location,
+        "row_count": row_count,
+        "table_action": table_action,
+        "layer_definitions": layer_defs_path,
+    }
+    log_path = gpkg_path.parent / f"{gpkg_path.stem}_upload_log.json"
+    try:
+        history: list[dict] = []
+        if log_path.exists():
+            with log_path.open("r", encoding="utf-8") as f:
+                history = json.load(f)
+            if not isinstance(history, list):
+                history = [history]
+        history.append(record)
+        with log_path.open("w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2)
+        log.info(f"Run log written to {log_path}")
+    except Exception as exc:
+        log.warning(f"Could not write run log: {exc}")
+
+
+def run_athena_workflow(
+    gdf: gpd.GeoDataFrame,
+    schema: Schema,
+    layer_name: str,
+    target_crs: str,
+    column_comments: dict[str, str] | None = None,
+    layer_description: str = "",
+    gpkg_path: Path | None = None,
+    layer_defs_path: str | None = None,
+) -> None:
     """Drive the interactive Athena-on-S3 (Glue) upload workflow.
 
     Prompts the user for:
@@ -693,11 +982,40 @@ def run_athena_workflow(gdf: gpd.GeoDataFrame, schema: Schema, layer_name: str, 
     table_created = False
     try:
         namespace_created = ensure_namespace_glue(catalog, glue_db)
-        iceberg_table, table_created = get_or_create_table_glue(catalog, glue_db, table_name, schema, s3_location, crs_wkt)
+        iceberg_table, table_created, table_action = get_or_create_table_glue(
+            catalog,
+            glue_db,
+            table_name,
+            schema,
+            s3_location,
+            crs_wkt,
+        )
+        if iceberg_table is None:
+            return
+
+        # Keep Glue comments synchronized from layer_definitions metadata.
+        update_glue_column_comments(
+            glue_db,
+            table_name,
+            column_comments or {},
+            layer_description,
+        )
 
         # Write
         append_in_chunks(iceberg_table, arrow_table, f"{glue_db}.{table_name}")
         log.info(f'Query via Athena: SELECT * FROM "{glue_db}"."{table_name}" LIMIT 10;')
+        if gpkg_path:
+            _write_run_log(
+                gpkg_path=gpkg_path,
+                layer_name=layer_name,
+                target_crs=target_crs,
+                destination="athena",
+                table_ref=f"{glue_db}.{table_name}",
+                s3_location=s3_location,
+                row_count=arrow_table.num_rows,
+                table_action=table_action,
+                layer_defs_path=layer_defs_path,
+            )
 
     except Exception:
         log.error("Upload failed. Rolling back …")
@@ -749,7 +1067,13 @@ def ensure_namespace_s3tables(s3tables_client, bucket_arn: str, namespace: str) 
         return True
 
 
-def get_or_create_table_s3tables(catalog, namespace: str, table_name: str, schema: Schema, crs_wkt: str) -> tuple[IcebergTable, bool]:
+def get_or_create_table_s3tables(
+    catalog,
+    namespace: str,
+    table_name: str,
+    schema: Schema,
+    crs_wkt: str,
+) -> tuple[IcebergTable | None, bool, Literal["create", "append", "recreate", "cancel"]]:
     """Load the Iceberg table from the S3 Tables catalog if it exists, or create it.
 
     Parameters
@@ -767,25 +1091,38 @@ def get_or_create_table_s3tables(catalog, namespace: str, table_name: str, schem
 
     Returns
     -------
-    tuple[IcebergTable, bool]
+    tuple[IcebergTable | None, bool, Literal["create", "append", "recreate", "cancel"]]
         The Iceberg table and a flag that is ``True`` if the table was newly created.
+        Returns ``(None, False, "cancel")`` when the user cancels.
     """
     log = Logger("get_or_create_table_s3tables")
     try:
         tbl = catalog.load_table((namespace, table_name))
-        log.info(f"Loaded existing table '{namespace}.{table_name}'.")
-        return tbl, False
+        table_ref = f"{namespace}.{table_name}"
+        action = ask_existing_table_action(table_ref)
+        if action == "cancel":
+            log.info("Upload cancelled by user.")
+            return None, False, "cancel"
+        if action == "append":
+            log.info(f"Using existing table '{table_ref}' for append.")
+            return tbl, False, "append"
+
+        catalog.drop_table((namespace, table_name))
+        log.warning(f"Dropped existing table '{table_ref}'.")
+        create_action: Literal["create", "append", "recreate", "cancel"] = "recreate"
     except pyiceberg.exceptions.NoSuchTableError:
-        tbl = catalog.create_table(
-            identifier=(namespace, table_name),
-            schema=schema,
-            properties={
-                "geo.crs_wkt": crs_wkt,
-                "write.format.default": "parquet",
-            },
-        )
-        log.info(f"Created table '{namespace}.{table_name}'.")
-        return tbl, True
+        create_action = "create"
+
+    tbl = catalog.create_table(
+        identifier=(namespace, table_name),
+        schema=schema,
+        properties={
+            "geo.crs_wkt": crs_wkt,
+            "write.format.default": "parquet",
+        },
+    )
+    log.info(f"Created table '{namespace}.{table_name}'.")
+    return tbl, True, create_action
 
 
 def run_s3tables_workflow(gdf: gpd.GeoDataFrame, schema: Schema, layer_name: str, target_crs: str) -> None:
@@ -820,10 +1157,10 @@ def run_s3tables_workflow(gdf: gpd.GeoDataFrame, schema: Schema, layer_name: str
         buckets: list[dict] = []
         continuation_token: str | None = None
         while True:
-            kwargs: dict = {}
+            list_kwargs: dict = {}
             if continuation_token:
-                kwargs["continuationToken"] = continuation_token
-            resp = s3tables_client.list_table_buckets(**kwargs)
+                list_kwargs["continuationToken"] = continuation_token
+            resp = s3tables_client.list_table_buckets(**list_kwargs)
             buckets.extend(resp.get("tableBuckets", []))
             continuation_token = resp.get("continuationToken")
             if not continuation_token:
@@ -917,7 +1254,9 @@ def run_s3tables_workflow(gdf: gpd.GeoDataFrame, schema: Schema, layer_name: str
     table_created = False
     try:
         namespace_created = ensure_namespace_s3tables(s3tables_client, bucket_arn, namespace)
-        iceberg_table, table_created = get_or_create_table_s3tables(catalog, namespace, table_name, schema, crs_wkt)
+        iceberg_table, table_created, _table_action = get_or_create_table_s3tables(catalog, namespace, table_name, schema, crs_wkt)
+        if iceberg_table is None:
+            return
 
         # Write
         append_in_chunks(iceberg_table, arrow_table, f"{namespace}.{table_name}")
@@ -981,14 +1320,17 @@ def main() -> None:
             log.info("Aborted by user.")
             sys.exit(0)
 
-        # ── Step 3: CRS detection & reprojection ─────────────────────────────
+        # ── Step 3: Optional layer metadata (column comments) ───────────────
+        column_comments, layer_description, layer_defs_path = ask_layer_metadata(gpkg_path, layer_name)
+
+        # ── Step 4: CRS detection & reprojection ─────────────────────────────
         target_crs = ask_reproject(gdf)
 
-        # ── Step 4: Derive Iceberg schema ────────────────────────────────────
-        schema = derive_iceberg_schema(gdf)
+        # ── Step 5: Derive Iceberg schema ────────────────────────────────────
+        schema = derive_iceberg_schema(gdf, column_comments=column_comments)
         log.info(f"Derived Iceberg schema with {len(schema.fields)} field(s).")
 
-        # ── Step 5: Destination selection ────────────────────────────────────
+        # ── Step 6: Destination selection ────────────────────────────────────
         destination = questionary.select(
             "Upload destination:",
             choices=[_DEST_ATHENA, _DEST_S3TABLES],
@@ -997,9 +1339,18 @@ def main() -> None:
             log.error("No destination selected.")
             sys.exit(1)
 
-        # ── Step 6: Run workflow ──────────────────────────────────────────────
+        # ── Step 7: Run workflow ──────────────────────────────────────────────
         if destination == _DEST_ATHENA:
-            run_athena_workflow(gdf, schema, layer_name, target_crs)
+            run_athena_workflow(
+                gdf,
+                schema,
+                layer_name,
+                target_crs,
+                column_comments=column_comments,
+                layer_description=layer_description,
+                gpkg_path=gpkg_path,
+                layer_defs_path=layer_defs_path,
+            )
         else:
             run_s3tables_workflow(gdf, schema, layer_name, target_crs)
 
