@@ -1,64 +1,118 @@
-# GeoPackage → Athena / S3 Tables Interactive Upload
+# GeoPackage -> Athena / S3 Tables Interactive Upload
 
-An interactive command-line script that reads a layer from a GeoPackage file and uploads it as an Apache Iceberg table to either **AWS Athena on S3 (via Glue)** or **AWS S3 Tables**.
+An interactive command-line script that reads a layer from a GeoPackage file and uploads it as an Apache Iceberg table to either AWS Athena on S3 (via Glue) or AWS S3 Tables.
 
----
+## Overview
 
-## 1. Overview
+The script walks through these interactive steps:
 
-The script guides you through every step via interactive prompts:
+1. Credential check via `sts:GetCallerIdentity`.
+2. GeoPackage path and layer selection.
+3. Source schema preview (field, dtype, sample value).
+4. User confirmation that schema is correct.
+5. Optional load of column comments and layer description from `layer_definitions.json`.
+6. Optional reprojection (default target CRS prompt is `EPSG:4326`).
+7. Destination choice:
+   - Athena on S3 (Parquet/Iceberg via Glue)
+   - S3 Tables (Iceberg REST catalog)
+8. Destination schema preview and final confirmation.
+9. Chunked Iceberg append with a live progress bar.
+10. Automatic rollback of newly created namespace/table on failure.
 
-1. **Credential check** — verifies AWS credentials before anything else; bails with actionable instructions if they are missing or expired.
-2. Select a GeoPackage file and layer.
-3. Preview the source schema (field names, pandas dtypes, sample values).
-4. Optionally reproject geometry to a target CRS (default: WGS 84 / EPSG:4326).
-5. Choose an upload destination:
-   - **Athena on S3** — Parquet files in a regular S3 bucket registered in the AWS Glue Data Catalog; immediately queryable via Athena SQL.
-   - **S3 Tables** — Dedicated S3 Tables bucket accessed via the PyIceberg REST catalog (SigV4-authenticated).
-6. Preview the **destination schema** (Iceberg column names, types, field IDs) and confirm before writing.
-7. Data is written in chunks as atomic Iceberg snapshots with a live progress bar.
-8. On failure, any newly-created table or namespace is automatically rolled back.
+Key data behavior:
 
-Geometry is stored as WKB bytes in a `geom_wkb` binary column. The CRS is persisted as the `geo.crs_wkt` table property so downstream tools can recover the spatial reference.
-
----
+- Geometry is written to a binary `geom_wkb` column (WKB bytes).
+- CRS is stored in table property `geo.crs_wkt`.
+- Source column names are normalized to lowercase before schema derivation and write.
+- If a `fid` field is expected by schema but only exists in index, it is exposed as a column before write.
 
 ## Prerequisites
 
 ### Python environment
 
 ```bash
-# From the repo root — all dependencies are managed by uv
+# From the repo root
 uv sync
-source .venv/bin/activate
 ```
+
+Run with `uv run` (no manual venv activation required).
 
 ### AWS credentials
 
-Valid AWS credentials must be present **before** running the script. The script performs an automatic check at startup (see [§5 — Step 0](#step-0-credential-check)) and will print clear remediation instructions if credentials are missing or expired.
+Valid AWS credentials are required before running the script. The startup check prints remediation guidance when credentials are missing or expired.
 
 Supported credential sources (standard AWS chain):
-- AWS SSO: `aws sso login [--profile <profile>]`
-- Named profile: `export AWS_PROFILE=<profile>`
-- Static keys: `export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...`
-- IAM instance / task role (EC2, ECS, Lambda)
 
----
+- AWS SSO: `aws sso login [--profile <profile>]`
+- Named profile: `AWS_PROFILE=<profile>`
+- Static keys: `AWS_ACCESS_KEY_ID=...` and `AWS_SECRET_ACCESS_KEY=...`
+- IAM role credentials (EC2/ECS/Lambda)
+
+### Region
+
+- Uses `AWS_REGION` when set.
+- Defaults to `us-west-2` when `AWS_REGION` is unset.
 
 ## Usage
 
+From repo root:
+
 ```bash
-cd scripts/athena_upload
-python geopackage_athena_iceberg_upload.py
+uv run python scripts/athena_upload/geopackage_athena_iceberg_upload.py
 ```
 
-No command-line arguments — all configuration is collected interactively.
+No command-line arguments are required.
 
----
+## Destination-specific prompts
 
-## 5. Querying Athena tables
+### Athena on S3 (Glue catalog)
 
-Once uploaded, query the table from the Athena console or AWS CLI:
+Prompts for:
+
+- Glue database (select existing or enter new)
+- Table name (auto-sanitized)
+- S3 table location (default: `s3://riverscapes-athena/<db>/<table>/`)
+
+On completion, logs a ready-to-run Athena query:
+
+```sql
+SELECT * FROM "<database>"."<table>" LIMIT 10;
+```
+
+If metadata was loaded from `layer_definitions.json`, Glue column comments and table description are updated to match.
+
+### S3 Tables (REST catalog)
+
+Prompts for:
+
+- S3 Table Bucket (select from listed buckets when possible; fallback to ARN text input)
+- Namespace (select existing or enter new)
+- Table name (auto-sanitized)
+
+The script connects via the PyIceberg REST catalog endpoint:
+
+- `https://s3tables.<AWS_REGION>.amazonaws.com/iceberg`
+- SigV4 enabled (`rest.signing-name=s3tables`)
+
+## Existing table behavior
+
+If the target table already exists (Athena or S3 Tables), you must choose one:
+
+- Cancel upload (default)
+- Append to existing table
+- Delete and recreate table
+
+## Run log
+
+For Athena uploads, the script writes/updates a JSON history log next to the GeoPackage:
+
+- `<gpkg_stem>_upload_log.json`
+
+Each run record includes timestamp, input path/layer, destination, table reference, row count, table action, target CRS, and optional `layer_definitions.json` path.
+
+## Querying Athena tables
+
+Example queries:
 
 ```sql
 -- Preview rows
@@ -80,43 +134,34 @@ WHERE ST_Within(
 );
 ```
 
-> **Tip:** Tables are visible immediately after the first Iceberg snapshot is committed — no `MSCK REPAIR TABLE` needed.
+Tip: tables are queryable after the first Iceberg snapshot commit. `MSCK REPAIR TABLE` is not needed.
 
----
-
-## 8. Troubleshooting
+## Troubleshooting
 
 ### Credentials missing or expired
 
-The startup check will catch this and print remediation steps. Re-authenticate with `aws sso login` (or equivalent) then re-run.
+Re-authenticate (`aws sso login`, refresh profile/session, or role credentials), then re-run.
 
-### `NotFoundException` when creating a namespace
+### Could not list Glue databases / S3 buckets / namespaces
 
-The bucket ARN may be wrong or you may lack `s3tables:CreateNamespace`. Verify with:
-```bash
-aws s3tables list-table-buckets
-```
+The script falls back to manual text prompts. Verify permissions and resource visibility for your AWS principal.
 
-### `invalid_table_name` from S3 Tables
+### Invalid table name errors
 
-Table names must be lowercase, alphanumeric, and underscores only. The script sanitizes names automatically, but if you bypass the prompt this error can still surface. Run the script and let it suggest the safe default.
+Table names are sanitized to lowercase letters, digits, and underscores. Leading underscores are stripped.
 
-### PyIceberg `SchemaError` on append
+### PyIceberg schema mismatch on append
 
-The target table already exists with a different schema. Either drop it first or choose a new table name.
+An existing table may have a different schema. Choose "Delete and recreate table" or upload to a new table name.
 
-### `NamespaceAlreadyExistsError`
+### Geometry reprojection errors
 
-Harmless — the script detects and skips creation silently.
+Use canonical CRS strings like `EPSG:4326`. Validate with `pyproj.CRS("<your-crs>")`.
 
-### Geometry reprojection fails
+### Large GeoPackages consume too much memory
 
-Use canonical EPSG codes such as `EPSG:4326` rather than proj4 strings. Verify the source CRS is valid with `pyproj.CRS("<your-crs>")`.
+The layer is read fully before chunked writes. Split very large inputs or lower `CHUNK_SIZE` in the script.
 
-### Large GeoPackages run out of memory
+### Missing Python modules
 
-The script reads the entire layer into memory before chunking. For very large layers, consider splitting the GeoPackage first. The chunk size (100 000 rows per Iceberg snapshot) can be adjusted by changing `CHUNK_SIZE` at the top of the script.
-
-### `ModuleNotFoundError`
-
-Run `uv sync` from the repo root to ensure all dependencies are installed.
+Run `uv sync` from repo root and re-run with `uv run`.
