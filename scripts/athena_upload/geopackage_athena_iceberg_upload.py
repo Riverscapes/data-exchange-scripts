@@ -26,6 +26,7 @@ from typing import Any, Literal
 import boto3
 import botocore.exceptions
 import geopandas as gpd
+import pandas as pd
 import pyarrow as pa
 import pyiceberg.exceptions
 import pyogrio
@@ -329,11 +330,11 @@ def _pick_layer_definition(layer_defs: dict[str, Any], selected_layer: str) -> d
     return by_label.get(chosen)
 
 
-def ask_layer_metadata(gpkg_path: Path, selected_layer: str) -> tuple[dict[str, str], str, str | None]:
-    """Optionally load column descriptions from layer_definitions.json.
+def ask_layer_metadata(gpkg_path: Path, selected_layer: str) -> tuple[dict[str, str], dict[str, str], str, str | None]:
+    """Optionally load column descriptions and dtype intent from layer_definitions.json.
 
     Returns:
-        (column_comments, layer_description, layer_defs_path_str)
+        (column_comments, column_dtypes, layer_description, layer_defs_path_str)
     """
     log = Logger("ask_layer_metadata")
 
@@ -342,7 +343,7 @@ def ask_layer_metadata(gpkg_path: Path, selected_layer: str) -> tuple[dict[str, 
         default=True,
     ).ask()
     if not use_defs:
-        return {}, "", None
+        return {}, {}, "", None
 
     default_path = gpkg_path.parent / "layer_definitions.json"
     raw_path = questionary.path(
@@ -352,38 +353,42 @@ def ask_layer_metadata(gpkg_path: Path, selected_layer: str) -> tuple[dict[str, 
     ).ask()
     if not raw_path:
         log.warning("No layer_definitions.json path provided. Continuing without column comments.")
-        return {}, "", None
+        return {}, {}, "", None
 
     defs_path = _normalize_user_path(raw_path)
     if not defs_path.is_file():
         log.warning(f"layer_definitions.json not found: {defs_path}. Continuing without column comments.")
-        return {}, "", None
+        return {}, {}, "", None
 
     try:
         with defs_path.open("r", encoding="utf-8") as f:
             layer_defs = json.load(f)
     except Exception as exc:
         log.warning(f"Could not parse {defs_path}: {exc}. Continuing without column comments.")
-        return {}, "", None
+        return {}, {}, "", None
 
     selected = _pick_layer_definition(layer_defs, selected_layer)
     if not selected:
         log.warning("No matching layer found in layer_definitions.json. Continuing without column comments.")
-        return {}, "", None
+        return {}, {}, "", None
 
     comments: dict[str, str] = {}
+    dtypes: dict[str, str] = {}
     for col in selected.get("columns", []):
         if not isinstance(col, dict):
             continue
         name = str(col.get("name", "")).strip().lower()
         description = str(col.get("description", "")).strip()
+        dtype = str(col.get("dtype", "")).strip().upper()
         if name and description:
             comments[name] = description
+        if name and dtype:
+            dtypes[name] = dtype
 
     layer_description = str(selected.get("description", "")).strip()
     layer_id = str(selected.get("layer_id", "")).strip() or "(unknown layer_id)"
-    log.info(f"Loaded {len(comments)} column comments from {defs_path.name} for layer '{layer_id}'.")
-    return comments, layer_description, str(defs_path)
+    log.info(f"Loaded {len(comments)} column comments and {len(dtypes)} dtype definitions from {defs_path.name} for layer '{layer_id}'.")
+    return comments, dtypes, layer_description, str(defs_path)
 
 
 # ---------------------------------------------------------------------------
@@ -403,7 +408,7 @@ def display_schema_table(gdf: gpd.GeoDataFrame) -> None:
         The GeoDataFrame whose schema is to be displayed.
     """
     console = Console()
-    rich_tbl = RichTable(title="Layer Schema", show_header=True, header_style="bold cyan")
+    rich_tbl = RichTable(title="GeoDataFrame Schema", show_header=True, header_style="bold cyan")
     rich_tbl.add_column("Field Name", style="bold")
     rich_tbl.add_column("Type")
     rich_tbl.add_column("Sample Value")
@@ -458,6 +463,52 @@ def display_iceberg_schema(schema: Schema, destination: str) -> None:
             str(field.field_type),
             "✔" if field.required else "",
         )
+
+    console.print(rich_tbl)
+
+
+def display_schema_resolution_table(
+    gdf: gpd.GeoDataFrame,
+    schema: Schema,
+    column_dtypes: dict[str, str] | None = None,
+) -> None:
+    """Show how source dtypes resolve into final Iceberg types.
+
+    This is a transparency/debug view so users can see whether a column's
+    final Iceberg type came from layer_definitions intent or pandas inference.
+    """
+    console = Console()
+    rich_tbl = RichTable(
+        title="Schema Resolution (Source -> Intent -> Iceberg)",
+        show_header=True,
+        header_style="bold green",
+    )
+    rich_tbl.add_column("Column", style="bold")
+    rich_tbl.add_column("Source dtype")
+    rich_tbl.add_column("layer_definitions dtype")
+    rich_tbl.add_column("Iceberg type")
+
+    dtype_overrides = {k.lower(): v for k, v in (column_dtypes or {}).items()}
+    iceberg_by_name = {f.name.lower(): str(f.field_type) for f in schema.fields}
+    geom_col = gdf.geometry.name
+
+    for col in gdf.columns:
+        if col == geom_col:
+            continue
+        rich_tbl.add_row(
+            col,
+            str(gdf[col].dtype),
+            dtype_overrides.get(col.lower(), "(inferred from source)"),
+            iceberg_by_name.get(col.lower(), "(not in schema)"),
+        )
+
+    # Include synthetic geometry output column for completeness.
+    rich_tbl.add_row(
+        "geom_wkb",
+        "geometry",
+        "(synthetic)",
+        iceberg_by_name.get("geom_wkb", "binary"),
+    )
 
     console.print(rich_tbl)
 
@@ -547,7 +598,33 @@ def _dtype_to_iceberg(dtype_str: str):
     return StringType()
 
 
-def derive_iceberg_schema(gdf: gpd.GeoDataFrame, column_comments: dict[str, str] | None = None) -> Schema:
+def _layer_dtype_to_iceberg(layer_dtype: str):
+    """Map layer_definitions dtype strings to Iceberg types.
+
+    Supported input dtypes are the Riverscapes layer_definitions values used by
+    vector prep: STRING, INTEGER, FLOAT, BOOLEAN, DATETIME, DATE.
+    """
+    d = (layer_dtype or "").strip().upper()
+    if d == "STRING":
+        return StringType()
+    if d == "INTEGER":
+        return IntegerType()
+    if d == "FLOAT":
+        return DoubleType()
+    if d == "BOOLEAN":
+        return BooleanType()
+    if d == "DATETIME":
+        return TimestampType()
+    if d == "DATE":
+        return DateType()
+    return None
+
+
+def derive_iceberg_schema(
+    gdf: gpd.GeoDataFrame,
+    column_comments: dict[str, str] | None = None,
+    column_dtypes: dict[str, str] | None = None,
+) -> Schema:
     """Auto-derive a PyIceberg ``Schema`` from a GeoDataFrame's column dtypes.
 
     The geometry column is replaced by ``geom_wkb`` (``BinaryType``).
@@ -567,13 +644,20 @@ def derive_iceberg_schema(gdf: gpd.GeoDataFrame, column_comments: dict[str, str]
     """
     geom_col = gdf.geometry.name
     comments = column_comments or {}
+    dtype_overrides = {k.lower(): v for k, v in (column_dtypes or {}).items()}
+    log = Logger("derive_iceberg_schema")
     fields: list[NestedField] = []
     field_id = 1
 
     for col in gdf.columns:
         if col == geom_col:
             continue
-        iceberg_type = _dtype_to_iceberg(str(gdf[col].dtype))
+        intended = dtype_overrides.get(col.lower())
+        iceberg_type = _layer_dtype_to_iceberg(intended) if intended else None
+        if iceberg_type is None:
+            if intended:
+                log.warning(f"Column '{col}': unrecognised layer dtype '{intended}', falling back to pandas dtype '{gdf[col].dtype}'.")
+            iceberg_type = _dtype_to_iceberg(str(gdf[col].dtype))
         fields.append(
             NestedField(
                 field_id=field_id,
@@ -670,7 +754,31 @@ def update_glue_column_comments(database: str, table_name: str, column_comments:
 # ---------------------------------------------------------------------------
 
 
-def prepare_arrow_table(gdf: gpd.GeoDataFrame, schema: Schema, target_crs: str) -> pa.Table:
+def _coerce_series_to_layer_dtype(series: pd.Series, layer_dtype: str) -> pd.Series:
+    """Coerce a pandas Series to the semantic dtype from layer_definitions."""
+    d = (layer_dtype or "").strip().upper()
+    if d == "INTEGER":
+        return pd.to_numeric(series, errors="coerce").astype("Int64")
+    if d == "FLOAT":
+        return pd.to_numeric(series, errors="coerce").astype("float64")
+    if d == "BOOLEAN":
+        return series.astype("boolean")
+    if d == "DATETIME":
+        parsed = pd.to_datetime(series, errors="coerce", utc=True)
+        return pd.Series(parsed.dt.tz_localize(None), index=series.index)
+    if d == "DATE":
+        return pd.to_datetime(series, errors="coerce").dt.date
+    if d == "STRING":
+        return series.astype("string")
+    return series
+
+
+def prepare_arrow_table(
+    gdf: gpd.GeoDataFrame,
+    schema: Schema,
+    target_crs: str,
+    column_dtypes: dict[str, str] | None = None,
+) -> pa.Table:
     """Reproject geometry, encode as WKB, and convert to a typed PyArrow table.
 
     Parameters
@@ -716,6 +824,12 @@ def prepare_arrow_table(gdf: gpd.GeoDataFrame, schema: Schema, target_crs: str) 
     for field in schema.fields:
         if field.name not in gdf.columns:
             gdf[field.name] = None
+
+    # Coerce to semantic dtypes from layer_definitions when available.
+    dtype_overrides = {k.lower(): v for k, v in (column_dtypes or {}).items()}
+    for col in gdf.columns:
+        if col in dtype_overrides:
+            gdf[col] = _coerce_series_to_layer_dtype(gdf[col], dtype_overrides[col])
 
     arrow_table = pa.Table.from_pandas(
         gdf,
@@ -907,6 +1021,7 @@ def run_athena_workflow(
     layer_description: str = "",
     gpkg_path: Path | None = None,
     layer_defs_path: str | None = None,
+    column_dtypes: dict[str, str] | None = None,
 ) -> None:
     """Drive the interactive Athena-on-S3 (Glue) upload workflow.
 
@@ -973,7 +1088,7 @@ def run_athena_workflow(
 
     # --- Prepare data ---
     crs_wkt = pyproj.CRS(target_crs).to_wkt()
-    arrow_table = prepare_arrow_table(gdf, schema, target_crs)
+    arrow_table = prepare_arrow_table(gdf, schema, target_crs, column_dtypes=column_dtypes)
 
     # --- Connect to Glue catalog ---
     catalog = load_catalog("glue", **{"type": "glue", "region_name": AWS_REGION})
@@ -1125,7 +1240,13 @@ def get_or_create_table_s3tables(
     return tbl, True, create_action
 
 
-def run_s3tables_workflow(gdf: gpd.GeoDataFrame, schema: Schema, layer_name: str, target_crs: str) -> None:
+def run_s3tables_workflow(
+    gdf: gpd.GeoDataFrame,
+    schema: Schema,
+    layer_name: str,
+    target_crs: str,
+    column_dtypes: dict[str, str] | None = None,
+) -> None:
     """Drive the interactive S3 Tables (REST catalog) upload workflow.
 
     Prompts the user for:
@@ -1235,7 +1356,7 @@ def run_s3tables_workflow(gdf: gpd.GeoDataFrame, schema: Schema, layer_name: str
 
     # --- Prepare data ---
     crs_wkt = pyproj.CRS(target_crs).to_wkt()
-    arrow_table = prepare_arrow_table(gdf, schema, target_crs)
+    arrow_table = prepare_arrow_table(gdf, schema, target_crs, column_dtypes=column_dtypes)
 
     # --- Connect to S3 Tables REST catalog ---
     catalog = load_catalog(
@@ -1316,19 +1437,27 @@ def main() -> None:
 
         display_schema_table(gdf)
 
-        if not questionary.confirm("Is this schema correct? Continue with upload?").ask():
+        if not questionary.confirm(
+            "Continue to metadata/CRS/schema mapping review? (No upload happens yet)",
+            default=True,
+        ).ask():
             log.info("Aborted by user.")
             sys.exit(0)
 
         # ── Step 3: Optional layer metadata (column comments) ───────────────
-        column_comments, layer_description, layer_defs_path = ask_layer_metadata(gpkg_path, layer_name)
+        column_comments, column_dtypes, layer_description, layer_defs_path = ask_layer_metadata(gpkg_path, layer_name)
 
         # ── Step 4: CRS detection & reprojection ─────────────────────────────
         target_crs = ask_reproject(gdf)
 
         # ── Step 5: Derive Iceberg schema ────────────────────────────────────
-        schema = derive_iceberg_schema(gdf, column_comments=column_comments)
+        schema = derive_iceberg_schema(
+            gdf,
+            column_comments=column_comments,
+            column_dtypes=column_dtypes,
+        )
         log.info(f"Derived Iceberg schema with {len(schema.fields)} field(s).")
+        display_schema_resolution_table(gdf, schema, column_dtypes=column_dtypes)
 
         # ── Step 6: Destination selection ────────────────────────────────────
         destination = questionary.select(
@@ -1350,9 +1479,16 @@ def main() -> None:
                 layer_description=layer_description,
                 gpkg_path=gpkg_path,
                 layer_defs_path=layer_defs_path,
+                column_dtypes=column_dtypes,
             )
         else:
-            run_s3tables_workflow(gdf, schema, layer_name, target_crs)
+            run_s3tables_workflow(
+                gdf,
+                schema,
+                layer_name,
+                target_crs,
+                column_dtypes=column_dtypes,
+            )
 
     except KeyboardInterrupt:
         Logger("main").info("\nInterrupted by user.")

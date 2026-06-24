@@ -15,14 +15,17 @@ through every choice interactively via ``questionary`` prompts.
 
 from __future__ import annotations
 
+import json
 import os
+import sqlite3
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import boto3
 import botocore.exceptions
 import geopandas as gpd
+import pandas as pd
 import pyproj
 import questionary
 from pyiceberg.catalog import load_catalog
@@ -267,6 +270,225 @@ def ask_bounds() -> tuple[BaseGeometry | None, str | None]:
     return bounds_geom, crs_wkt
 
 
+def _pick_layer_definition(layer_defs: dict[str, Any], selected_layer: str) -> dict[str, Any] | None:
+    """Select the layer definition record that should map to the selected layer name."""
+    layers = layer_defs.get("layers", [])
+    if not isinstance(layers, list) or not layers:
+        return None
+
+    selected_norm = selected_layer.strip().lower()
+
+    exact_id = [layer for layer in layers if isinstance(layer, dict) and str(layer.get("layer_id", "")).strip().lower() == selected_norm]
+    if len(exact_id) == 1:
+        return exact_id[0]
+
+    exact_name = [layer for layer in layers if isinstance(layer, dict) and str(layer.get("layer_name", "")).strip().lower() == selected_norm]
+    if len(exact_name) == 1:
+        return exact_name[0]
+
+    if len(layers) == 1 and isinstance(layers[0], dict):
+        return layers[0]
+
+    choices: list[str] = []
+    by_label: dict[str, dict[str, Any]] = {}
+    for layer in layers:
+        if not isinstance(layer, dict):
+            continue
+        layer_id = str(layer.get("layer_id", "")).strip() or "(no layer_id)"
+        layer_name = str(layer.get("layer_name", "")).strip() or "(no layer_name)"
+        label = f"{layer_name} [{layer_id}]"
+        choices.append(label)
+        by_label[label] = layer
+
+    if not choices:
+        return None
+
+    chosen = questionary.select(
+        "Select layer from layer_definitions.json:",
+        choices=choices,
+    ).ask()
+    if not chosen:
+        return None
+    return by_label.get(chosen)
+
+
+def ask_layer_metadata(layer_name: str, default_dir: Path) -> tuple[dict[str, str], dict[str, str], dict[str, str], str]:
+    """Optionally load column descriptions, aliases, and dtype intent from layer_definitions.json.
+
+    Returns:
+        (column_comments, column_aliases, column_dtypes, layer_description)
+    """
+    log = Logger("ask_layer_metadata")
+
+    use_defs = questionary.confirm(
+        "Load column metadata/dtypes from layer_definitions.json?",
+        default=True,
+    ).ask()
+    if not use_defs:
+        return {}, {}, {}, ""
+
+    default_path = default_dir / "layer_definitions.json"
+    raw_path = questionary.path(
+        "Path to layer_definitions.json:",
+        default=str(default_path),
+        only_directories=False,
+    ).ask()
+    if not raw_path:
+        log.warning("No layer_definitions path provided. Continuing without metadata overrides.")
+        return {}, {}, {}, ""
+
+    defs_path = _normalize_user_path(raw_path)
+    if not defs_path.is_file():
+        log.warning(f"layer_definitions.json not found: {defs_path}. Continuing without metadata overrides.")
+        return {}, {}, {}, ""
+
+    try:
+        with defs_path.open("r", encoding="utf-8") as f:
+            layer_defs = json.load(f)
+    except Exception as exc:
+        log.warning(f"Could not parse {defs_path}: {exc}. Continuing without metadata overrides.")
+        return {}, {}, {}, ""
+
+    selected = _pick_layer_definition(layer_defs, layer_name)
+    if not selected:
+        log.warning("No matching layer found in layer_definitions.json. Continuing without metadata overrides.")
+        return {}, {}, {}, ""
+
+    comments: dict[str, str] = {}
+    aliases: dict[str, str] = {}
+    dtypes: dict[str, str] = {}
+    for col in selected.get("columns", []):
+        if not isinstance(col, dict):
+            continue
+        name = str(col.get("name", "")).strip().lower()
+        friendly_name = str(col.get("friendly_name", "")).strip()
+        description = str(col.get("description", "")).strip()
+        dtype = str(col.get("dtype", "")).strip().upper()
+        if name and friendly_name:
+            aliases[name] = friendly_name
+        if name and description:
+            comments[name] = description
+        if name and dtype:
+            dtypes[name] = dtype
+
+    layer_description = str(selected.get("description", "")).strip()
+    layer_id = str(selected.get("layer_id", "")).strip() or "(unknown layer_id)"
+    log.info(f"Loaded {len(comments)} column comments, {len(aliases)} aliases, and {len(dtypes)} dtype definitions for layer '{layer_id}'.")
+    return comments, aliases, dtypes, layer_description
+
+
+def _coerce_chunk_to_layer_dtypes(
+    gdf_chunk: gpd.GeoDataFrame,
+    column_dtypes: dict[str, str],
+) -> gpd.GeoDataFrame:
+    """Coerce chunk columns to layer_definitions semantic dtypes where possible."""
+    if not column_dtypes:
+        return gdf_chunk
+
+    log = Logger("coerce_chunk_dtypes")
+    out = gdf_chunk.copy()
+    geom_col = out.geometry.name
+    dtype_lookup = {k.lower(): v for k, v in column_dtypes.items()}
+
+    for col in out.columns:
+        if col == geom_col:
+            continue
+        intended = dtype_lookup.get(col.lower())
+        if not intended:
+            continue
+
+        try:
+            if intended == "INTEGER":
+                out[col] = pd.to_numeric(out[col], errors="coerce").astype("Int64")
+            elif intended == "FLOAT":
+                out[col] = pd.to_numeric(out[col], errors="coerce").astype("float64")
+            elif intended == "BOOLEAN":
+                out[col] = out[col].astype("boolean")
+            elif intended == "DATETIME":
+                parsed = pd.to_datetime(out[col], errors="coerce", utc=True)
+                out[col] = pd.Series(parsed.dt.tz_localize(None), index=out.index)
+            elif intended == "DATE":
+                out[col] = pd.to_datetime(out[col], errors="coerce").dt.date
+            elif intended == "STRING":
+                out[col] = out[col].astype("string")
+        except Exception as exc:
+            log.warning(f"Could not coerce column '{col}' to '{intended}' ({exc}); keeping source dtype '{out[col].dtype}'.")
+
+    return out
+
+
+def _write_gpkg_metadata(
+    gpkg_path: Path,
+    layer_name: str,
+    column_comments: dict[str, str],
+    column_aliases: dict[str, str],
+    layer_description: str,
+) -> None:
+    """Write layer/column descriptions into GeoPackage metadata tables."""
+    if not column_comments and not column_aliases and not layer_description:
+        return
+
+    log = Logger("write_gpkg_metadata")
+    try:
+        with sqlite3.connect(gpkg_path) as conn:
+            cur = conn.cursor()
+
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS gpkg_data_columns (
+                    table_name TEXT NOT NULL,
+                    column_name TEXT NOT NULL,
+                    name TEXT,
+                    title TEXT,
+                    description TEXT,
+                    mime_type TEXT,
+                    constraint_name TEXT,
+                    CONSTRAINT pk_gdc PRIMARY KEY (table_name, column_name),
+                    CONSTRAINT fk_gdc_tn FOREIGN KEY (table_name)
+                        REFERENCES gpkg_contents(table_name)
+                )
+                """
+            )
+
+            if layer_description:
+                cur.execute(
+                    "UPDATE gpkg_contents SET description = ? WHERE table_name = ?",
+                    (layer_description, layer_name),
+                )
+
+            # Upsert rows when either alias/title or description is present.
+            all_cols = sorted(set(column_comments.keys()) | set(column_aliases.keys()))
+            for col_name in all_cols:
+                description = column_comments.get(col_name, "")
+                alias = column_aliases.get(col_name, "")
+                if not description and not alias:
+                    continue
+                cur.execute(
+                    """
+                    INSERT INTO gpkg_data_columns (
+                        table_name, column_name, name, title, description, mime_type, constraint_name
+                    )
+                    VALUES (?, ?, ?, ?, ?, NULL, NULL)
+                    ON CONFLICT(table_name, column_name) DO UPDATE SET
+                        name = excluded.name,
+                        title = excluded.title,
+                        description = excluded.description
+                    """,
+                    (
+                        layer_name,
+                        col_name,
+                        alias or col_name,
+                        alias or col_name,
+                        description,
+                    ),
+                )
+
+            conn.commit()
+        log.info(f"Wrote GeoPackage metadata for layer '{layer_name}' ({len(column_comments)} description(s), {len(column_aliases)} alias(es)).")
+    except Exception as exc:
+        log.warning(f"Could not write GeoPackage metadata: {exc}")
+
+
 # ---------------------------------------------------------------------------
 # Core download function
 # ---------------------------------------------------------------------------
@@ -278,6 +500,10 @@ def download_and_save(
     layer_name: str,
     bounds_geom: BaseGeometry | None,
     bounds_crs_wkt: str | None,
+    column_comments: dict[str, str] | None = None,
+    column_aliases: dict[str, str] | None = None,
+    column_dtypes: dict[str, str] | None = None,
+    layer_description: str = "",
     chunk_size: int = DOWNLOAD_CHUNK_SIZE,
 ) -> None:
     """Download an Iceberg table and save it as a GeoPackage layer.
@@ -358,6 +584,9 @@ def download_and_save(
     # overwrite earlier chunks.
     initial_mode = "a" if gpkg_path.exists() else "w"
     rows_written = 0
+    comments = {k.lower(): v for k, v in (column_comments or {}).items()}
+    aliases = {k.lower(): v for k, v in (column_aliases or {}).items()}
+    dtypes = {k.lower(): v for k, v in (column_dtypes or {}).items()}
 
     progbar = ProgressBar(total_rows, text=f"Processing & writing → {layer_name}")
     for chunk_idx, offset in enumerate(range(0, total_rows, chunk_size)):
@@ -368,13 +597,20 @@ def download_and_save(
         geometry = gpd.GeoSeries.from_wkb(df["geom_wkb"])
         df = df.drop(columns=["geom_wkb"])
         gdf_chunk = gpd.GeoDataFrame(df, geometry=geometry, crs=table_crs)
+        gdf_chunk = _coerce_chunk_to_layer_dtypes(gdf_chunk, dtypes)
 
         if bounds_geom_reprojected is not None:
             gdf_chunk = gdf_chunk[gdf_chunk.geometry.intersects(bounds_geom_reprojected)].copy()
 
         if not gdf_chunk.empty:
             write_mode = initial_mode if chunk_idx == 0 else "a"
-            gdf_chunk.to_file(gpkg_path, layer=layer_name, driver="GPKG", mode=write_mode)
+            gdf_chunk.to_file(
+                gpkg_path,
+                layer=layer_name,
+                driver="GPKG",
+                mode=write_mode,
+                engine="pyogrio",
+            )
             rows_written += len(gdf_chunk)
 
         progbar.update(min(offset + length, total_rows))
@@ -387,6 +623,7 @@ def download_and_save(
 
     file_size_mb = gpkg_path.stat().st_size / 1024 / 1024
     log.info(f"Saved {rows_written:,} features to layer '{layer_name}' in {gpkg_path} ({file_size_mb:.1f} MB).")
+    _write_gpkg_metadata(gpkg_path, layer_name, comments, aliases, layer_description)
 
 
 # ---------------------------------------------------------------------------
@@ -482,6 +719,9 @@ def run_athena_workflow() -> None:
         log.error("Layer name is required.")
         sys.exit(1)
 
+    # ── Optional layer metadata + dtype intent ───────────────────────────────
+    column_comments, column_aliases, column_dtypes, layer_description = ask_layer_metadata(table_name, gpkg_path.parent)
+
     # ── Optional bounds filter ────────────────────────────────────────────────
     bounds_geom, bounds_crs_wkt = ask_bounds()
 
@@ -492,7 +732,17 @@ def run_athena_workflow() -> None:
         return
 
     # ── Download & save ───────────────────────────────────────────────────────
-    download_and_save(iceberg_table, gpkg_path, layer_name, bounds_geom, bounds_crs_wkt)
+    download_and_save(
+        iceberg_table,
+        gpkg_path,
+        layer_name,
+        bounds_geom,
+        bounds_crs_wkt,
+        column_comments=column_comments,
+        column_aliases=column_aliases,
+        column_dtypes=column_dtypes,
+        layer_description=layer_description,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -653,6 +903,9 @@ def run_s3tables_workflow() -> None:
         log.error("Layer name is required.")
         sys.exit(1)
 
+    # ── Optional layer metadata + dtype intent ───────────────────────────────
+    column_comments, column_aliases, column_dtypes, layer_description = ask_layer_metadata(table_name, gpkg_path.parent)
+
     # ── Optional bounds filter ────────────────────────────────────────────────
     bounds_geom, bounds_crs_wkt = ask_bounds()
 
@@ -663,7 +916,17 @@ def run_s3tables_workflow() -> None:
         return
 
     # ── Download & save ───────────────────────────────────────────────────────
-    download_and_save(iceberg_table, gpkg_path, layer_name, bounds_geom, bounds_crs_wkt)
+    download_and_save(
+        iceberg_table,
+        gpkg_path,
+        layer_name,
+        bounds_geom,
+        bounds_crs_wkt,
+        column_comments=column_comments,
+        column_aliases=column_aliases,
+        column_dtypes=column_dtypes,
+        layer_description=layer_description,
+    )
 
 
 # ---------------------------------------------------------------------------
