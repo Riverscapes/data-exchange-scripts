@@ -381,6 +381,9 @@ def ask_layer_metadata(gpkg_path: Path, selected_layer: str) -> tuple[dict[str, 
         description = str(col.get("description", "")).strip()
         dtype = str(col.get("dtype", "")).strip().upper()
         if name and description:
+            if len(description) > 255:
+                log.debug(f"Description for column {name} is {len(description)} and will be truncated for table COMMENT purpose.")
+                description = description[:252] + "..."
             comments[name] = description
         if name and dtype:
             dtypes[name] = dtype
