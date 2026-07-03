@@ -33,15 +33,12 @@ from shapely import wkb
 from pydex import RiverscapesAPI, RiverscapesProject
 from pydex.lib.athena import query_to_dataframe
 
-# Environment-configurable buckets. These represent stable infrastructure and
-# should not vary run-to-run, so we prefer environment variables over CLI args.
+# Environment-configurable data bucket for scraped parquet uploads.
 DATA_BUCKET_ENV_VAR = "RME_DATA_BUCKET"
-OUTPUT_BUCKET_ENV_VAR = "RME_ATHENA_OUTPUT_BUCKET"
 DEFAULT_DATA_BUCKET = "riverscapes-athena"
 BASE_S3_KEY = "data_exchange/rs_metric_engine2"
 
 DATA_BUCKET = os.getenv(DATA_BUCKET_ENV_VAR, DEFAULT_DATA_BUCKET)
-ATHENA_OUTPUT_BUCKET = os.getenv(OUTPUT_BUCKET_ENV_VAR, DATA_BUCKET)  # fallback to data bucket if not set
 
 # Query to identify projects to add/replace. No semicolon allowed.
 missing_projects_query = """
@@ -353,11 +350,8 @@ def main():
 
     log.title("rme scrape to parquet to athena")
 
-    # Log bucket resolution
-    if ATHENA_OUTPUT_BUCKET == DATA_BUCKET:
-        log.warning(f"Using single bucket for data & Athena output: {DATA_BUCKET} (override with {OUTPUT_BUCKET_ENV_VAR})")
-    else:
-        log.info(f"Data bucket: {DATA_BUCKET} (env {DATA_BUCKET_ENV_VAR}); Athena output bucket: {ATHENA_OUTPUT_BUCKET} (env {OUTPUT_BUCKET_ENV_VAR})")
+    # Log bucket resolution for this pipeline's upload target.
+    log.info(f"Data bucket: {DATA_BUCKET} (env {DATA_BUCKET_ENV_VAR})")
 
     with RiverscapesAPI(stage=args.stage) as api:
         scrape_rme(api, args.spatialite_path, download_folder, DATA_BUCKET, args.delete)
