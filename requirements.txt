@@ -1,11 +1,11 @@
 graphql-core==3.2.6
 inquirer==3.4.0
-lxml==5.3.1
+lxml>=6.1.0
 python-dateutil==2.9.0.post0
-requests==2.32.3
+requests>=2.33.0
 rsxml==2.0.6
 semver==3.0.4
-setuptools==76.0.0
+setuptools>=83.0.0
 six==1.17.0
 termcolor==2.5.0
-urllib3==2.3.0
+urllib3>=2.7.0
