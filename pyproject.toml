@@ -19,6 +19,7 @@ dependencies = [
   "inquirer==3.4.0",
   "lxml>=6.1.0",
   "matplotlib>=3.9.4",
+  "Pillow>=12.3.0",
   "pyarrow>=21.0.0",
   "pyathena>=2.9.4",
   "jsonschema>=4.17.3",
