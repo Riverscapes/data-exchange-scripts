@@ -12,8 +12,8 @@ NOTE: If we want to go deeper, there are established libraries for this:
 e.g. Could add types, could make Total=True if all fields are required
 """
 
-import keyword
 import argparse
+import keyword
 from pathlib import Path
 
 from graphql import (
@@ -25,7 +25,6 @@ from graphql import (
     TypeNode,
     parse,
 )
-
 
 # Mapping from GraphQL scalar types to Python types
 SCALAR_MAPPING = {
@@ -133,11 +132,7 @@ def generate_types(schema_path: Path, output_path: Path) -> None:
                 has_keyword_field = any(keyword.iskeyword(fn) for fn in field_names)
 
                 if has_keyword_field:
-                    fields_str = ', '.join(
-                        f"'{fn}': '{get_python_type(field.type)}'" if fn == get_python_type(field.type)
-                        else f"'{fn}': {get_python_type(field.type)!r}"
-                        for fn, field in zip(field_names, definition.fields)
-                    )
+                    ', '.join(f"'{fn}': '{get_python_type(field.type)}'" if fn == get_python_type(field.type) else f"'{fn}': {get_python_type(field.type)!r}" for fn, field in zip(field_names, definition.fields, strict=False))
                     # Build a proper dict literal for the functional form
                     field_items = []
                     for field in definition.fields:

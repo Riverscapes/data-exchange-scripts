@@ -25,7 +25,7 @@ def dump_views(sqlite_db_path):
     # Here's a view that shows only where there ARE matching projects in the Data Exchange
     curs.execute('''
       CREATE VIEW vw_exchange_projects AS
-      SELECT Huc10_conus.*, 
+      SELECT Huc10_conus.*,
             CASE WHEN m.project_id IS NOT NULL THEN 1 ELSE 0 END AS has_matching_project
       FROM Huc10_conus
       LEFT JOIN riverscapes_project_meta m ON m.key = 'HUC' AND m.value = Huc10_conus.HUC10
@@ -39,7 +39,7 @@ def dump_views(sqlite_db_path):
     # Now insert a new row into gpkg_contents with a new name corresponding to the view above
     curs.execute(
         '''
-    INSERT INTO gpkg_contents (table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id) 
+    INSERT INTO gpkg_contents (table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     ''',
         ('vw_exchange_projects', gpkg_contents_row[1], gpkg_contents_row[2], gpkg_contents_row[3], gpkg_contents_row[4], gpkg_contents_row[5], gpkg_contents_row[6], gpkg_contents_row[7], gpkg_contents_row[8], gpkg_contents_row[9]),

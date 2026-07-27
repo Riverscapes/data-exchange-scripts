@@ -2,11 +2,11 @@
 Generated from riverscapes.schema.graphql using generate_python_classes_from_graphql_api.py
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import TypedDict
 
 
-class AttributionRoleEnum(str, Enum):
+class AttributionRoleEnum(StrEnum):
     ANALYST = 'ANALYST'
     CONTRIBUTOR = 'CONTRIBUTOR'
     CO_FUNDER = 'CO_FUNDER'
@@ -17,7 +17,7 @@ class AttributionRoleEnum(str, Enum):
     SUPPORTER = 'SUPPORTER'
 
 
-class DatasetContainerTypesEnum(str, Enum):
+class DatasetContainerTypesEnum(StrEnum):
     CommonDatasets = 'CommonDatasets'
     Configuration = 'Configuration'
     Datasets = 'Datasets'
@@ -28,7 +28,7 @@ class DatasetContainerTypesEnum(str, Enum):
     Products = 'Products'
 
 
-class DatasetTypeEnum(str, Enum):
+class DatasetTypeEnum(StrEnum):
     AuxInstrumentFile = 'AuxInstrumentFile'
     CSV = 'CSV'
     ConfigFile = 'ConfigFile'
@@ -53,14 +53,14 @@ class DatasetTypeEnum(str, Enum):
     ZipFile = 'ZipFile'
 
 
-class DateWithinEnum(str, Enum):
+class DateWithinEnum(StrEnum):
     ONE_DAY = 'ONE_DAY'
     ONE_MONTH = 'ONE_MONTH'
     ONE_WEEK = 'ONE_WEEK'
     SIX_MONTHS = 'SIX_MONTHS'
 
 
-class EntitiesWithImagesEnum(str, Enum):
+class EntitiesWithImagesEnum(StrEnum):
     COLLECTION = 'COLLECTION'
     ORGANIZATION = 'ORGANIZATION'
     PROJECT = 'PROJECT'
@@ -69,20 +69,20 @@ class EntitiesWithImagesEnum(str, Enum):
     USER = 'USER'
 
 
-class EntityDeleteActionsEnum(str, Enum):
+class EntityDeleteActionsEnum(StrEnum):
     DELETE = 'DELETE'
     DELETE_COMPLETE = 'DELETE_COMPLETE'
     MAKE_PUBLIC = 'MAKE_PUBLIC'
     REQUEST_TRANSFER = 'REQUEST_TRANSFER'
 
 
-class ImageTypeEnum(str, Enum):
+class ImageTypeEnum(StrEnum):
     AVATAR = 'AVATAR'
     HERO = 'HERO'
     LOGO = 'LOGO'
 
 
-class JobStatusEnum(str, Enum):
+class JobStatusEnum(StrEnum):
     FAILED = 'FAILED'
     PROCESSING = 'PROCESSING'
     READY = 'READY'
@@ -90,13 +90,13 @@ class JobStatusEnum(str, Enum):
     UNKNOWN = 'UNKNOWN'
 
 
-class MetaDataExtEnum(str, Enum):
+class MetaDataExtEnum(StrEnum):
     DATASET = 'DATASET'
     PROJECT = 'PROJECT'
     WAREHOUSE = 'WAREHOUSE'
 
 
-class MetaDataTypeEnum(str, Enum):
+class MetaDataTypeEnum(StrEnum):
     BOOLEAN = 'BOOLEAN'
     FILEPATH = 'FILEPATH'
     FLOAT = 'FLOAT'
@@ -114,7 +114,7 @@ class MetaDataTypeEnum(str, Enum):
     VIDEO = 'VIDEO'
 
 
-class NotificationActionsEnum(str, Enum):
+class NotificationActionsEnum(StrEnum):
     CREATED = 'CREATED'
     DELETED = 'DELETED'
     RENAMED = 'RENAMED'
@@ -122,13 +122,13 @@ class NotificationActionsEnum(str, Enum):
     UPDATED = 'UPDATED'
 
 
-class NotificationOperationEnum(str, Enum):
+class NotificationOperationEnum(StrEnum):
     DELETE = 'DELETE'
     MARK_READ = 'MARK_READ'
     MARK_UNREAD = 'MARK_UNREAD'
 
 
-class NotificationTypesEnum(str, Enum):
+class NotificationTypesEnum(StrEnum):
     COLLECTION = 'COLLECTION'
     ORGANIZATION = 'ORGANIZATION'
     PROJECT = 'PROJECT'
@@ -136,13 +136,13 @@ class NotificationTypesEnum(str, Enum):
     USER = 'USER'
 
 
-class OrganizationInviteRoleEnum(str, Enum):
+class OrganizationInviteRoleEnum(StrEnum):
     ADMIN = 'ADMIN'
     CONTRIBUTOR = 'CONTRIBUTOR'
     VIEWER = 'VIEWER'
 
 
-class OrganizationInviteStateEnum(str, Enum):
+class OrganizationInviteStateEnum(StrEnum):
     ACCEPTED = 'ACCEPTED'
     EXPIRED = 'EXPIRED'
     INVITED = 'INVITED'
@@ -150,7 +150,7 @@ class OrganizationInviteStateEnum(str, Enum):
     REQUESTED = 'REQUESTED'
 
 
-class OrganizationRoleEnum(str, Enum):
+class OrganizationRoleEnum(StrEnum):
     ADMIN = 'ADMIN'
     CONTRIBUTOR = 'CONTRIBUTOR'
     NONE = 'NONE'
@@ -158,22 +158,22 @@ class OrganizationRoleEnum(str, Enum):
     VIEWER = 'VIEWER'
 
 
-class OwnerInputTypesEnum(str, Enum):
+class OwnerInputTypesEnum(StrEnum):
     ORGANIZATION = 'ORGANIZATION'
     USER = 'USER'
 
 
-class ProjectDeleteChoicesEnum(str, Enum):
+class ProjectDeleteChoicesEnum(StrEnum):
     DELETE = 'DELETE'
     DELETE_COMPLETE = 'DELETE_COMPLETE'
 
 
-class ProjectGroupVisibilityEnum(str, Enum):
+class ProjectGroupVisibilityEnum(StrEnum):
     PUBLIC = 'PUBLIC'
     SECRET = 'SECRET'
 
 
-class ProjectTreeLayerTypeEnum(str, Enum):
+class ProjectTreeLayerTypeEnum(StrEnum):
     FILE = 'FILE'
     LINE = 'LINE'
     POINT = 'POINT'
@@ -183,31 +183,31 @@ class ProjectTreeLayerTypeEnum(str, Enum):
     TIN = 'TIN'
 
 
-class ProjectTypeStateEnum(str, Enum):
+class ProjectTypeStateEnum(StrEnum):
     ACTIVE = 'ACTIVE'
     DELETED = 'DELETED'
     SUGGESTED = 'SUGGESTED'
 
 
-class ProjectVisibilityEnum(str, Enum):
+class ProjectVisibilityEnum(StrEnum):
     PRIVATE = 'PRIVATE'
     PUBLIC = 'PUBLIC'
     SECRET = 'SECRET'
 
 
-class QAQCStateEnum(str, Enum):
+class QAQCStateEnum(StrEnum):
     FAILED = 'FAILED'
     PASSED = 'PASSED'
     PROVISIONAL = 'PROVISIONAL'
 
 
-class RampTypeEnum(str, Enum):
+class RampTypeEnum(StrEnum):
     DISCRETE = 'DISCRETE'
     EXACT = 'EXACT'
     INTERPOLATED = 'INTERPOLATED'
 
 
-class SearchSortEnum(str, Enum):
+class SearchSortEnum(StrEnum):
     AREA_DESC = 'AREA_DESC'
     DATE_CREATED_ASC = 'DATE_CREATED_ASC'
     DATE_CREATED_DESC = 'DATE_CREATED_DESC'
@@ -220,7 +220,7 @@ class SearchSortEnum(str, Enum):
     NAME_DESC = 'NAME_DESC'
 
 
-class SearchableTypesEnum(str, Enum):
+class SearchableTypesEnum(StrEnum):
     COLLECTION = 'COLLECTION'
     ORGANIZATION = 'ORGANIZATION'
     PROJECT = 'PROJECT'
@@ -228,7 +228,7 @@ class SearchableTypesEnum(str, Enum):
     USER = 'USER'
 
 
-class SeverityEnum(str, Enum):
+class SeverityEnum(StrEnum):
     CRITICAL = 'CRITICAL'
     DEBUG = 'DEBUG'
     ERROR = 'ERROR'
@@ -236,7 +236,7 @@ class SeverityEnum(str, Enum):
     WARNING = 'WARNING'
 
 
-class StarrableTypesEnum(str, Enum):
+class StarrableTypesEnum(StrEnum):
     COLLECTION = 'COLLECTION'
     ORGANIZATION = 'ORGANIZATION'
     PROJECT = 'PROJECT'
@@ -244,7 +244,7 @@ class StarrableTypesEnum(str, Enum):
     USER = 'USER'
 
 
-class SymbologyStateEnum(str, Enum):
+class SymbologyStateEnum(StrEnum):
     ERROR = 'ERROR'
     FETCHING = 'FETCHING'
     FOUND = 'FOUND'
@@ -253,14 +253,14 @@ class SymbologyStateEnum(str, Enum):
     UNKNOWN = 'UNKNOWN'
 
 
-class TileTypesEnum(str, Enum):
+class TileTypesEnum(StrEnum):
     HTML = 'HTML'
     RASTER = 'RASTER'
     VECTOR_GPKG = 'VECTOR_GPKG'
     VECTOR_SHP = 'VECTOR_SHP'
 
 
-class TilingStateEnum(str, Enum):
+class TilingStateEnum(StrEnum):
     CREATING = 'CREATING'
     FETCHING = 'FETCHING'
     FETCH_ERROR = 'FETCH_ERROR'
@@ -275,7 +275,7 @@ class TilingStateEnum(str, Enum):
     UNKNOWN = 'UNKNOWN'
 
 
-class TransferStateEnum(str, Enum):
+class TransferStateEnum(StrEnum):
     ACCEPTED = 'ACCEPTED'
     EXPIRED = 'EXPIRED'
     IN_PROGRESS = 'IN_PROGRESS'
@@ -283,7 +283,7 @@ class TransferStateEnum(str, Enum):
     REJECTED = 'REJECTED'
 
 
-class TransferrableTypesEnum(str, Enum):
+class TransferrableTypesEnum(StrEnum):
     COLLECTION = 'COLLECTION'
     ORGANIZATION = 'ORGANIZATION'
     PROJECT = 'PROJECT'

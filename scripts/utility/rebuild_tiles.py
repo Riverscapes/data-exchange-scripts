@@ -15,7 +15,7 @@ from rsxml.util import safe_makedirs
 from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 
-def confirm(msg: str = None):
+def confirm(msg: str | None = None):
     """Just a little confirmation function"""
     log = Logger('confirm')
     if msg:

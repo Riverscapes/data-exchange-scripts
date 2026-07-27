@@ -117,7 +117,7 @@ MEASUREMENT_NAMES = [
 
 
 def process_champ_visits(
-    api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_curs: psycopg2.extensions.cursor, download_dir: str, delete_files: bool, project_owner: str, visit_id: int = None, watershed: str = None, year: int = None
+    api: RiverscapesAPI, sqlite_curs: sqlite3.Cursor, pg_curs: psycopg2.extensions.cursor, download_dir: str, delete_files: bool, project_owner: str, visit_id: int | None = None, watershed: str | None = None, year: int | None = None
 ) -> None:
 
     log = Logger('CHaMP_Aux_Measurements')

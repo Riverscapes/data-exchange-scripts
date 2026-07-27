@@ -72,7 +72,7 @@ def delete_by_tags(riverscapes_api: RiverscapesAPI):
         return
 
     # Now delete all projects
-    mutation_script = riverscapes_api.load_mutation('deleteProject')
+    riverscapes_api.load_mutation('deleteProject')
     for project in deletable_projects:
         print(f"Deleting project: {project['name']} with id: {project['id']}")
         raise Exception("TOO DANGEROUS!!! UNCOMMENT THE LINE BELOW TO DELETE PROJECTS!")

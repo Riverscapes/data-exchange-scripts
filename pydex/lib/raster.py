@@ -323,7 +323,7 @@ class Raster:
                 gt = ds.GetGeoTransform()
                 x0 = gt[0] + xoff * gt[1]
                 y0 = gt[3] + yoff * gt[5]
-                window_counts = dict(zip((str(int(u)) for u in unique), map(int, counts)))
+                window_counts = dict(zip((str(int(u)) for u in unique), map(int, counts), strict=False))
                 print(f"Window ({xoff},{yoff}) @ ({x0:.1f},{y0:.1f}): counts={window_counts}")
                 retval['value_count'] += arr.size
                 for category, count in window_counts.items():
@@ -412,7 +412,7 @@ class Raster:
                     arr = arr[arr != nodata]
                 if arr.size == 0:
                     continue
-                hist, edges = np.histogram(arr, bins=bins)
+                hist, _edges = np.histogram(arr, bins=bins)
                 gt = ds.GetGeoTransform()
                 x0 = gt[0] + xoff * gt[1]
                 y0 = gt[3] + yoff * gt[5]

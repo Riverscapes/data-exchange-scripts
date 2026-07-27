@@ -26,7 +26,7 @@ def dump_geom(sqlite_db_path: str, geom_template_db: str):
     log.title('Dump Geometry to SQLITE')
 
     conn = sqlite3.connect(sqlite_db_path)
-    curs = conn.cursor()
+    conn.cursor()
 
     # Initialize our API and log in
     # Open source and destination databases

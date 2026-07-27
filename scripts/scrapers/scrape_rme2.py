@@ -161,7 +161,7 @@ def scrape_rme(rs_stage: str, rs_api: RiverscapesAPI, log_path: str, spatialite_
     log.info(f'Project XML file written to {merged_project_xml}')
 
 
-def get_project_meta_value(project: Project, keys: list[str], required_length: int = None) -> str:
+def get_project_meta_value(project: Project, keys: list[str], required_length: int | None = None) -> str:
     """
     Get the value of a metadata item from a project.
     """

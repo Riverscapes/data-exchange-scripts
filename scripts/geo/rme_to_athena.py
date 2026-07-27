@@ -80,7 +80,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
             conn.load_extension(spatialite_path)
 
             def dict_row_factory(cursor, row):
-                return {description[0]: value for description, value in zip(cursor.getdescription(), row)}
+                return {description[0]: value for description, value in zip(cursor.getdescription(), row, strict=False)}
 
             curs = conn.cursor()
             curs.setrowtrace(dict_row_factory)

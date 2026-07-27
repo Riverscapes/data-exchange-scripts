@@ -9,7 +9,7 @@ from rsxml.util import safe_makedirs
 from pydex import RiverscapesAPI, RiverscapesProject, RiverscapesSearchParams
 
 
-def fix_rme(riverscapes_api: RiverscapesAPI, logdir: str = None) -> tuple[str, str]:
+def fix_rme(riverscapes_api: RiverscapesAPI, logdir: str | None = None) -> tuple[str, str]:
     """
     Find all projects with tags 2024CONUS and 2025CONUS and write each set to a log file.
 
@@ -50,7 +50,7 @@ def fix_rme(riverscapes_api: RiverscapesAPI, logdir: str = None) -> tuple[str, s
             total = search_total
             projects.append(project)
 
-        ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
         fname = f"fix_2023_CONUS_{riverscapes_api.stage}_{tag}.json"
         fpath = os.path.join(logdir, fname)
 
@@ -206,7 +206,7 @@ def filter_2024conus_missing_bounds():
         return None
 
     # Stream + write filtered results
-    kept, total = stream_filter_projects_without_bounds(input_path, output_path, log)
+    _kept, _total = stream_filter_projects_without_bounds(input_path, output_path, log)
     log.info(f"Wrote filtered list to: {output_path}")
     return output_path
 

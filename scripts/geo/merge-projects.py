@@ -377,7 +377,7 @@ def process_rasters(master_project: dict, output_dir: str, delete_source: bool =
 
         input_rasters = [f"\"{rp['path']}\"" for rp in raster_info['occurences']]
 
-        params = ['gdal_merge.py', '-o', f'"{output_raster_path}"', '-co', compression, no_data] + input_rasters
+        params = ['gdal_merge.py', '-o', f'"{output_raster_path}"', '-co', compression, no_data, *input_rasters]
         params_flat = ' '.join(params)
         log.debug(f'EXECUTING: {params_flat}')
         subprocess.call(params_flat, shell=True)

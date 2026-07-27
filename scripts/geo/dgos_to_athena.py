@@ -67,7 +67,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
             log.warning(f'Project {project.id} does not have a model version. Skipping.')
             continue
 
-        model_version_int = project.model_version.major * MAJOR + project.model_version.minor * MINOR + project.model_version.patch
+        project.model_version.major * MAJOR + project.model_version.minor * MINOR + project.model_version.patch
 
         try:
             huc_dir = os.path.join(download_dir, project.huc)
@@ -97,7 +97,7 @@ def scrape_rme(rs_api: RiverscapesAPI, spatialite_path: str, search_params: Rive
 
                 curs.execute(
                     '''SELECT d.level_path, d.seg_distance, st_astext(CastAutomagic(d.geom)) geom
-                             FROM simplified_dgos d 
+                             FROM simplified_dgos d
                              inner join rme.dgos rmed on d.level_path = rmed.level_path and d.seg_distance = rmed.seg_distance
                              inner join rme.dgo_desc dd on rmed.dgoid = dd.dgoid
                              WHERE dd.huc12 = ?''',

@@ -1,27 +1,30 @@
-""" Utility functions to get data from AWS Athena and return it in useful formats
+"""Utility functions to get data from AWS Athena and return it in useful formats
 a version/copy of these functions can be found in multiple Riverscapes repositories
 * data-exchange-scripts (this one)
-* rs-reports-gen 
-* athena 
+* rs-reports-gen
+* athena
 * cybercastor_scripts
 
-Consider porting any improvements to/from these other repositories. 
+Consider porting any improvements to/from these other repositories.
 """
-import time
+
 import re
+import time
 import uuid
+
+import awswrangler as wr
+
 # 3rd party
 import boto3
-import awswrangler as wr
 import pandas as pd
-
 from rsxml import Logger
+
 S3_ATHENA_BUCKET = "riverscapes-athena-output"
 
 
 def query_to_dataframe(query: str, querylabel: str = "") -> pd.DataFrame:
     """uses awswrangler to return a DataFrame for a given query
-    args: 
+    args:
         query : the query to execute
         querylabel : optional label for log messages, handy when queries are running in parallel
 
@@ -30,7 +33,7 @@ def query_to_dataframe(query: str, querylabel: str = "") -> pd.DataFrame:
     see docs for details https://aws-sdk-pandas.readthedocs.io/en/3.14.0/stubs/awswrangler.athena.read_sql_query.html
 
     PROS:
-    *   Faster for mid and big result sizes 
+    *   Faster for mid and big result sizes
     *   Can handle some level of nested types.
     *   Does not modify Glue Data Catalog
 
@@ -66,9 +69,9 @@ def query_to_dataframe(query: str, querylabel: str = "") -> pd.DataFrame:
 
 def fix_s3_uri(argstr: str) -> str:
     """the parser is messing up s3 paths. this should fix them
-    launch.json value (a valid s3 string): "s3://riverscapes-athena/athena_query_results/d40eac38-0d04-4249-8d55-ad34901fee82.csv" 
+    launch.json value (a valid s3 string): "s3://riverscapes-athena/athena_query_results/d40eac38-0d04-4249-8d55-ad34901fee82.csv"
     agrstr (input to this function) 's3:\\\\riverscapes-athena\\\\athena_query_results\\\\d40eac38-0d04-4249-8d55-ad34901fee82.csv'
-    Returns: a valid s3 string 
+    Returns: a valid s3 string
     """
     # Replace all backslashes with slashes
     uri = argstr.replace("\\", "/")
@@ -78,8 +81,7 @@ def fix_s3_uri(argstr: str) -> str:
 
 
 def get_s3_file(s3path: str, localpath: str):
-    """Download a file from S3 to local path, fixing S3 URI if needed.
-    """
+    """Download a file from S3 to local path, fixing S3 URI if needed."""
     s3_uri = fix_s3_uri(s3path)
     download_file_from_s3(s3_uri, localpath)
 
@@ -120,7 +122,7 @@ def download_file_from_s3(s3_uri: str, local_path: str) -> None:
 def parse_athena_results(rows):
     """Convert Athena result rows to a list of dicts.
 
-    Args: 
+    Args:
         rows (list): Raw Athena result rows.
 
     Returns:
@@ -132,7 +134,7 @@ def parse_athena_results(rows):
     data = []
     for row in rows[1:]:
         values = [col.get('VarCharValue', None) for col in row['Data']]
-        data.append(dict(zip(headers, values)))
+        data.append(dict(zip(headers, values, strict=False)))
     return data
 
 
@@ -163,14 +165,14 @@ def athena_query_get_rows(s3_bucket: str, query: str, max_wait: int = 600) -> li
 
     Returns:
         list | None: Raw Athena result rows, or None on failure.
-    TODO: No results is legitimate and should return an empty list. 
+    TODO: No results is legitimate and should return an empty list.
     """
     result = _run_athena_query(s3_bucket, query, max_wait)
     if not result:
         return None
     _, query_execution_id = result
 
-    log = Logger("Athena query")
+    Logger("Athena query")
     athena = boto3.client('athena', region_name='us-west-2')
     results = []
     next_token = None
@@ -207,11 +209,7 @@ def athena_query_get_parsed(s3_bucket: str, query: str, max_wait: int = 600) -> 
     return None
 
 
-def _run_athena_query(
-    s3_bucket: str,
-    query: str,
-    max_wait: int = 600
-) -> tuple[str, str] | None:
+def _run_athena_query(s3_bucket: str, query: str, max_wait: int = 600) -> tuple[str, str] | None:
     """
     Run an Athena query and wait for completion.
 
@@ -234,23 +232,14 @@ def _run_athena_query(
     else:
         log.debug(f'Query is {query_length} bytes')
         log.debug(f"Query starts with: {query[:1900]}")
-        log.debug(f"Query ends with: {repr(query[-100:])}")
+        log.debug(f"Query ends with: {query[-100:]!r}")
     # print("Full query:")
     # print(query_str)
     # with open("athena_query.sql", "w", encoding="utf-8") as f:
     #     f.write(query_str)
 
     athena = boto3.client('athena', region_name='us-west-2')
-    response = athena.start_query_execution(
-        QueryString=query,
-        QueryExecutionContext={
-            'Database': 'default',
-            'Catalog': 'AwsDataCatalog'
-        },
-        ResultConfiguration={
-            'OutputLocation': f's3://{s3_bucket}/athena_query_results'
-        }
-    )
+    response = athena.start_query_execution(QueryString=query, QueryExecutionContext={'Database': 'default', 'Catalog': 'AwsDataCatalog'}, ResultConfiguration={'OutputLocation': f's3://{s3_bucket}/athena_query_results'})
     query_execution_id = response['QueryExecutionId']
     start_time = time.time()
     log.debug(f"Query started at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
@@ -285,6 +274,7 @@ def athena_execute(s3_bucket: str, query: str, max_wait: int = 600) -> bool:
     result = _run_athena_query(s3_bucket, query, max_wait)
     return result is not None
 
+
 # =========================
 # LEGACY FUNCTION
 # =========================
@@ -292,21 +282,12 @@ def athena_execute(s3_bucket: str, query: str, max_wait: int = 600) -> bool:
 
 def athena_query(s3_bucket: str, query: str):
     """
-    DEPRECATED - use one of the other, improved queries. 
+    DEPRECATED - use one of the other, improved queries.
     Perform an Athena query and return the result.
     """
 
     athena = boto3.client('athena', region_name='us-west-2')
-    response = athena.start_query_execution(
-        QueryString=query,
-        QueryExecutionContext={
-            'Database': 'default',
-            'Catalog': 'AwsDataCatalog'
-        },
-        ResultConfiguration={
-            'OutputLocation': f's3://{s3_bucket}/athena_query_results'
-        }
-    )
+    response = athena.start_query_execution(QueryString=query, QueryExecutionContext={'Database': 'default', 'Catalog': 'AwsDataCatalog'}, ResultConfiguration={'OutputLocation': f's3://{s3_bucket}/athena_query_results'})
 
     query_execution_id = response['QueryExecutionId']
 

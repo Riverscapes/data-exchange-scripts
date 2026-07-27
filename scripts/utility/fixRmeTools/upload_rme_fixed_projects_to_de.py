@@ -202,7 +202,7 @@ def main():
     # Optional CSV summary
     rows: list[list[str]] = [["huc", "project_id", "project_rs_xml", "project_bounds_geojson", "status", "note"]]
 
-    # RiverscapesAPI context ONLY if we’re actually uploading
+    # RiverscapesAPI context ONLY if we're actually uploading
     api_ctx = RiverscapesAPI(stage="production") if not DRY_RUN else None
 
     try:
@@ -271,7 +271,7 @@ def main():
             # === Real upload path ===
             try:
                 # If you're testing step-by-step, pass finalize=False.
-                # When you’re ready, set finalize=True so we only mark uploaded after finalization.
+                # When you're ready, set finalize=True so we only mark uploaded after finalization.
                 finalize = True  # <- set to False for pre-finalize testing
                 do_real_upload(api_ctx, project_id, files_abs_by_rel, log, finalize=finalize)
 

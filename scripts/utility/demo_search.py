@@ -88,7 +88,7 @@ def simple_search(api: RiverscapesAPI):
     # NB: We set max_results here for demo purposes so this doesn't take 20 minutes but you probably don't want to do that in production
     # ====================================================================================================
     log.title("Loop over each project and \"DO\" somewthing with each one")
-    for project, stats, _total, _prg in api.search(RiverscapesSearchParams({"projectTypeId": "vbet"}), progress_bar=True, max_results=1234):
+    for project, _stats, _total, _prg in api.search(RiverscapesSearchParams({"projectTypeId": "vbet"}), progress_bar=True, max_results=1234):
         # Do a thing (like tag the project, delete it etc.)
         # INSERT THING DOING HERE
         log.debug(f"Project {project.id} has {len(project.json['tags'])} tags")

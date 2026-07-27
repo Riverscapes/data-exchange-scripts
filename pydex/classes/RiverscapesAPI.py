@@ -61,7 +61,7 @@ class RiverscapesAPI:
     authentication workflow which is appropriate for end-users.
     """
 
-    def __init__(self, stage: str = None, machine_auth: dict[str, str] = None, dev_headers: dict[str, str] = None):
+    def __init__(self, stage: str | None = None, machine_auth: dict[str, str] | None = None, dev_headers: dict[str, str] | None = None):
         self.log = Logger('API')
         self.stage = stage.upper() if stage else self._get_stage_interactive()
 
@@ -114,7 +114,7 @@ class RiverscapesAPI:
         i = length
         chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
         while i > 0:
-            result += chars[int(round(os.urandom(1)[0] * (len(chars) - 1)))]
+            result += chars[round(os.urandom(1)[0] * (len(chars) - 1))]
             i -= 1
         return result
 
@@ -336,7 +336,7 @@ class RiverscapesAPI:
         return mutation_file_path.read_text(encoding='utf-8')
 
     def search(
-        self, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: list[str] = None, max_results: int = None, search_query_name: str = None
+        self, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: list[str] | None = None, max_results: int | None = None, search_query_name: str | None = None
     ) -> Generator[tuple[RiverscapesProject, dict, int], None, None]:
         """A simple function to make a yielded search on the riverscapes API
 
@@ -417,7 +417,7 @@ class RiverscapesAPI:
             _prg.finish()
         self.log.debug(f"Search complete: retrieved {outer_counter:,} records")
 
-    def process_search_results_async(self, callback: callable, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: list[str] = None, max_results: int = None, max_workers=5):
+    def process_search_results_async(self, callback: callable, search_params: RiverscapesSearchParams, progress_bar: bool = False, page_size: int = 500, sort: list[str] | None = None, max_results: int | None = None, max_workers=5):
         """
 
         Considerations:
@@ -446,7 +446,7 @@ class RiverscapesAPI:
                 # Submit a new job only if we have not reached max_workers
                 if len(futures) >= max_workers:
                     # Wait for at least one future to complete before continuing
-                    done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+                    _done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
                     futures = list(not_done)  # Update futures list with only incomplete futures
 
                 # Submit the job and track the future
@@ -605,7 +605,7 @@ class RiverscapesAPI:
         else:
             raise RiverscapesAPIException(f"Query failed to run by returning code of {request.status_code}. {query} {json.dumps(variables)}")
 
-    def download_files(self, project_id: str, download_dir: str, re_filter: list[str] = None, force=False):
+    def download_files(self, project_id: str, download_dir: str, re_filter: list[str] | None = None, force=False):
         """From a project id get all relevant files and download them
 
         Args:

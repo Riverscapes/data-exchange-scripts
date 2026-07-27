@@ -40,11 +40,7 @@ from rsxml.logging.progress_bar import ProgressBar
 
 BUCKET_ARN = os.environ.get("S3_TABLES_BUCKET_ARN", "")
 if not BUCKET_ARN:
-    raise OSError(
-        "S3_TABLES_BUCKET_ARN environment variable is not set.\n"
-        "Example: export S3_TABLES_BUCKET_ARN=arn:aws:s3tables:us-west-2:123456789012:bucket/my-bucket"
-    )
-
+    raise OSError("S3_TABLES_BUCKET_ARN environment variable is not set.\nExample: export S3_TABLES_BUCKET_ARN=arn:aws:s3tables:us-west-2:123456789012:bucket/my-bucket")
 AWS_REGION = "us-west-2"
 
 GPKG_PATH = os.environ.get(
@@ -70,26 +66,26 @@ CHUNK_SIZE = 100_000
 # as a property rather than being embedded per-row.
 
 ICEBERG_SCHEMA = Schema(
-    NestedField(field_id=1,  name="fid",        field_type=LongType(),    required=False),
-    NestedField(field_id=2,  name="LINKNO",     field_type=IntegerType(), required=False),
-    NestedField(field_id=3,  name="DSLINKNO",   field_type=IntegerType(), required=False),
-    NestedField(field_id=4,  name="USLINKNO1",  field_type=IntegerType(), required=False),
-    NestedField(field_id=5,  name="USLINKNO2",  field_type=IntegerType(), required=False),
-    NestedField(field_id=6,  name="DSNODEID",   field_type=LongType(),    required=False),
-    NestedField(field_id=7,  name="strmOrder",  field_type=IntegerType(), required=False),
-    NestedField(field_id=8,  name="Length",     field_type=DoubleType(),  required=False),
-    NestedField(field_id=9,  name="Magnitude",  field_type=IntegerType(), required=False),
-    NestedField(field_id=10, name="DSContArea", field_type=DoubleType(),  required=False),
-    NestedField(field_id=11, name="strmDrop",   field_type=DoubleType(),  required=False),
-    NestedField(field_id=12, name="Slope",      field_type=DoubleType(),  required=False),
-    NestedField(field_id=13, name="StraightL",  field_type=DoubleType(),  required=False),
-    NestedField(field_id=14, name="USContArea", field_type=DoubleType(),  required=False),
-    NestedField(field_id=15, name="WSNO",       field_type=IntegerType(), required=False),
-    NestedField(field_id=16, name="DOUTEND",    field_type=DoubleType(),  required=False),
-    NestedField(field_id=17, name="DOUTSTART",  field_type=DoubleType(),  required=False),
-    NestedField(field_id=18, name="DOUTMID",    field_type=DoubleType(),  required=False),
-    NestedField(field_id=19, name="level_path", field_type=DoubleType(),  required=False),
-    NestedField(field_id=20, name="geom_wkb",   field_type=BinaryType(),  required=False),
+    NestedField(field_id=1, name="fid", field_type=LongType(), required=False),
+    NestedField(field_id=2, name="LINKNO", field_type=IntegerType(), required=False),
+    NestedField(field_id=3, name="DSLINKNO", field_type=IntegerType(), required=False),
+    NestedField(field_id=4, name="USLINKNO1", field_type=IntegerType(), required=False),
+    NestedField(field_id=5, name="USLINKNO2", field_type=IntegerType(), required=False),
+    NestedField(field_id=6, name="DSNODEID", field_type=LongType(), required=False),
+    NestedField(field_id=7, name="strmOrder", field_type=IntegerType(), required=False),
+    NestedField(field_id=8, name="Length", field_type=DoubleType(), required=False),
+    NestedField(field_id=9, name="Magnitude", field_type=IntegerType(), required=False),
+    NestedField(field_id=10, name="DSContArea", field_type=DoubleType(), required=False),
+    NestedField(field_id=11, name="strmDrop", field_type=DoubleType(), required=False),
+    NestedField(field_id=12, name="Slope", field_type=DoubleType(), required=False),
+    NestedField(field_id=13, name="StraightL", field_type=DoubleType(), required=False),
+    NestedField(field_id=14, name="USContArea", field_type=DoubleType(), required=False),
+    NestedField(field_id=15, name="WSNO", field_type=IntegerType(), required=False),
+    NestedField(field_id=16, name="DOUTEND", field_type=DoubleType(), required=False),
+    NestedField(field_id=17, name="DOUTSTART", field_type=DoubleType(), required=False),
+    NestedField(field_id=18, name="DOUTMID", field_type=DoubleType(), required=False),
+    NestedField(field_id=19, name="level_path", field_type=DoubleType(), required=False),
+    NestedField(field_id=20, name="geom_wkb", field_type=BinaryType(), required=False),
 )
 
 # ---------------------------------------------------------------------------
@@ -133,8 +129,7 @@ def load_and_prepare(gpkg_path: str, layer_name: str, schema: Schema) -> pa.Tabl
         schema=schema_to_pyarrow(schema),
         preserve_index=False,
     )
-    log.info(f"  Arrow table: {arrow_table.num_rows:,} rows × {arrow_table.num_columns} cols "
-             f"({arrow_table.nbytes / 1024 / 1024:.1f} MB)")
+    log.info(f"  Arrow table: {arrow_table.num_rows:,} rows x {arrow_table.num_columns} cols ({arrow_table.nbytes / 1024 / 1024:.1f} MB)")
     return arrow_table
 
 

@@ -165,10 +165,8 @@ def make_cog(
     if src_ct:
         src_ct = src_ct.Clone()  # clone before closing src_ds
 
-    nodata = src_band.GetNoDataValue()
+    src_band.GetNoDataValue()
 
-    width = src_ds.RasterXSize
-    height = src_ds.RasterYSize
     src_ds = None  # close — we reopen below after building overviews
 
     # ------------------------------------------------------------------

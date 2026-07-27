@@ -23,7 +23,7 @@ def create_collection(riverscapes_api: RiverscapesAPI, environment: str):
     # First gather everything we need to to create a collection
     # ================================================================================================================
 
-    default_dir = os.path.join(os.path.expanduser("~"), 'RSTagging')
+    os.path.join(os.path.expanduser("~"), 'RSTagging')
     questions = [
         inquirer.Text('name', message="What is the name for the new collection?"),
         inquirer.Text('description', message="What is the description for the new collection?"),

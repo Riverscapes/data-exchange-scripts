@@ -80,7 +80,7 @@ def iter_json_array_stream(path: str, chunk_size: int = 1_048_576) -> Iterable[d
                 except ValueError:
                     chunk = f.read(chunk_size)
                     if not chunk:
-                        raise ValueError("Malformed JSON or unexpected EOF while decoding an array element.")
+                        raise ValueError("Malformed JSON or unexpected EOF while decoding an array element.") from None
                     buf += chunk
 
 

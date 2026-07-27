@@ -46,7 +46,7 @@ def update_hero_images(riverscapes_api: RiverscapesAPI):
         # 2. Upload the file using the request module and the signed url
         log.info(f'Uploading {hero_image} to project {project_guid} using signed url {signed_url}')
         # now create the request with the url and the fields
-        response = requests.post(signed_url, data=fields, files={'file': open(hero_image_path, 'rb')}, timeout=60)
+        requests.post(signed_url, data=fields, files={'file': open(hero_image_path, 'rb')}, timeout=60)
 
         # 3.
         log.info('Waiting 5 seconds then Checking if image was uploaded successfully...')
@@ -62,7 +62,7 @@ def update_hero_images(riverscapes_api: RiverscapesAPI):
                 # 4. Now we need to update the project with the new hero image
                 log.info('Updating project with new hero image...')
                 update_project_qry = riverscapes_api.load_mutation('updateProject')
-                update_project_resp = riverscapes_api.run_query(update_project_qry, {'projectId': project_guid, 'project': {'heroImageToken': token}})
+                riverscapes_api.run_query(update_project_qry, {'projectId': project_guid, 'project': {'heroImageToken': token}})
                 break
             elif status == 'FAILED':
                 log.error('Image upload failed')

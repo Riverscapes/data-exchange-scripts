@@ -1,9 +1,12 @@
 """
 Dumps Riverscapes Data Exchange projects to a SQLite database
 """
+
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from rsxml import Logger
+
 from pydex import RiverscapesAPI, RiverscapesSearchParams
 from pydex.imports import import_sqlite3
 
@@ -12,8 +15,8 @@ SCHEMA_FILE = os.path.join(os.path.dirname(__file__), 'riverscapes_schema.sql')
 sqlite3 = import_sqlite3()
 
 
-def dump_riverscapes(rs_api: RiverscapesAPI, db_path: str, search_tags: str = None) -> None:
-    """ DUmp all projects to a DB
+def dump_riverscapes(rs_api: RiverscapesAPI, db_path: str, search_tags: str | None = None) -> None:
+    """DUmp all projects to a DB
 
     Args:
         output_folder ([type]): [description]
@@ -29,9 +32,11 @@ def dump_riverscapes(rs_api: RiverscapesAPI, db_path: str, search_tags: str = No
     curs = conn.cursor()
 
     # Basically just search for everything
-    searchParams = RiverscapesSearchParams({
-        'tags': [tag.strip() for tag in search_tags.split(',')],
-    })
+    searchParams = RiverscapesSearchParams(
+        {
+            'tags': [tag.strip() for tag in search_tags.split(',')],
+        }
+    )
 
     # Determine last created date projects in the database.
     # Delete all projects that were in that same day and then start the download
@@ -43,12 +48,11 @@ def dump_riverscapes(rs_api: RiverscapesAPI, db_path: str, search_tags: str = No
     # to fully complete once.
     if last_inserted_row[0] is not None:
         # Convert milliseconds to seconds and create a datetime object
-        last_inserted = datetime.fromtimestamp(last_inserted_row[0] / 1000, tz=timezone.utc)
+        last_inserted = datetime.fromtimestamp(last_inserted_row[0] / 1000, tz=UTC)
         searchParams.createdOnFrom = last_inserted
 
     # Create a timedelta object with a difference of 1 day
     for project, _stats, _searchtotal, _prg in rs_api.search(searchParams, progress_bar=True, page_size=100):
-
         # Attempt to retrieve the huc10 from the project metadata if it exists
         huc10 = None
         for key in ['HUC10', 'huc10', 'HUC', 'huc']:
@@ -65,46 +69,45 @@ def dump_riverscapes(rs_api: RiverscapesAPI, db_path: str, search_tags: str = No
                 break
 
         # Insert project data
-        curs.execute('''
+        curs.execute(
+            '''
             INSERT INTO rs_projects(project_id, name, tags, huc10, model_version, project_type_id, created_on, owned_by_id, owned_by_name, owned_by_type)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
             ''',
-                     (
-                         project.id,
-                         project.name,
-                         ','.join(project.tags),
-                         huc10,
-                         model_version,
-                         project.project_type,
-                         int(project.created_date.timestamp() * 1000),
-                         project.json['ownedBy']['id'],
-                         project.json['ownedBy']['name'],
-                         project.json['ownedBy']['__typename']
-                     ))
+            (
+                project.id,
+                project.name,
+                ','.join(project.tags),
+                huc10,
+                model_version,
+                project.project_type,
+                int(project.created_date.timestamp() * 1000),
+                project.json['ownedBy']['id'],
+                project.json['ownedBy']['name'],
+                project.json['ownedBy']['__typename'],
+            ),
+        )
 
         # Don't rely on curs.lastrowid because it's not reliable when using ON CONFLICT DO NOTHING
         curs.execute('SELECT id FROM rs_projects WHERE project_id = ?', [project.id])
         project_id = curs.fetchone()[0]
 
         # Insert project meta data
-        curs.executemany('INSERT INTO rs_project_meta (project_id, key, value) VALUES (?, ?, ?) ON CONFLICT DO NOTHING', [
-            (project_id, key, value) for key, value in project.project_meta.items()
-        ])
+        curs.executemany('INSERT INTO rs_project_meta (project_id, key, value) VALUES (?, ?, ?) ON CONFLICT DO NOTHING', [(project_id, key, value) for key, value in project.project_meta.items()])
 
     conn.commit()
     log.info(f'Finished Writing: {db_path}')
 
 
 def create_database(db_path: str):
-    """ Incorporate the Riverscapes Data Exchange schema into the SQLite database
-    """
+    """Incorporate the Riverscapes Data Exchange schema into the SQLite database"""
     log = Logger('Create Database')
 
     if not os.path.exists(SCHEMA_FILE):
         raise Exception(f'The schema file does not exist: {SCHEMA_FILE}')
 
     # Read the schema from the file
-    with open(SCHEMA_FILE, 'r', encoding='utf8') as file:
+    with open(SCHEMA_FILE, encoding='utf8') as file:
         schema = file.read()
 
     # Connect to a new (or existing) database

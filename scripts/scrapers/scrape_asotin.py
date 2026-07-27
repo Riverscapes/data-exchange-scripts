@@ -12,7 +12,7 @@ search_params = RiverscapesSearchParams(
 
 projects = []
 with RiverscapesAPI(stage='production') as api:
-    for project, _stats, search_total, _prg in api.search(search_params, progress_bar=True):
+    for project, _stats, _search_total, _prg in api.search(search_params, progress_bar=True):
         project_type = project.project_type
         visit_id = project.project_meta.get('Visit', None)
         site_name = project.project_meta.get('Site', None)

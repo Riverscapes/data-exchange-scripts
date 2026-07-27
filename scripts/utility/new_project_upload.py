@@ -72,7 +72,7 @@ def upload_projects(riverscapes_api: RiverscapesAPI, parent_folder: str, owner: 
     log.info(f'Upload completed: {success_count} succeeded, {fail_count} failed')
 
 
-def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, project_id: str, owner: str, visibility: str, tags: list = None, no_wait: bool = False):
+def upload_project(riverscapes_api: RiverscapesAPI, project_xml_path: str, project_id: str, owner: str, visibility: str, tags: list | None = None, no_wait: bool = False):
     """A typical pattern we use is to upload or update files in a project. In order to do this we need to upload both the
     files we wish to change as well as the project.rs.xml file which describes the project and its files.
 

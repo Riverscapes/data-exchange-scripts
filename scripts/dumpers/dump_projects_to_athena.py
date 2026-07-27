@@ -143,7 +143,7 @@ def upload_sqlite_to_s3(curs: sqlite3.Cursor, s3_bucket: str) -> None:
     # each day and each project type. This should help partition the data better in Athena.
     curs.execute("""
         CREATE TEMP TABLE temp_projects AS
-        SELECT DISTINCT 
+        SELECT DISTINCT
             project_type_id,
             CAST(created_on / 86400000 as INT) * 86400000 create_stamp,
             date(created_on / 1000, 'unixepoch') create_date,

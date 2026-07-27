@@ -389,10 +389,10 @@ def scrape_hucs_batch(rs_api: RiverscapesAPI, projects: dict[str, str], download
             huc_dir = os.path.join(download_dir, huc)
 
             rme_guid = project_ids['rme']
-            rme_gpkg = download_file(rs_api, rme_guid, os.path.join(huc_dir, 'rme'), RME_OUTPUT_GPKG_REGEX)
+            download_file(rs_api, rme_guid, os.path.join(huc_dir, 'rme'), RME_OUTPUT_GPKG_REGEX)
 
             rcat_guid = project_ids['rcat']
-            rcat_gpkg = download_file(rs_api, rcat_guid, os.path.join(huc_dir, 'rcat'), RCAT_OUTPUT_GPKG_REGEX)
+            download_file(rs_api, rcat_guid, os.path.join(huc_dir, 'rcat'), RCAT_OUTPUT_GPKG_REGEX)
 
             raise NotImplementedError('Scraping HUC batch is not implemented yet. FIX THIS ERROR!!!!!')
             # scrape_huc_statistics(huc, rme_gpkg, rcat_gpkg, output_db)

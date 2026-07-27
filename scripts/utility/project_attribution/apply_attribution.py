@@ -38,7 +38,7 @@ import argparse
 import logging
 import uuid
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -48,7 +48,7 @@ from rsxml import Logger, ProgressBar, dotenv
 from pydex import RiverscapesAPI
 
 
-class AttributionRoleEnum(str, Enum):
+class AttributionRoleEnum(StrEnum):
     ANALYST = "ANALYST"
     CONTRIBUTOR = "CONTRIBUTOR"
     CO_FUNDER = "CO_FUNDER"
@@ -83,7 +83,7 @@ class ProjectAttributionOutput(TypedDict):
     roles: list[str]
 
 
-class UpdateMode(str, Enum):
+class UpdateMode(StrEnum):
     """Allowed options for attribution changes"""
 
     ADD = "ADD"
@@ -132,7 +132,7 @@ def is_attribution_equal(list_a: list[ProjectAttributionInput], list_b: list[Pro
         return False
 
     # We assume the order of organizations matters (e.g. Primary first)
-    for a, b in zip(list_a, list_b):
+    for a, b in zip(list_a, list_b, strict=False):
         if a["organizationId"] != b["organizationId"]:
             return False
 

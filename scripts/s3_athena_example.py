@@ -164,7 +164,7 @@ def load_and_prepare(gpkg_path: str, layer_name: str, schema: Schema) -> pa.Tabl
         schema=schema_to_pyarrow(schema),
         preserve_index=False,
     )
-    log.info(f"  Arrow table: {arrow_table.num_rows:,} rows × {arrow_table.num_columns} cols ({arrow_table.nbytes / 1024 / 1024:.1f} MB)")
+    log.info(f"  Arrow table: {arrow_table.num_rows:,} rows x {arrow_table.num_columns} cols ({arrow_table.nbytes / 1024 / 1024:.1f} MB)")
     return arrow_table
 
 

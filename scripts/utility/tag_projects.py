@@ -91,8 +91,8 @@ def tag_projects(rs_api: RiverscapesAPI, engine: str, db_path: str) -> tuple[boo
         print('No projects found for the specified engine and HUCs')
         return False, answers['engine']
 
-    for project_id in project_ids:
-        log.info('Project ID: {project_id}')
+    for _project_id in project_ids:
+        log.info('Project ID: {_project_id}')
 
     project_check = inquirer.prompt([inquirer.List("project_check", message=f'Continue and update {len(project_ids)} projects?', choices=['Yes', 'No'], default='No')])
     if project_check['project_check'] != 'Yes':
