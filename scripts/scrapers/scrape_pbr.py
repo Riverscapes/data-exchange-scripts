@@ -3,9 +3,9 @@ Script to query the PBR GraphQL API for projects using the SearchProjects query.
 """
 
 import json
-import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
 import requests
 
@@ -68,6 +68,10 @@ query SearchProjects {
                 latitude
                 longitude
             }
+            meta {
+                key
+                value
+            }
         }
     }
 }
@@ -92,14 +96,24 @@ def fetch_pbr_projects(output_path: str | None = None):
     projects = data["data"]["searchProjects"]["results"]
     print(f"Fetched {len(projects)} projects.")
 
-    if output_path is None:
-        output_dir = os.path.join(os.path.expanduser("~"), "PBRProjects")
-        os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, f"pbr_projects_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    timestamped_name = f"pbr_projects_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    if output_path is None:
+        output_dir = Path.home() / "PBRProjects"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / timestamped_name
+    elif Path(output_path).is_dir() or output_path.endswith(("/", "\\")):
+        # If a directory is provided, write a timestamped JSON file into it.
+        output_dir = Path(output_path)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / timestamped_name
+    else:
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_file.open("w", encoding="utf-8") as f:
         json.dump(projects, f, indent=2)
-    print(f"Saved project list to {output_path}")
+    print(f"Saved project list to {output_file}")
 
 
 if __name__ == "__main__":
