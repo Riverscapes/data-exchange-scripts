@@ -45,22 +45,37 @@ missing_projects_query = """
 with huc_projects_dex as
          (select project_id,
                  huc,
-                 created_on
-          from vw_projects
+                 name,
+                 model_version,
+                 model_version_int,
+                 created_on,
+                 created_on_date
+          from default.vw_projects
           WHERE project_type_id = 'rs_metric_engine'
             and owner = 'a52b8094-7a1d-4171-955c-ad30ae935296'
             AND created_on >= 1735689600
             AND (contains(tags, '2025CONUS')
               OR contains(tags, 'conus_athena'))),
-    huc_projects_scraped as
-        (select substr(huc12, 1, 10) as huc10,
-                raw_rme_pq2.rme_date_created_ts
-         from rs_raw.raw_rs_metric_engine2 raw_rme_pq2)
-select distinct project_id, huc, created_on, rme_date_created_ts
+    huc_projects_scraped as (
+    -- Grouping ensures strictly 1 row per HUC before the join
+    SELECT substr(huc12, 1, 10) AS huc10,
+           MIN(rme_date_created_ts) AS oldest_scrape_ts
+    FROM rs_raw.raw_rs_metric_engine2
+    GROUP BY substr(huc12, 1, 10)
+    ),
+    ranked_projects as
+(select project_id, huc, created_on, oldest_scrape_ts, created_on_date, model_version, model_version_int, name
+,CASE
+           WHEN ROW_NUMBER() OVER (PARTITION BY huc ORDER BY model_version_int DESC) = 1 THEN true
+           ELSE false
+       END AS is_latest_version
 from huc_projects_dex dex
     left join huc_projects_scraped scr on dex.huc = scr.huc10
 where scr.huc10 is null
-   or scr.rme_date_created_ts < truncate(dex.created_on/1000)*1000
+OR scr.oldest_scrape_ts < truncate(dex.created_on/1000)*1000
+)
+select * from ranked_projects
+where is_latest_version
 """
 
 
