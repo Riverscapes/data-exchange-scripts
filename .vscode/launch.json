@@ -33,6 +33,23 @@
   ],
   "configurations": [
     {
+      "name": "Python Debugger: QRiS Beaver Activity to Athena",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/pipelines/qris_beaver_activity_to_athena/qris_beaver_activity_to_athena.py",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        // Stage (staging | production)
+        "production",
+        // Working folder (downloads)
+        "{env:DATA_ROOT}/qris_scrape"
+      ]
+    },
+    {
       "name": "Python Debugger: Current File with Arguments",
       "type": "debugpy",
       "request": "launch",
@@ -547,7 +564,8 @@
         "False",
         "c7d8c487-c377-42b0-a5b6-4c16db18fb41",
         // "--visit_id", "1165",
-        "--watershed", "Lemhi",
+        "--watershed",
+        "Lemhi",
       ]
     },
     // {

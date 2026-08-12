@@ -13,6 +13,7 @@ from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlencode, urlparse, urlunparse
 
 # We want to make inquirer optional so that we can use this module in other contexts
@@ -605,13 +606,17 @@ class RiverscapesAPI:
         else:
             raise RiverscapesAPIException(f"Query failed to run by returning code of {request.status_code}. {query} {json.dumps(variables)}")
 
-    def download_files(self, project_id: str, download_dir: str, re_filter: list[str] | None = None, force=False):
-        """From a project id get all relevant files and download them
+    def download_files(self, project_id: str, download_dir: str | Path, re_filter: list[str] | None = None, force: bool = False) -> None:
+        """Download files for a project, optionally filtered by regex patterns.
 
         Args:
-            project_id (_type_): _description_
-            local_path (_type_): _description_
-            force (bool, optional): _description_. Defaults to False.
+            project_id (str): Project GUID.
+            download_dir (str | Path): Local destination directory root.
+            re_filter (list[str] | None, optional): Regex patterns used to match
+                each API file's ``localPath``. If ``None`` or empty, all files
+                are considered.
+            force (bool, optional): If ``True``, force re-download even when a
+                matching file already exists locally.
         """
 
         # Fetch the project files from the API
@@ -641,21 +646,74 @@ class RiverscapesAPI:
             return
 
         for file in filtered_files:
-            local_file_path = os.path.join(download_dir, file['localPath'])
+            local_file_path = Path(download_dir) / file['localPath']
             self.download_file(file, local_file_path, force)
 
-    def download_file(self, api_file_obj: dict[str, any], local_path: str, force=False):
-        """NOTE: The directory for this file will be created if it doesn't exist
+    def download_project_file(self, project_id: str, project_local_path: str, destination_folder: str | Path, force: bool = False) -> Path:
+        """Download specific file from project listing using exact name match and return the path to the file.
+        Only overwrites existing files if etags differ or force is True.
 
-        Arguments:
-            api_file_obj {[type]} -- The dictionary that the API returns. should include the name, md5, size etc
-            local_path {[type]} -- the file's local path
+        Args:
+            project_id: Project GUID
+            project_local_path (str): filename and relative path, e.g. 'project.rs.xml' or 'context/feature_classes.gpkg'
+            destination_folder (str | Path): where to put the file
+            force (bool, optional): If True, ``True``, re-download even if file already exists with matching etag
 
-        Keyword Arguments:
-            force {bool} -- if true we will download regardless
+        Returns:
+            Path: downloaded file
+
+        Raises:
+            FileNotFoundError if no exact match
+            RiverscapesAPIException if multiple matches
         """
-        file_is_there = os.path.exists(local_path) and os.path.isfile(local_path)
-        etag_match = file_is_there and calculate_etag(local_path) == api_file_obj['etag']
+        file_results = self.get_project_files(project_id)
+
+        # Normalize slashes so callers can pass either Windows or POSIX separators.
+        target_path = project_local_path.replace('\\', '/').lstrip('/')
+
+        matched_files = []
+        for file in file_results:
+            local_path = file.get('localPath')
+            if local_path is None:
+                continue
+            if local_path.replace('\\', '/').lstrip('/') == target_path:
+                matched_files.append(file)
+
+        if len(matched_files) == 0:
+            raise FileNotFoundError(f"File '{project_local_path}' was not found in project {project_id}")
+
+        if len(matched_files) > 1:
+            raise RiverscapesAPIException(f"Multiple files matched '{project_local_path}' in project {project_id}")
+
+        matched_file = matched_files[0]
+
+        if 'localPath' not in matched_file:
+            raise RiverscapesAPIException(f"Matched file for '{project_local_path}' is missing localPath metadata")
+
+        local_file_path = Path(destination_folder) / matched_file['localPath']
+        self.download_file(matched_file, local_file_path, force)
+        return local_file_path
+
+    def download_file(self, api_file_obj: dict[str, Any], local_path: str | Path, force: bool = False) -> bool | None:
+        """Download a single API file object to a local path.
+
+        The destination directory is created if it does not already exist.
+
+        Args:
+            api_file_obj (dict[str, any]): API file descriptor containing fields
+                like ``downloadUrl`` and ``etag``.
+            local_path (str | Path): Local destination file path.
+            force (bool, optional): If ``True``, re-download even when an
+                existing local file matches the expected ETag. If False, will re-download only if files differ (etag mismatch).
+
+        Returns:
+            bool | None: ``True`` when a download occurred, ``False`` when the
+                existing local file was retained, or ``None`` if retries are
+                exhausted and an exception is raised upstream.
+        """
+        local_path = Path(local_path)
+        file_is_there = local_path.exists() and local_path.is_file()
+        etag_match = file_is_there and calculate_etag(str(local_path)) == api_file_obj['etag']
 
         file_directory = os.path.dirname(local_path)
 
