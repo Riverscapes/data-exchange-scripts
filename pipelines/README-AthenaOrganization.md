@@ -2,7 +2,7 @@
 
 > ![Note] 2026-01-15 This file in `data-exchange-scripts` repository `\pipelines\athena_readme.md`
 
-Pipelines output for Athena should go in the Riverscapes-athena bucket in the data_exchange/ prefix.  
+Pipelines output for Athena hive-style tables should go in the Riverscapes-athena bucket in the data_exchange/ prefix.  
 
 Suggested naming convention, partitions & organization:
 

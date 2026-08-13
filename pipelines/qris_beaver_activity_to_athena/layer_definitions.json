@@ -1,0 +1,133 @@
+{
+  "$schema": "https://xml.riverscapes.net/riverscapes_metadata/schema/layer_definitions.schema.json",
+  "tool_schema_version": "0.1.0",
+  "tool_schema_name": "qris_beaver_activity_to_athena",
+  "layers": [
+    {
+      "layer_id": "qris_beaver_activity",
+      "layer_name": "Beaver Activity",
+      "description": "Data Extracted from Data Exchange Riverscapes Studio (QRiS) projects. NOTE: Most source projects are PRIVATE and can only be accessed by members of the owning organizations.",
+      "layer_type": "DataTable",
+      "columns": [
+                {
+          "name": "project_id",
+          "dtype": "STRING",
+          "friendly_name": "Project ID",
+          "data_unit": "NA",
+          "description": "Riverscapes Data Exchange Project GUID",
+          "is_key": false,
+          "is_required": true,
+          "theme": "Context",
+          "default_value": null
+        },
+        {
+          "name": "project_created_on",
+          "dtype": "INTEGER",
+          "friendly_name": "Project Created Timestamp",
+          "data_unit": "NA",
+          "description": "Timestamp for project creation from Riverscapes Data Exchange",
+          "is_key": false,
+          "is_required": false,
+          "theme": "Context",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "project_updated_on",
+          "dtype": "INTEGER",
+          "friendly_name": "Project Updated Timestamp",
+          "data_unit": "NA",
+          "description": "Timestamp for project update from Riverscapes Data Exchange",
+          "is_key": false,
+          "is_required": false,
+          "theme": "Context",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "dam_cer",
+          "dtype": "STRING",
+          "friendly_name": "Dam Certainty",
+          "data_unit": "NA",
+          "description": "The observer's confidence that the mapped feature represents a beaver dam.",
+          "is_key": false,
+          "is_required": true,
+          "theme": "Beaver",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "dam_type",
+          "dtype": "STRING",
+          "friendly_name": "Dam Type",
+          "data_unit": "NA",
+          "description": "The type of dam (active, inactive, or relic)",
+          "is_key": false,
+          "is_required": true,
+          "theme": "Beaver",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "type_cer",
+          "dtype": "STRING",
+          "friendly_name": "Type Certainty",
+          "data_unit": "NA",
+          "description": "The observer's confidence in their assessment of the dam type",
+          "is_key": false,
+          "is_required": false,
+          "theme": "Beaver",
+          "preferred_bin_definition": "",
+          "default_value": null
+        },
+        {
+          "name": "realization_name",
+          "dtype": "STRING",
+          "friendly_name": "Realization Name",
+          "data_unit": "NA",
+          "description": "",
+          "is_key": false,
+          "is_required": false,
+          "theme": "Context",
+          "default_value": null
+        },
+        {
+          "name": "realization_description",
+          "dtype": "STRING",
+          "friendly_name": "Realization Description",
+          "data_unit": "NA",
+          "description": "",
+          "is_key": false,
+          "is_required": false,
+          "theme": "Context"
+        },
+        {
+          "name": "metadata_census_date",
+          "dtype": "STRING",
+          "friendly_name": "Census Date",
+          "data_unit": "NA",
+          "description": "",
+          "is_key": false,
+          "is_required": false,
+          "theme": "Context"
+        },
+        {
+          "name": "parsed_survey_year",
+          "dtype": "STRING",
+          "friendly_name": "Parsed Survey Year",
+          "data_unit": "NA",
+          "description": "Extracted programatically from either metadata_census_date or realization_name. If not found or there is disagreement, value is 'unclear'.",
+          "is_key": false,
+          "is_required": false,
+          "theme": "Context"
+        },
+        {
+            "name": "geom_wkb",
+            "dtype": "BINARY",
+            "friendly_name": "Geometry (WKB)",
+            "description": "Geometry as Well Known Binary"
+        }
+      ]
+    }
+  ]
+}
