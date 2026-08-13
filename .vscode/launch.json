@@ -46,7 +46,8 @@
         // Stage (staging | production)
         "production",
         // Working folder (downloads)
-        "{env:DATA_ROOT}/qris_scrape"
+        "{env:DATA_ROOT}/qris_scrape",
+        "--dry-run"
       ]
     },
     {

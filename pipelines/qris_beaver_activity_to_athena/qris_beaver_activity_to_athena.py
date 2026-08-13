@@ -39,6 +39,27 @@ ICEBERG_LOCATION: str = 's3://riverscapes-athena/rs_raw/qris_beaver_activity/'
 SYNC_SOURCE_TABLE: str = 'dev_riverscapes.qris_beaver_activity_sync_source'
 SYNC_SOURCE_PREFIX_BASE: str = 'dev-test/rs_raw_sync_source/qris_beaver_activity'
 
+SOURCE_PROJECTS_CTE: str = """
+source_projects AS (
+    SELECT project_id,
+        huc,
+        name,
+        model_version,
+        model_version_int,
+        created_on,
+        created_on_date,
+        updated_on,
+        updated_on_date,
+        owner
+    FROM default.data_exchange_projects
+    WHERE project_type_id = 'riverscapesstudio'
+      AND owner IN ('a52b8094-7a1d-4171-955c-ad30ae935296',
+              '4a49c97e-7ce2-4c66-8ffe-ed41a675a115',
+              'f0f6a9e7-f102-4066-9265-2d29ec1c467a')
+      AND (contains(tags, 'beaver_activity'))
+)
+"""
+
 
 def parse_s3_uri(s3_uri: str) -> tuple[str, str]:
     """Parse an S3 URI into (bucket, key_prefix)."""
@@ -143,30 +164,47 @@ def delete_s3_prefix(s3_bucket: str, prefix: str) -> int:
 
 
 def get_projects():
-    """Return projects to be upserted into Athena"""
-    # TODO: this is all projects matching criteria, makes no check for what is already there
-    sql = """
-SELECT project_id,
-       huc,
-       name,
-       model_version,
-       model_version_int,
-       created_on,
-       created_on_date,
-       updated_on,
-       updated_on_date,
-       owner
-FROM default.data_exchange_projects
-WHERE project_type_id = 'riverscapesstudio'
-  AND owner IN ('a52b8094-7a1d-4171-955c-ad30ae935296', -- USU RAM
-                '4a49c97e-7ce2-4c66-8ffe-ed41a675a115', -- Bonneville Environmental Foundation
-                'f0f6a9e7-f102-4066-9265-2d29ec1c467a' -- Defenders of Wildlife
-    )
-  AND (contains(tags, 'beaver_activity'))
-  LIMIT 10
-  """
-    projects_to_add_df = query_to_dataframe(sql, 'identify new projects')
-    return projects_to_add_df
+    """Return only projects that are new or updated relative to target table."""
+    source_projects_cte = f"""
+WITH {SOURCE_PROJECTS_CTE}
+"""
+
+    table_exists_sql = """
+SELECT 1 AS table_exists
+FROM information_schema.tables
+WHERE table_schema = 'rs_raw'
+  AND table_name = 'qris_beaver_activity'
+LIMIT 1
+"""
+    table_exists_df = query_to_dataframe(table_exists_sql, 'check target table exists')
+    table_exists = not table_exists_df.empty
+
+    if not table_exists:
+        sql = f"""
+{source_projects_cte}
+SELECT *
+FROM source_projects
+"""
+        return query_to_dataframe(sql, 'identify projects for initial load')
+
+    sql = f"""
+{source_projects_cte},
+target_projects AS (
+    SELECT
+        project_id,
+        MAX(project_updated_on) AS target_updated_on
+    FROM {TARGET_TABLE}
+    GROUP BY project_id
+)
+SELECT s.*
+FROM source_projects s
+LEFT JOIN target_projects t
+    ON s.project_id = t.project_id
+WHERE t.project_id IS NULL
+   OR CAST(s.updated_on AS BIGINT) > CAST(t.target_updated_on AS BIGINT)
+"""
+
+    return query_to_dataframe(sql, 'identify new/updated projects')
 
 
 def download_projectrsxml(rs_api: RiverscapesAPI, project_id: str, download_dir: Path) -> Path:
@@ -329,82 +367,127 @@ def get_year_from_meta_or_realiz(layer_row: dict) -> str:
     return 'unclear'
 
 
-def scrape_projects(rs_api: RiverscapesAPI, download_dir: Path, keep_sync_source: bool = False):
+def scrape_projects(rs_api: RiverscapesAPI, download_dir: Path, keep_sync_source: bool = False, dry_run: bool = False):
     """orchestrate scraping of projects"""
     log = Logger('Scrape Projects')
     projects = get_projects()
     if projects.empty:
-        log.info("Query to identify projects to scrape returned no results.")
+        log.info("Query to identify projects to scrape returned no new/updated projects.")
+    else:
+        log.info(f"Query to identify projects to scrape returned {len(projects)} projects.")
+
+    if dry_run:
+        table_exists_sql = """
+SELECT 1 AS table_exists
+FROM information_schema.tables
+WHERE table_schema = 'rs_raw'
+  AND table_name = 'qris_beaver_activity'
+LIMIT 1
+"""
+        table_exists_df = query_to_dataframe(table_exists_sql, 'check target table exists for dry-run')
+        table_exists = not table_exists_df.empty
+
+        changed_project_ids = sorted({str(pid) for pid in projects['project_id'].tolist()}) if not projects.empty else []
+
+        delete_project_ids: list[str] = []
+        if table_exists:
+            delete_candidates_sql = f"""
+SELECT t.project_id
+FROM (SELECT DISTINCT project_id FROM {TARGET_TABLE}) t
+LEFT JOIN (
+    SELECT DISTINCT project_id
+    FROM default.data_exchange_projects
+    WHERE project_type_id = 'riverscapesstudio'
+      AND owner IN ('a52b8094-7a1d-4171-955c-ad30ae935296',
+                    '4a49c97e-7ce2-4c66-8ffe-ed41a675a115',
+                    'f0f6a9e7-f102-4066-9265-2d29ec1c467a')
+      AND (contains(tags, 'beaver_activity'))
+) s ON s.project_id = t.project_id
+WHERE s.project_id IS NULL
+"""
+            delete_candidates_df = query_to_dataframe(delete_candidates_sql, 'identify projects that would be deleted')
+            if not delete_candidates_df.empty and 'project_id' in delete_candidates_df.columns:
+                delete_project_ids = sorted({str(pid) for pid in delete_candidates_df['project_id'].tolist()})
+
+        log.info('Dry run mode enabled. No downloads or Athena DML will be executed.')
+        log.info(f"Would replace/add {len(changed_project_ids)} project(s) in {TARGET_TABLE}.")
+        log.info(f"Would delete {len(delete_project_ids)} project(s) from {TARGET_TABLE}.")
+        if changed_project_ids:
+            sample_changed = ', '.join(changed_project_ids[:20])
+            log.info(f"Sample changed/new project_ids (up to 20): {sample_changed}")
+        if delete_project_ids:
+            sample_deleted = ', '.join(delete_project_ids[:20])
+            log.info(f"Sample delete project_ids (up to 20): {sample_deleted}")
         return
-    log.info(f"Query to identify projects to scrape returned {len(projects)} projects.")
 
     count = 0
     errors = 0
     all_rows: list[dict[str, object | None]] = []
     feature_frames: list[gpd.GeoDataFrame] = []
-    prg = ProgressBar(projects.shape[0], text="Scrape Progress")
-    for project_row in projects.itertuples(index=False):
-        project_id = str(project_row.project_id)
-        project_name = str(project_row.name)
-        created_on_raw = project_row.created_on
-        updated_on_raw = project_row.updated_on
-        created_on = 0
-        updated_on = 0
-        if pd.notna(created_on_raw):
+    if not projects.empty:
+        prg = ProgressBar(projects.shape[0], text="Scrape Progress")
+        for project_row in projects.itertuples(index=False):
+            project_id = str(project_row.project_id)
+            project_name = str(project_row.name)
+            created_on_raw = project_row.created_on
+            updated_on_raw = project_row.updated_on
+            created_on = 0
+            updated_on = 0
+            if pd.notna(created_on_raw):
+                try:
+                    created_on = int(float(str(created_on_raw)))
+                except (TypeError, ValueError):
+                    log.warning(f"Could not parse created_on for {project_name} ({project_id}): {created_on_raw}")
+            if pd.notna(updated_on_raw):
+                try:
+                    updated_on = int(float(str(updated_on_raw)))
+                except (TypeError, ValueError):
+                    log.warning(f"Could not parse updated_on for {project_name} ({project_id}): {updated_on_raw}")
+            log.debug(f"Scraping {project_name} ({project_id})")
             try:
-                created_on = int(float(str(created_on_raw)))
-            except (TypeError, ValueError):
-                log.warning(f"Could not parse created_on for {project_name} ({project_id}): {created_on_raw}")
-        if pd.notna(updated_on_raw):
-            try:
-                updated_on = int(float(str(updated_on_raw)))
-            except (TypeError, ValueError):
-                log.warning(f"Could not parse updated_on for {project_name} ({project_id}): {updated_on_raw}")
-        log.debug(f"Scraping {project_name} ({project_id})")
-        try:
-            # get the project.rs.xml and parse realizations
-            project_download_dir = download_dir / project_id
-            projectrsxml_path = download_projectrsxml(rs_api, project_id, project_download_dir)
-            layers = beaver_dam_layers(projectrsxml_path)
-            if len(layers) == 0:
-                log.warning("No matching Vector layer found.")
-            for layer in layers:
-                row: dict[str, object | None] = {'project_id': project_id, 'project_name': project_name, 'created_on': created_on, 'updated_on': updated_on}
-                row.update(layer)
-                all_rows.append(row)
-                layer_gdf = process_layer(rs_api, row, project_download_dir)
-                if layer_gdf.empty:
-                    continue
-                layer_gdf = layer_gdf.copy()
-                layer_gdf['project_id'] = project_id
-                # layer_gdf['project_name'] = project_name # this can be derived from project_id joining to projects table in Athena, but could keep it for convenience
-                # layer_gdf['lyrName'] = str(row.get('lyrName', '')) # values are vw_beaver_dam_1 or vw_beaver_dam_2 or vw_beaver_dam_event_1_event_layer_1
-                # layer_gdf['geopackage_path'] = str(row.get('geopackage_path', '')) # this is internal info not useful, also ALL values are qris.gpkg
-                # layer_gdf['realization_id'] = str(row.get('realization_id', '')) # all values are realization_qris_1 or realization_qris_2 . is this useful?
-                layer_gdf['realization_name'] = str(row.get('realization_name', ''))
-                layer_gdf['realization_description'] = str(row.get('realization_description', ''))
-                # Python is good for string matching, logic etc, but we'll provide the raw data in case someone wants to extract it differently
-                parsed_survey_year = get_year_from_meta_or_realiz(row)
-                layer_gdf['parsed_survey_year'] = parsed_survey_year
-                metadata_value = row.get('realization_metadata')
-                # only care about the CensusDate metadatavalue, not the other two
-                census_date_raw = metadata_value.get('CensusDate', '') if isinstance(metadata_value, dict) else ''
-                layer_gdf['metadata_census_date'] = census_date_raw
-                created_on_value = row.get('created_on', 0)
-                updated_on_value = row.get('updated_on', 0)
-                layer_gdf['created_on'] = int(created_on_value) if isinstance(created_on_value, (int, float, str)) else 0
-                layer_gdf['updated_on'] = int(updated_on_value) if isinstance(updated_on_value, (int, float, str)) else 0
-                feature_frames.append(layer_gdf)
-            count += 1
-            prg.update(count + errors)
+                # get the project.rs.xml and parse realizations
+                project_download_dir = download_dir / project_id
+                projectrsxml_path = download_projectrsxml(rs_api, project_id, project_download_dir)
+                layers = beaver_dam_layers(projectrsxml_path)
+                if len(layers) == 0:
+                    log.warning("No matching Vector layer found.")
+                for layer in layers:
+                    row: dict[str, object | None] = {'project_id': project_id, 'project_name': project_name, 'created_on': created_on, 'updated_on': updated_on}
+                    row.update(layer)
+                    all_rows.append(row)
+                    layer_gdf = process_layer(rs_api, row, project_download_dir)
+                    if layer_gdf.empty:
+                        continue
+                    layer_gdf = layer_gdf.copy()
+                    layer_gdf['project_id'] = project_id
+                    # layer_gdf['project_name'] = project_name # this can be derived from project_id joining to projects table in Athena, but could keep it for convenience
+                    # layer_gdf['lyrName'] = str(row.get('lyrName', '')) # values are vw_beaver_dam_1 or vw_beaver_dam_2 or vw_beaver_dam_event_1_event_layer_1
+                    # layer_gdf['geopackage_path'] = str(row.get('geopackage_path', '')) # this is internal info not useful, also ALL values are qris.gpkg
+                    # layer_gdf['realization_id'] = str(row.get('realization_id', '')) # all values are realization_qris_1 or realization_qris_2 . is this useful?
+                    layer_gdf['realization_name'] = str(row.get('realization_name', ''))
+                    layer_gdf['realization_description'] = str(row.get('realization_description', ''))
+                    # Python is good for string matching, logic etc, but we'll provide the raw data in case someone wants to extract it differently
+                    parsed_survey_year = get_year_from_meta_or_realiz(row)
+                    layer_gdf['parsed_survey_year'] = parsed_survey_year
+                    metadata_value = row.get('realization_metadata')
+                    # only care about the CensusDate metadatavalue, not the other two
+                    census_date_raw = metadata_value.get('CensusDate', '') if isinstance(metadata_value, dict) else ''
+                    layer_gdf['metadata_census_date'] = census_date_raw
+                    created_on_value = row.get('created_on', 0)
+                    updated_on_value = row.get('updated_on', 0)
+                    layer_gdf['created_on'] = int(created_on_value) if isinstance(created_on_value, (int, float, str)) else 0
+                    layer_gdf['updated_on'] = int(updated_on_value) if isinstance(updated_on_value, (int, float, str)) else 0
+                    feature_frames.append(layer_gdf)
+                count += 1
+                prg.update(count + errors)
 
-        except Exception as e:
-            errors += 1
-            log.error(f'Error scraping {project_name} ({project_id}): {e}')
-            prg.update(count + errors)
-            # raise
+            except Exception as e:
+                errors += 1
+                log.error(f'Error scraping {project_name} ({project_id}): {e}')
+                prg.update(count + errors)
+                # raise
 
-    prg.finish()
+        prg.finish()
 
     output_columns = [
         'project_id',
@@ -433,52 +516,38 @@ def scrape_projects(rs_api: RiverscapesAPI, download_dir: Path, keep_sync_source
         feature_gdf = gpd.GeoDataFrame(columns=['dam_cer', 'dam_type', 'type_cer', 'parsed_survey_year', 'geometry'], geometry='geometry', crs='EPSG:4326')
     feature_gdf.to_parquet(feature_output_path)
 
-    if not feature_gdf.empty:
-        sync_source_relation = ''
-        iceberg_bucket, _ = parse_s3_uri(ICEBERG_LOCATION)
-        sync_source_prefix = ''
-        load_succeeded = False
-        try:
+    sync_source_relation = ''
+    iceberg_bucket, _ = parse_s3_uri(ICEBERG_LOCATION)
+    sync_source_prefix = ''
+    load_succeeded = False
+    try:
+        if not feature_gdf.empty:
             sync_source_relation, iceberg_bucket, sync_source_prefix = stage_feature_gdf_to_sync_source(feature_gdf, download_dir.parent)
-            load_succeeded = create_iceberg_table_and_initial_load(iceberg_bucket, sync_source_relation)
-            if not load_succeeded:
-                log.error("Iceberg initial load failed.")
-        except Exception as e:
-            log.error(f"Error loading QRiS beaver activity to Iceberg: {e}")
-        finally:
-            if sync_source_relation and keep_sync_source:
-                log.info(f"Keeping sync source artifacts: table {SYNC_SOURCE_TABLE} and s3://{iceberg_bucket}/{sync_source_prefix}")
-            elif sync_source_relation:
-                if athena_execute(iceberg_bucket, f"DROP TABLE IF EXISTS {SYNC_SOURCE_TABLE}"):
-                    log.info(f"Dropped sync source table {SYNC_SOURCE_TABLE}")
-                else:
-                    log.warning(f"Could not drop sync source table {SYNC_SOURCE_TABLE}")
-                if sync_source_prefix:
-                    deleted_count = delete_s3_prefix(iceberg_bucket, sync_source_prefix)
-                    log.info(f"Deleted {deleted_count} sync source S3 objects from s3://{iceberg_bucket}/{sync_source_prefix}")
-    else:
-        log.info('Skipping Iceberg load because feature dataframe is empty.')
+        load_succeeded = sync_iceberg_from_sync_source(iceberg_bucket, sync_source_relation if sync_source_relation else None)
+        if not load_succeeded:
+            log.error("Iceberg synchronization failed.")
+    except Exception as e:
+        log.error(f"Error synchronizing QRiS beaver activity to Iceberg: {e}")
+    finally:
+        if sync_source_relation and keep_sync_source:
+            log.info(f"Keeping sync source artifacts: table {SYNC_SOURCE_TABLE} and s3://{iceberg_bucket}/{sync_source_prefix}")
+        elif sync_source_relation:
+            if athena_execute(iceberg_bucket, f"DROP TABLE IF EXISTS {SYNC_SOURCE_TABLE}"):
+                log.info(f"Dropped sync source table {SYNC_SOURCE_TABLE}")
+            else:
+                log.warning(f"Could not drop sync source table {SYNC_SOURCE_TABLE}")
+            if sync_source_prefix:
+                deleted_count = delete_s3_prefix(iceberg_bucket, sync_source_prefix)
+                log.info(f"Deleted {deleted_count} sync source S3 objects from s3://{iceberg_bucket}/{sync_source_prefix}")
 
     log.info(f'Wrote {len(results_df)} beaver_dam layer rows to {output_path}')
     log.info(f'Wrote {len(feature_gdf)} beaver activity feature rows to {feature_output_path}')
     log.info(f'Processed {count} projects successfully and {errors} failed.')
 
 
-def create_iceberg_table_and_initial_load(
-    s3_bucket: str,
-    source_table_or_view: str,
-) -> bool:
-    """Draft helper for first-time Iceberg load from an Athena source table/view.
-
-    This creates the target Iceberg table if needed and inserts all rows from
-    ``source_table_or_view``. The source relation is expected to expose these
-    columns: project_id, created_on, updated_on, dam_cer, dam_type, type_cer,
-    realization_name, realization_description, parsed_survey_year,
-    metadata_census_date, geom_wkb.
-
-    Geometry is persisted as WKB in ``geom_wkb`` (BINARY).
-    """
-    log = Logger('Iceberg Initial Load')
+def ensure_target_iceberg_table(s3_bucket: str) -> bool:
+    """Create the target Iceberg table if it does not already exist."""
+    log = Logger('Ensure Iceberg Table')
 
     create_sql = f"""
 CREATE TABLE IF NOT EXISTS {TARGET_TABLE} (
@@ -501,6 +570,60 @@ TBLPROPERTIES (
 )
 """
 
+    log.info(f"Creating Iceberg table if needed: {TARGET_TABLE}")
+    if not athena_execute(s3_bucket, create_sql):
+        log.error(f"Failed creating Iceberg table {TARGET_TABLE}")
+        return False
+    return True
+
+
+def sync_iceberg_from_sync_source(s3_bucket: str, sync_source_table: str | None, dry_run: bool = False) -> bool:
+    """Synchronize target table with source snapshots.
+
+    Always removes target projects that no longer exist in Data Exchange source criteria.
+    If ``sync_source_table`` is provided, also replaces changed/new projects from it.
+    """
+    log = Logger('Iceberg Sync')
+
+    if dry_run:
+        log.info('Dry run enabled in sync_iceberg_from_sync_source; skipping DML operations.')
+        return True
+
+    if not ensure_target_iceberg_table(s3_bucket):
+        return False
+
+    delete_missing_projects_sql = f"""
+DELETE FROM {TARGET_TABLE}
+WHERE project_id IN (
+    SELECT t.project_id
+    FROM (SELECT DISTINCT project_id FROM {TARGET_TABLE}) t
+    LEFT JOIN (
+        SELECT DISTINCT project_id
+        FROM default.data_exchange_projects
+        WHERE project_type_id = 'riverscapesstudio'
+          AND owner IN ('a52b8094-7a1d-4171-955c-ad30ae935296',
+                        '4a49c97e-7ce2-4c66-8ffe-ed41a675a115',
+                        'f0f6a9e7-f102-4066-9265-2d29ec1c467a')
+          AND (contains(tags, 'beaver_activity'))
+    ) s ON s.project_id = t.project_id
+    WHERE s.project_id IS NULL
+)
+"""
+
+    log.info("Deleting target projects that no longer exist in Data Exchange source.")
+    if not athena_execute(s3_bucket, delete_missing_projects_sql):
+        log.error("Failed deleting target projects missing from source.")
+        return False
+
+    if not sync_source_table:
+        log.info("No sync source table provided; skipped changed/new project replacement.")
+        return True
+
+    delete_changed_sql = f"""
+DELETE FROM {TARGET_TABLE}
+WHERE project_id IN (SELECT DISTINCT project_id FROM {sync_source_table})
+"""
+
     insert_sql = f"""
 INSERT INTO {TARGET_TABLE}
 SELECT
@@ -515,20 +638,18 @@ SELECT
     CAST(metadata_census_date AS VARCHAR) AS metadata_census_date,
     CAST(parsed_survey_year AS VARCHAR) AS parsed_survey_year,
     geom_wkb
-FROM {source_table_or_view}
+FROM {sync_source_table}
 """
 
-    log.info(f"Creating Iceberg table if needed: {TARGET_TABLE}")
-    if not athena_execute(s3_bucket, create_sql):
-        log.error(f"Failed creating Iceberg table {TARGET_TABLE}")
+    log.info(f"Replacing changed/new projects in {TARGET_TABLE} from {sync_source_table}")
+    if not athena_execute(s3_bucket, delete_changed_sql):
+        log.error("Failed deleting changed/new projects prior to insert.")
         return False
-
-    log.info(f"Running initial load into {TARGET_TABLE} from {source_table_or_view}")
     if not athena_execute(s3_bucket, insert_sql):
-        log.error(f"Failed initial insert into {TARGET_TABLE}")
+        log.error(f"Failed inserting changed/new projects into {TARGET_TABLE}")
         return False
 
-    log.info(f"Initial Iceberg load completed for {TARGET_TABLE}")
+    log.info(f"Iceberg synchronization completed for {TARGET_TABLE}")
     return True
 
 
@@ -538,6 +659,7 @@ def main():
     parser.add_argument('stage', help='Environment: staging or production', type=str)
     parser.add_argument('working_folder', help='top level folder for downloads and output', type=str)
     parser.add_argument('--keep-sync-source', help='Keep sync source table and sync source S3 objects for debugging', action='store_true', default=False)
+    parser.add_argument('--dry-run', help='Show what would change without downloading data or writing to Athena', action='store_true', default=False)
     # parser.add_argument('--delete', help='Whether or not to delete downloaded GeoPackages', action='store_true', default=False)
     args = dotenv.parse_args_env(parser)
 
@@ -553,7 +675,7 @@ def main():
     log.title("Scrape QRiS Projects Beaver Activity to Athena")
 
     with RiverscapesAPI(stage=args.stage) as api:
-        scrape_projects(api, download_folder, keep_sync_source=args.keep_sync_source)
+        scrape_projects(api, download_folder, keep_sync_source=args.keep_sync_source, dry_run=args.dry_run)
 
     log.info('Process complete')
 
