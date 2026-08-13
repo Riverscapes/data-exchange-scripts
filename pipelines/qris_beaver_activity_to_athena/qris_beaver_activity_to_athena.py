@@ -20,7 +20,8 @@ import argparse
 import logging
 from pathlib import Path
 
-from lxml import etree
+import lxml.etree as etree
+import pandas as pd
 from rsxml import Logger, ProgressBar, dotenv
 from rsxml.util import safe_makedirs
 
@@ -56,21 +57,51 @@ def download_projectrsxml(rs_api: RiverscapesAPI, project_id: str, download_dir:
     return rs_api.download_project_file(project_id, 'project.rs.xml', download_dir)
 
 
-def beaver_dam_layers(projectxmlpath: Path) -> dict[str, str | dict]:
-    """Parse the XML and return information about any vector nodes with type beaver_dam
-    e.g.
-    {lyrName vw_beaver_dam_1
-    Geopackage_Path qris.gpkg
-    Realizaion_id realization_qris_1
-    Realization_Name DamCensus
-    Realization_Description Virtual beaver dam census conducted in 2019 using a variety of imagery (e.g., various years of Google Earth, ESRI, etc.)
-    Realization_MetaData {DCE "", CensusDate:2019-2019}
-    }
-    """
-    xml_data = projectxmlpath.read_text()
-    root = etree.fromstring(xml_data)
+def beaver_dam_layers(projectxmlpath: Path) -> list[dict[str, str | dict[str, str]]]:
+    """Parse project XML and return all vectors with ``type='beaver_dam'``.
 
-    return {}
+    Each returned item contains:
+    - ``lyrName``
+    - ``geopackage_path``
+    - ``realization_id``
+    - ``realization_name``
+    - ``realization_description``
+    - ``realization_metadata`` (name->value dictionary)
+    """
+    # Parse bytes so XML declarations like <?xml version="1.0" encoding="UTF-8"?> are valid.
+    root = etree.fromstring(projectxmlpath.read_bytes())
+
+    results: list[dict[str, str | dict[str, str]]] = []
+
+    for realization in root.findall('.//Realizations/Realization'):
+        realization_id = realization.get('id', '')
+        realization_name = (realization.findtext('Name') or '').strip()
+        realization_description = (realization.findtext('Description') or '').strip()
+
+        realization_metadata: dict[str, str] = {}
+        for meta in realization.findall('MetaData/Meta'):
+            meta_name = meta.get('name')
+            if meta_name:
+                realization_metadata[meta_name] = (meta.text or '').strip()
+
+        geopackages = realization.findall('.//Geopackage')
+        for geopackage in geopackages:
+            geopackage_path = (geopackage.findtext('Path') or '').strip()
+            for vector in geopackage.findall('.//Vector'):
+                if vector.get('type') != 'beaver_dam':
+                    continue
+                results.append(
+                    {
+                        'lyrName': vector.get('lyrName', ''),
+                        'geopackage_path': geopackage_path,
+                        'realization_id': realization_id,
+                        'realization_name': realization_name,
+                        'realization_description': realization_description,
+                        'realization_metadata': realization_metadata,
+                    }
+                )
+
+    return results
 
 
 def scrape_projects(rs_api: RiverscapesAPI, download_dir: Path):
@@ -84,20 +115,49 @@ def scrape_projects(rs_api: RiverscapesAPI, download_dir: Path):
     # projects_to_add_df = pd.DataFrame({'project_id': ['756cc4e5-47ae-41c3-bc34-e50d970f8b05']})
     count = 0
     errors = 0
+    all_rows: list[dict[str, object | None]] = []
     prg = ProgressBar(projects.shape[0], text="Scrape Progress")
-    for project_id in projects['project_id']:
-        project = rs_api.get_project_full(project_id)
+    for project_row in projects.itertuples(index=False):
+        project_id = str(project_row.project_id)
+        project_name = str(project_row.name)
         try:
             # get the project.rs.xml and parse realizations
             project_download_dir = download_dir / project_id
             projectrsxml_path = download_projectrsxml(rs_api, project_id, project_download_dir)
-            beaver_dam_layers(projectrsxml_path)
+            layers = beaver_dam_layers(projectrsxml_path)
+            for layer in layers:
+                row: dict[str, object | None] = {'project_id': project_id, 'project_name': project_name}
+                row.update(layer)
+                all_rows.append(row)
+            count += 1
+            prg.update(count + errors)
 
         except Exception as e:
             errors += 1
-            log.error(f'Error scraping {project.name} ({project.id}): {e}')
+            log.error(f'Error scraping {project_name} ({project_id}): {e}')
             prg.update(count + errors)
-            raise
+            # raise
+
+    prg.finish()
+
+    output_columns = [
+        'project_id',
+        'project_name',
+        'lyrName',
+        'geopackage_path',
+        'realization_id',
+        'realization_name',
+        'realization_description',
+        'realization_metadata',
+    ]
+    results_df = pd.DataFrame(all_rows)
+    if results_df.empty:
+        results_df = pd.DataFrame(columns=output_columns)
+
+    output_path = download_dir.parent / 'qris_beaver_dam_layers.parquet'
+    results_df.to_parquet(output_path)
+    log.info(f'Wrote {len(results_df)} beaver_dam layer rows to {output_path}')
+    log.info(f'Processed {count} projects successfully and {errors} failed.')
 
 
 def main():
