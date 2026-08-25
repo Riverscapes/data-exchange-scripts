@@ -31,6 +31,7 @@ import lxml.etree as etree
 import pandas as pd
 from rsxml import Logger, ProgressBar, dotenv
 from rsxml.util import safe_makedirs
+from shapely import wkb
 
 from pydex import RiverscapesAPI
 from pydex.lib.athena import athena_execute, query_to_dataframe
@@ -304,8 +305,58 @@ def extract_metrics_to_geodataframe(gpkg_path: Path, layer_name: str) -> gpd.Geo
     if 'type_cer' not in extracted.columns:
         extracted['type_cer'] = pd.NA
     extracted = gpd.GeoDataFrame(extracted, geometry='geometry', crs=gdf.crs)
+    extracted = validate_and_coerce_geometry(extracted, layer_name)
     log.debug(f"Extracted {len(extracted)} beaver dam rows from layer '{layer_name}' in {gpkg_path}")
     return extracted
+
+
+def validate_and_coerce_geometry(gdf: gpd.GeoDataFrame, layer_name: str) -> gpd.GeoDataFrame:
+    """Normalize beaver dam geometries for downstream WKB/Athena compatibility.
+
+    - Coerces any 3D geometries to 2D (drops Z values).
+    - Keeps only point-like geometries expected for beaver dam features.
+    - Drops null/empty/invalid geometries.
+    """
+    log = Logger('Geometry QA')
+
+    if 'geometry' not in gdf.columns:
+        raise ValueError(f"Layer '{layer_name}' has no geometry column.")
+
+    if gdf.empty:
+        return gdf
+
+    cleaned = gdf.copy()
+    geom_series = cleaned.geometry
+    non_null_index = geom_series[geom_series.notna()].index
+
+    if len(non_null_index) > 0:
+        has_z_mask = cleaned.loc[non_null_index, 'geometry'].apply(lambda geom: bool(getattr(geom, 'has_z', False)))
+        z_count = int(has_z_mask.sum())
+        if z_count > 0:
+            log.warning(f"Layer '{layer_name}' contains {z_count} 3D geometry record(s); coercing to 2D.")
+            z_index = has_z_mask[has_z_mask].index
+            cleaned.loc[z_index, 'geometry'] = gpd.GeoSeries(
+                [_coerce_geom_to_2d(geom) for geom in cleaned.loc[z_index, 'geometry']],
+                index=z_index,
+                crs=gdf.crs,
+            )
+
+    expected_types = {'Point', 'MultiPoint'}
+    type_mask = cleaned.geometry.notna() & cleaned.geometry.geom_type.isin(expected_types)
+    valid_mask = cleaned.geometry.notna() & (~cleaned.geometry.is_empty) & cleaned.geometry.is_valid
+    keep_mask = type_mask & valid_mask
+
+    dropped_count = int((~keep_mask).sum())
+    if dropped_count > 0:
+        log.warning(f"Layer '{layer_name}' dropped {dropped_count} feature(s) due to unexpected type or invalid geometry. Expected types: {', '.join(sorted(expected_types))}.")
+
+    cleaned = cleaned.loc[keep_mask].copy()
+    return gpd.GeoDataFrame(cleaned, geometry='geometry', crs=gdf.crs)
+
+
+def _coerce_geom_to_2d(geom):
+    """Return a 2D copy of a Shapely geometry by dropping any Z values."""
+    return wkb.loads(wkb.dumps(geom, output_dimension=2))
 
 
 def process_layer(rs_api: RiverscapesAPI, layer_info: BeaverDamProjectLayerRow, download_dir: Path) -> gpd.GeoDataFrame:
