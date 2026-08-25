@@ -52,13 +52,21 @@ source_projects AS (
         updated_on_date,
         owner
     FROM default.data_exchange_projects
-    WHERE project_type_id = 'riverscapesstudio'
-      AND owner IN ('a52b8094-7a1d-4171-955c-ad30ae935296',
-              '4a49c97e-7ce2-4c66-8ffe-ed41a675a115',
-              'f0f6a9e7-f102-4066-9265-2d29ec1c467a')
-      AND (contains(tags, 'beaver_activity'))
+    WHERE (project_type_id = 'riverscapesstudio'
+    AND owner IN ('a52b8094-7a1d-4171-955c-ad30ae935296',
+                  '4a49c97e-7ce2-4c66-8ffe-ed41a675a115',
+                  'f0f6a9e7-f102-4066-9265-2d29ec1c467a')
+    AND (contains(tags, 'beaver_activity')))
+   OR (project_type_id = 'beaver_activity'
+    AND owner = '06439423-ee19-4040-9ebd-01c6e481a763'
+    AND (contains(tags, 'MT_Dam_Census')))
 )
 """
+
+
+def with_source_projects(sql_body: str) -> str:
+    """Prepend SQL defining source_projects to other sql"""
+    return f"WITH {SOURCE_PROJECTS_CTE}\n" + sql_body
 
 
 def parse_s3_uri(s3_uri: str) -> tuple[str, str]:
@@ -243,18 +251,19 @@ def beaver_dam_layers(projectxmlpath: Path) -> list[dict[str, str | dict[str, st
         for geopackage in geopackages:
             geopackage_path = (geopackage.findtext('Path') or '').strip()
             for vector in geopackage.findall('.//Vector'):
-                if vector.get('type') != 'beaver_dam':
+                if vector.get('type') == 'beaver_dam' or (geopackage_path == 'beaver_activity.gpkg' and vector.get('name') == 'Dams'):
+                    results.append(
+                        {
+                            'lyrName': vector.get('lyrName', ''),
+                            'geopackage_path': geopackage_path,
+                            'realization_id': realization_id,
+                            'realization_name': realization_name,
+                            'realization_description': realization_description,
+                            'realization_metadata': realization_metadata,
+                        }
+                    )
+                else:
                     continue
-                results.append(
-                    {
-                        'lyrName': vector.get('lyrName', ''),
-                        'geopackage_path': geopackage_path,
-                        'realization_id': realization_id,
-                        'realization_name': realization_name,
-                        'realization_description': realization_description,
-                        'realization_metadata': realization_metadata,
-                    }
-                )
 
     return results
 
@@ -391,20 +400,14 @@ LIMIT 1
 
         delete_project_ids: list[str] = []
         if table_exists:
-            delete_candidates_sql = f"""
+            delete_candidates_sql = with_source_projects(f"""
 SELECT t.project_id
 FROM (SELECT DISTINCT project_id FROM {TARGET_TABLE}) t
 LEFT JOIN (
     SELECT DISTINCT project_id
-    FROM default.data_exchange_projects
-    WHERE project_type_id = 'riverscapesstudio'
-      AND owner IN ('a52b8094-7a1d-4171-955c-ad30ae935296',
-                    '4a49c97e-7ce2-4c66-8ffe-ed41a675a115',
-                    'f0f6a9e7-f102-4066-9265-2d29ec1c467a')
-      AND (contains(tags, 'beaver_activity'))
-) s ON s.project_id = t.project_id
+    FROM source_projects) s ON s.project_id = t.project_id
 WHERE s.project_id IS NULL
-"""
+""")
             delete_candidates_df = query_to_dataframe(delete_candidates_sql, 'identify projects that would be deleted')
             if not delete_candidates_df.empty and 'project_id' in delete_candidates_df.columns:
                 delete_project_ids = sorted({str(pid) for pid in delete_candidates_df['project_id'].tolist()})
@@ -592,24 +595,18 @@ def sync_iceberg_from_sync_source(s3_bucket: str, sync_source_table: str | None,
     if not ensure_target_iceberg_table(s3_bucket):
         return False
 
-    delete_missing_projects_sql = f"""
+    delete_missing_projects_sql = with_source_projects(f"""
 DELETE FROM {TARGET_TABLE}
 WHERE project_id IN (
     SELECT t.project_id
     FROM (SELECT DISTINCT project_id FROM {TARGET_TABLE}) t
     LEFT JOIN (
         SELECT DISTINCT project_id
-        FROM default.data_exchange_projects
-        WHERE project_type_id = 'riverscapesstudio'
-          AND owner IN ('a52b8094-7a1d-4171-955c-ad30ae935296',
-                        '4a49c97e-7ce2-4c66-8ffe-ed41a675a115',
-                        'f0f6a9e7-f102-4066-9265-2d29ec1c467a')
-          AND (contains(tags, 'beaver_activity'))
-    ) s ON s.project_id = t.project_id
+        FROM source_projects) s
+    ON s.project_id = t.project_id
     WHERE s.project_id IS NULL
 )
-"""
-
+""")
     log.info("Deleting target projects that no longer exist in Data Exchange source.")
     if not athena_execute(s3_bucket, delete_missing_projects_sql):
         log.error("Failed deleting target projects missing from source.")
