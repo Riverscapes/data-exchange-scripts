@@ -22,11 +22,12 @@ from rsxml import Logger
 S3_ATHENA_BUCKET = "riverscapes-athena-output"
 
 
-def query_to_dataframe(query: str, querylabel: str = "") -> pd.DataFrame:
+def query_to_dataframe(query: str, querylabel: str = "", athena_output_dir: str | None = None) -> pd.DataFrame:
     """uses awswrangler to return a DataFrame for a given query
     args:
         query : the query to execute
         querylabel : optional label for log messages, handy when queries are running in parallel
+        athena_output_dir : optional S3 path for Athena UNLOAD output
 
     * ctas False, unload True is "approach 2"
     Does an UNLOAD query on Athena and parse the Parquet result on s3
@@ -45,7 +46,10 @@ def query_to_dataframe(query: str, querylabel: str = "") -> pd.DataFrame:
     *   data has to fit into RAM memory. do not use for results with millions of rows
     """
     log = Logger("Athena unload query to DF")
-    s3_output = f's3://{S3_ATHENA_BUCKET}/athena_unload/{uuid.uuid4()}/'
+    if athena_output_dir:
+        s3_output = f'{athena_output_dir.rstrip("/")}/athena_unload/{uuid.uuid4()}/'
+    else:
+        s3_output = f's3://{S3_ATHENA_BUCKET}/athena_unload/{uuid.uuid4()}/'
 
     query_bytes = len(query.encode('utf-8'))
     if query_bytes > 262144:

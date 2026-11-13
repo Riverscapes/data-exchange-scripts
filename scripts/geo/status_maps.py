@@ -4,7 +4,7 @@ from a GeoPackage containing project data.
 
 Note that for now, this script is designed to work with the SQLite GeoPackage
 that Philip developed to track project status. Utlimately, this should be
-replaced with a more generic solution that can work with Athena.
+replaced with a more generic solution that can work with Athena. See status_maps_athena.py for that solution.
 
 Philip Bailey
 12 July 2025

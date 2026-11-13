@@ -2,25 +2,28 @@
 Generates a series of status maps for different project types
 from a GeoPackage containing project data.
 
-This script connects to an Athena database, retrieves project data,
+This script uses shared Athena helpers to retrieve project data and HUC boundaries.
 
 Philip Bailey
 12 July 2025
+Updated Lorin Gaertner
+12 Nov 2026
 """
 
 import argparse
 import os
 from datetime import datetime
+from pathlib import Path
 
 import boto3
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import pandas as pd
-from pyathena import connect
 from shapely import wkb, wkt
 
+from pydex.lib.athena import query_to_dataframe
 
-def generate_map(gdf_outline: gpd.GeoDataFrame, projects_gdf: gpd.GeoDataFrame, title: str, output_img_path):
+
+def generate_map(gdf_outline: gpd.GeoDataFrame, projects_gdf: gpd.GeoDataFrame, title: str, output_img_path: Path):
     # Plot the fillpremed and unfilled polygons
     __fig, ax = plt.subplots(figsize=(10, 10))
     gdf_outline.plot(ax=ax, facecolor="#BBCD3F", edgecolor="#828F2C", linewidth=0.15, alpha=0.5)
@@ -38,25 +41,26 @@ def generate_map(gdf_outline: gpd.GeoDataFrame, projects_gdf: gpd.GeoDataFrame, 
     return
 
 
-def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_gpkgs: bool) -> list[str]:
+def generate_status_maps(athena_output_dir: str, output_image_dir: Path, output_gpkgs: bool) -> list[str]:
     """
     Generate status maps for different project types and save them as PNG images.
     """
 
     # Ensure output directory exists
-    os.makedirs(output_image_dir, exist_ok=True)
-    os.makedirs(output_image_dir, exist_ok=True)
+    output_image_dir.mkdir(parents=True, exist_ok=True)
 
-    conn = connect(s3_staging_dir=athena_output_dir, region_name='us-west-2')
-
-    # Get the number of CONUS HUCs. Use the official HUC table for this
-    huc10_count_df = pd.read_sql('SELECT COUNT(*) FROM vw_conus_hucs', conn)
+    # Denominator: only HUCs present in the displayed map layer
+    huc10_count_df = query_to_dataframe('SELECT COUNT(DISTINCT huc10) AS huc_count FROM wbdhu10_conus_rs_simplified', 'huc-count', athena_output_dir)
+    if huc10_count_df.empty:
+        raise RuntimeError("Failed to load CONUS HUC count from Athena.")
     huc10_count = huc10_count_df.iloc[0, 0]
 
     # Read the HUC10 outline polygons from the database
     # Convert the 'geom' column (WKT) into actual Shapely geometry objects
     # Create a GeoDataFrame
-    df = pd.read_sql('SELECT huc10, geometry FROM wbdhu10_conus_rs_simplified', conn)
+    df = query_to_dataframe('SELECT huc10, geometry FROM wbdhu10_conus_rs_simplified', 'huc-outlines', athena_output_dir)
+    if df.empty:
+        raise RuntimeError("Failed to load HUC outlines from Athena.")
     df['geometry'] = df['geometry'].apply(safe_load_geom)
     gdf_outline = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')  # WGS84 assumed
 
@@ -64,18 +68,35 @@ def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_g
 
     # Loop over each 2025CONUS project type and generate a status map image for each
     image_paths = []
-    project_types = pd.read_sql('select distinct project_type_id from conus_projects', conn)
-    for project_type in project_types['project_type_id']:
-        project_count = pd.read_sql(f"SELECT count(distinct huc) FROM conus_projects WHERE project_type_id = '{project_type}'", con=conn)
-        project_count = project_count.iloc[0, 0]
+    project_types_df = query_to_dataframe('SELECT DISTINCT project_type_id FROM conus_projects', 'project-types', athena_output_dir)
+    if project_types_df.empty:
+        return image_paths
+    for project_type in project_types_df['project_type_id']:
+        project_type_safe = str(project_type).replace("'", "''")
+        eligible_project_count_df = query_to_dataframe(
+            f"""SELECT COUNT(DISTINCT h.huc10) AS project_count
+                FROM conus_projects p
+                INNER JOIN wbdhu10_conus_rs_simplified h ON p.huc = h.huc10
+                WHERE p.project_type_id = '{project_type_safe}'""",
+            f'project-count-{project_type}',
+            athena_output_dir,
+        )
+        if eligible_project_count_df.empty:
+            print(f"Skipping {project_type}: failed to count matching projects.")
+            continue
+        project_count = int(eligible_project_count_df.iloc[0, 0])
 
         # Read the project polygons for this type
-        projects_df = pd.read_sql(
-            f"""SELECT h.huc10, h.geometry
+        projects_df = query_to_dataframe(
+            f"""SELECT DISTINCT h.huc10, h.geometry
                 FROM conus_projects p INNER JOIN wbdhu10_conus_rs_simplified h ON p.huc = h.huc10
-                WHERE p.project_type_id = '{project_type}'""",
-            con=conn,
+                WHERE p.project_type_id = '{project_type_safe}'""",
+            f'project-polygons-{project_type}',
+            athena_output_dir,
         )
+        if projects_df.empty:
+            print(f"Skipping {project_type}: no matching features.")
+            continue
         projects_df['geometry'] = projects_df['geometry'].apply(safe_load_geom)
         projects_gdf = gpd.GeoDataFrame(projects_df, geometry='geometry', crs='EPSG:4326')
         describe_gdf(projects_gdf, f"projects for {project_type}")
@@ -87,13 +108,13 @@ def generate_status_maps(athena_output_dir: str, output_image_dir: str, output_g
 
         # Optionally output the filled polygons to a new GeoPackage layer
         if output_gpkgs is True:
-            projects_gdf.to_file(os.path.join(output_image_dir, 'rs_complete.gpkg'), layer=project_type, driver="GPKG")
+            projects_gdf.to_file(output_image_dir / 'rs_complete.gpkg', layer=project_type, driver="GPKG")
 
         percent_complete = project_count / huc10_count * 100 if huc10_count > 0 else 0
         title = f'2025 CONUS Projects for {project_type}\nProjects: {project_count:,} ({percent_complete:.1f}% complete)\n{datetime.now().strftime("%d %b %Y %H:%M")}'
-        img_path = os.path.join(output_image_dir, f"status_map_{project_type}.png")
+        img_path = output_image_dir / f"status_map_{project_type}.png"
         generate_map(gdf_outline, projects_gdf, title, img_path)
-        image_paths.append(img_path)
+        image_paths.append(str(img_path))
 
         print(f"Saved image to {img_path}")
 
@@ -177,6 +198,10 @@ def describe_gdf(gdf: gpd.GeoDataFrame, name="GeoDataFrame"):
             print(f"  Index {idx}: {explain_validity(geom['geometry'])}")
 
 
+def resolve_output_dir(path_arg: str) -> Path:
+    return Path(os.path.expandvars(path_arg)).expanduser()
+
+
 def main():
     """Main function to parse arguments and call the status map generation function."""
 
@@ -187,10 +212,11 @@ def main():
     parser.add_argument('--output_gpkgs', action='store_true', default=False, help='Output filled polygons to GeoPackage layers')
     args = parser.parse_args()
 
-    image_paths = generate_status_maps(args.athena_output_dir, args.output_image_dir, args.output_gpkgs)
+    output_image_dir = resolve_output_dir(args.output_image_dir)
+    image_paths = generate_status_maps(args.athena_output_dir, output_image_dir, args.output_gpkgs)
     upload_to_s3(image_paths, args.s3_bucket)
 
-    print(f'Status maps generation complete. {len(image_paths)} images saved to {args.output_image_dir}.')
+    print(f'Status maps generation complete. {len(image_paths)} images saved to {output_image_dir}.')
 
 
 if __name__ == "__main__":
